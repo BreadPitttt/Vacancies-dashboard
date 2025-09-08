@@ -4,10 +4,15 @@ on:
   schedule:
     - cron: "30 19 * * *"   # 1:00 AM IST daily (UTC)
     - cron: "30 20 * * 0"   # 2:00 AM IST Monday (UTC)
-  workflow_dispatch:        # allow manual Run workflow from Actions tab
+  workflow_dispatch:        # enable Run workflow button in Actions tab
+
+# Small guard: avoid overlapping runs for the same branch
+concurrency:
+  group: schedule-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-  contents: write           # needed so the job can commit data.json
+  contents: write           # allow committing data.json with GITHUB_TOKEN
 
 jobs:
   update:
@@ -15,18 +20,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # BEGIN: Replace your old middle steps with these Python steps
+      # Python toolchain + dependencies (cached)
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
+          cache: pip
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Run scraper
         run: python scraper.py
-      # END: Python steps
 
       - name: Commit updated data.json
         run: |
