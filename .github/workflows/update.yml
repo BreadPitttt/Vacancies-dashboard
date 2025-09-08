@@ -1,0 +1,29 @@
+name: Nightly and Monday Recheck
+
+on:
+  schedule:
+    - cron: "30 19 * * *"   # 1:00 AM IST daily (UTC-based)
+    - cron: "30 20 * * 0"   # 2:00 AM IST Monday (UTC-based)
+  workflow_dispatch:        # lets you run it manually from the Actions tab
+
+permissions:
+  contents: write           # needed to commit data.json back to the repo
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Stamp data.json with a fresh ISO timestamp (Node is available on ubuntu-latest)
+      - name: Update lastUpdated timestamp
+        run: |
+          node -e "const fs=require('fs');let d={jobListings:[],transparencyInfo:{}};try{d=JSON.parse(fs.readFileSync('data.json','utf8'));}catch(e){};d.transparencyInfo=d.transparencyInfo||{};d.transparencyInfo.lastUpdated=new Date().toISOString();fs.writeFileSync('data.json',JSON.stringify(d,null,2));console.log('Stamped',d.transparencyInfo.lastUpdated);"
+
+      - name: Commit updated data.json
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data.json
+          git commit -m "Auto: stamp lastUpdated" || echo "No changes"
+          git push
