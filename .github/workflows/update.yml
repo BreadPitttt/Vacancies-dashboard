@@ -1,30 +1,31 @@
 name: Nightly and Monday Recheck
 
 on:
+  workflow_dispatch: {}
   schedule:
-    - cron: "30 19 * * *"   # 1:00 AM IST daily (UTC)
-    - cron: "30 20 * * 0"   # 2:00 AM IST Monday (UTC)
-  workflow_dispatch:        # enable Run workflow button in Actions tab
-
-# Small guard: avoid overlapping runs for the same branch
-concurrency:
-  group: schedule-${{ github.ref }}
-  cancel-in-progress: true
+    # UTC times; adjust to preference
+    - cron: '15 18 * * *'   # every day at 18:15 UTC
+    - cron: '15 18 * * 1'   # Mondays at 18:15 UTC
 
 permissions:
-  contents: write           # allow committing data.json with GITHUB_TOKEN
+  contents: write
+
+concurrency:
+  group: scrape-data
+  cancel-in-progress: false
 
 jobs:
-  update:
+  scrape:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # Python toolchain + dependencies (cached)
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
-          cache: pip
+          python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -34,10 +35,23 @@ jobs:
       - name: Run scraper
         run: python scraper.py
 
-      - name: Commit updated data.json
+      - name: Format data.json
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add data.json
-          git commit -m "Auto: refresh data.json" || echo "No changes"
-          git push
+          python - << 'PY'
+          import json, pathlib
+          p = pathlib.Path("data.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+          PY
+
+      - name: Commit updated data.json if changed
+        run: |
+          git config user.name "actions-user"
+          git config user.email "actions@users.noreply.github.com"
+          if [[ -n "$(git status --porcelain data.json)" ]]; then
+            git add data.json
+            git commit -m "chore(data): automated refresh"
+            git push
+          else
+            echo "No changes to commit."
+          fi
