@@ -1,6 +1,18 @@
 {
-  "jobListings": [],
+  "jobListings": [
+    {
+      "id": "demo-1",
+      "title": "Clerk Recruitment (Any Graduate)",
+      "organization": "Demo Org",
+      "qualificationLevel": "Graduate",
+      "domicile": "All India",
+      "source": "official",
+      "deadline": "2025-12-31",
+      "applyLink": "",
+      "pdfLink": ""
+    }
+  ],
   "transparencyInfo": {
-    "lastUpdated": "2025-09-14T20:41:05Z"
+    "lastUpdated": "init"
   }
 }
