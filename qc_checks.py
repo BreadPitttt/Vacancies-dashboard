@@ -1,13 +1,25 @@
 import json, sys, requests, dateparser
 from datetime import datetime, timezone
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 U = datetime.now(timezone.utc).date()
 
+def session_with_retries():
+    s = requests.Session()
+    retry = Retry(total=3, connect=3, read=3, backoff_factor=0.5,
+                  status_forcelist=[429,500,502,503,504], allowed_methods={"GET","HEAD"})
+    adapter = HTTPAdapter(max_retries=retry)
+    s.mount("http://", adapter); s.mount("https://", adapter)
+    return s
+
+HTTP = session_with_retries()
+
 def head_ok(url):
     try:
-        r = requests.head(url, timeout=20, allow_redirects=True)
+        r = HTTP.head(url, timeout=20, allow_redirects=True)
         if r.status_code in (405, 501):
-            r = requests.get(url, timeout=20, stream=True)
+            r = HTTP.get(url, timeout=20, stream=True)
         return 200 <= r.status_code < 300
     except Exception:
         return False
