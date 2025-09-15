@@ -1,55 +1,48 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Government Jobs Dashboard</title>
-  <!-- Uses your neo‑minimal style.css from the previous step -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header aria-label="Site header">
+  <header class="container">
     <h1>Government Jobs Dashboard</h1>
-    <p>Bihar & All India Vacancies</p>
+    <p class="muted">Bihar & All India Vacancies</p>
+    <p id="status" aria-live="polite">Loading jobs…</p>
   </header>
 
-  <!-- Sticky filter bar with pill buttons -->
-  <div class="filterbar" role="region" aria-label="Filters">
-    <div class="filterbar__wrap" id="filterBar">
-      <!-- Urgency -->
-      <button class="pill" data-filter="urgency" data-value="urgent" aria-pressed="false">Urgent</button>
-      <button class="pill" data-filter="urgency" data-value="normal" aria-pressed="false">Normal</button>
+  <nav class="container pillbar" aria-label="Filters">
+    <!-- Education -->
+    <button class="pill" data-filter="qual" data-value="Graduate" aria-pressed="false">Graduate</button>
+    <button class="pill" data-filter="qual" data-value="12th" aria-pressed="false">12th</button>
+    <button class="pill" data-filter="qual" data-value="10th" aria-pressed="false">10th</button>
 
-      <!-- Qualification -->
-      <button class="pill" data-filter="qual" data-value="10th" aria-pressed="false">10th</button>
-      <button class="pill" data-filter="qual" data-value="12th" aria-pressed="false">12th</button>
-      <button class="pill" data-filter="qual" data-value="Graduate" aria-pressed="false">Graduate</button>
+    <!-- Allowed extra skills -->
+    <button class="pill" data-filter="skill" data-value="typing" aria-pressed="false">Typing</button>
+    <button class="pill" data-filter="skill" data-value="computer" aria-pressed="false">Computer</button>
+    <button class="pill" data-filter="skill" data-value="physical" aria-pressed="false">Physical</button>
 
-      <!-- Skills -->
-      <button class="pill" data-filter="skill" data-value="Typing" aria-pressed="false">Typing</button>
-      <button class="pill" data-filter="skill" data-value="Computer" aria-pressed="false">Computer</button>
-      <button class="pill" data-filter="skill" data-value="Physical" aria-pressed="false">Physical</button>
+    <!-- Domicile -->
+    <button class="pill" data-filter="state" data-value="All India" aria-pressed="false">All India</button>
+    <button class="pill" data-filter="state" data-value="Bihar" aria-pressed="false">Bihar</button>
 
-      <!-- Domicile -->
-      <button class="pill" data-filter="state" data-value="Bihar" aria-pressed="false">Bihar</button>
-      <button class="pill" data-filter="state" data-value="All India" aria-pressed="false">All India</button>
+    <!-- Source -->
+    <button class="pill" data-filter="source" data-value="official" aria-pressed="false">Official</button>
+    <button class="pill" data-filter="source" data-value="aggregator" aria-pressed="false">Aggregator</button>
 
-      <!-- Source -->
-      <button class="pill" data-filter="source" data-value="official" aria-pressed="false">Official</button>
-      <button class="pill" data-filter="source" data-value="archive" aria-pressed="false">Archive</button>
-      <button class="pill" data-filter="source" data-value="aggregator" aria-pressed="false">Aggregator</button>
+    <!-- Urgency (optional, populated by scraper if present) -->
+    <button class="pill" data-filter="urgency" data-value="urgent" aria-pressed="false">Urgent</button>
+    <button class="pill" id="clearFilters">Clear</button>
+  </nav>
 
-      <!-- Clear filters -->
-      <button class="pill" id="clearFilters" aria-pressed="false">Clear</button>
-    </div>
-  </div>
-
-  <main>
-    <p id="status">Loading jobs…</p>
-    <div id="jobs" class="grid" role="list"></div>
+  <main class="container">
+    <!-- Active jobs list -->
+    <section id="jobs" role="list" aria-label="Active vacancies"></section>
+    <!-- The Archive section will be created by app.js when needed -->
   </main>
 
-  <!-- App -->
-  <script src="app.js"></script>
+  <script src="app.js" defer></script>
 </body>
 </html>
