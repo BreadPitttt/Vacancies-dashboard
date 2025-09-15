@@ -1,8 +1,10 @@
-# scraper.py — General-competition vacancies with SSC/Bank/Railway/Insurance + domicile and skill rules
+# scraper.py — Official-first with aggregator fallback, corrigendum/extension handling, de-dup, expiry
+# Filters: Any Graduate / 12th / 10th only; allow no skill or only typing/computer/PET-PST/physical;
+# Domicile: All India and Bihar (Bihar-only OK); other states only if outsiders explicitly allowed.
 
 import json, re
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
@@ -10,33 +12,24 @@ import feedparser
 import dateparser
 
 DATA_PATH = Path("data.json")
-UTC_NOW = datetime.utcnow()
+UTC_NOW = datetime.now(timezone.utc)
 
-SOURCES = [
-    # SSC (new portal); include ER region as an example
-    {"name": "SSC", "type": "html", "base": "https://ssc.gov.in", "url": "https://ssc.gov.in", "domicile": "All India", "source": "official"},
-    {"name": "SSC-ER", "type": "html", "base": "https://sscer.org", "url": "https://sscer.org", "domicile": "All India", "source": "official"},
-
-    # Banks via IBPS
-    {"name": "IBPS", "type": "html", "base": "https://www.ibps.in", "url": "https://www.ibps.in", "domicile": "All India", "source": "official"},
-
-    # Railways via RRB portals
-    {"name": "RRB-CDG", "type": "html", "base": "https://www.rrbcdg.gov.in", "url": "https://www.rrbcdg.gov.in", "domicile": "All India", "source": "official"},
-    {"name": "RRB-Patna", "type": "html", "base": "https://www.rrbpatna.gov.in", "url": "https://www.rrbpatna.gov.in", "domicile": "All India", "source": "official"},
-
-    # Bihar PSC (Bihar-only acceptable)
-    {"name": "BPSC", "type": "html", "base": "https://bpsc.bihar.gov.in", "url": "https://bpsc.bihar.gov.in/whats-new/", "domicile": "Bihar", "source": "official"},
-
-    # Insurance careers
-    {"name": "LIC", "type": "html", "base": "https://licindia.in", "url": "https://licindia.in/careers", "domicile": "All India", "source": "official"},
-    {"name": "NIACL", "type": "html", "base": "https://www.newindia.co.in", "url": "https://www.newindia.co.in/recruitment", "domicile": "All India", "source": "official"},
-    {"name": "UIIC", "type": "html", "base": "https://www.uiic.co.in", "url": "https://www.uiic.co.in/web/careers/recruitment", "domicile": "All India", "source": "official"},
-
-    # Aggregator fallbacks
-    {"name": "CareerPower", "type": "html", "base": "https://www.adda247.com", "url": "https://www.adda247.com/jobs/government-jobs/", "domicile": "All India", "source": "aggregator"},
-    {"name": "SarkariExam", "type": "html", "base": "https://www.sarkariexam.com", "url": "https://www.sarkariexam.com", "domicile": "All India", "source": "aggregator"},
-    {"name": "RojgarResult", "type": "html", "base": "https://www.rojgarresult.com", "url": "https://www.rojgarresult.com", "domicile": "All India", "source": "aggregator"},
-    {"name": "SarkariResult", "type": "html", "base": "https://sarkariresult.com.cm", "url": "https://sarkariresult.com.cm/latest-jobs/", "domicile": "All India", "source": "aggregator"},
+SOURCES_OFFICIAL = [
+    {"name": "SSC", "base": "https://ssc.gov.in", "url": "https://ssc.gov.in"},
+    {"name": "SSC-ER", "base": "https://sscer.org", "url": "https://sscer.org"},
+    {"name": "IBPS", "base": "https://www.ibps.in", "url": "https://www.ibps.in"},
+    {"name": "RRB-CDG", "base": "https://www.rrbcdg.gov.in", "url": "https://www.rrbcdg.gov.in"},
+    {"name": "RRB-Patna", "base": "https://www.rrbpatna.gov.in", "url": "https://www.rrbpatna.gov.in"},
+    {"name": "BPSC", "base": "https://bpsc.bihar.gov.in", "url": "https://bpsc.bihar.gov.in/whats-new/"},
+    {"name": "LIC", "base": "https://licindia.in", "url": "https://licindia.in/careers"},
+    {"name": "NIACL", "base": "https://www.newindia.co.in", "url": "https://www.newindia.co.in/recruitment"},
+    {"name": "UIIC", "base": "https://www.uiic.co.in", "url": "https://www.uiic.co.in/web/careers/recruitment"},
+]
+SOURCES_AGG = [
+    {"name": "CareerPower", "base": "https://www.adda247.com", "url": "https://www.adda247.com/jobs/government-jobs/"},
+    {"name": "SarkariExam", "base": "https://www.sarkariexam.com", "url": "https://www.sarkariexam.com"},
+    {"name": "RojgarResult", "base": "https://www.rojgarresult.com", "url": "https://www.rojgarresult.com"},
+    {"name": "SarkariResult", "base": "https://sarkariresult.com.cm", "url": "https://sarkariresult.com.cm/latest-jobs/"},
 ]
 
 INCLUDE_EDU = [
@@ -49,19 +42,12 @@ INCLUDE_EDU = [
 ALLOWED_SKILLS = [r"\btyping\b", r"\bcomputer(?!\s*science)\b", r"\bpet\b", r"\bpst\b", r"\bphysical\b", r"\bms\s*office\b", r"\bccc\b", r"\bdca\b"]
 DISALLOWED_SKILLS = [r"\b(programming|coding|java|python|autocad|cad|sap|oracle|network|hardware|software|tally|marketing|sales|management)\b", r"\bcertificate|licen[cs]e|diploma\b"]
 EXCLUDE_DEGREE = [
-    r"\b(b\.?tech|be\b|m\.?tech|engineering)\b", r"\bmba|pgdm|management\b", r"\blaw\b|\bllb\b|\ballm\b",
-    r"\bnursing\b|\bgnm\b|\banm\b|\bpharma|bpharm|mpharm\b", r"\bmca\b|\bbca\b|\bcomputer\s+science\b|\bit\b",
-    r"\b(b\.?ed|bed)\b", r"\b(diploma|iti)\b", r"\bca\b|\bcs\b|\bcma\b|\bicwa\b", r"\bmedical|mbbs|bds|ayush|veterinary\b",
+    r"\b(b\.?tech|be\b|m\.?tech|engineering)\b", r"\bmba|pgdm|management\b",
+    r"\blaw\b|\bllb\b|\ballm\b", r"\bnursing\b|\bgnm\b|\banm\b|\bpharma|bpharm|mpharm\b",
+    r"\bmca\b|\bbca\b|\bcomputer\s+science\b|\bit\b", r"\b(b\.?ed|bed)\b", r"\b(diploma|iti)\b",
+    r"\bca\b|\bcs\b|\bcma\b|\bicwa\b", r"\bmedical|mbbs|bds|ayush|veterinary\b",
 ]
 EXCLUDE_NON_RECRUITMENT = [r"\badmit\s*card\b", r"\bresult\b", r"\banswer\s*key\b", r"\bexam\s*date\b", r"\bsyllabus\b"]
-CORRIGENDUM_TAGS = [r"\bcorrigendum\b", r"\baddendum\b", r"\bnotice\b", r"\bupdate\b"]
-DATE_HINTS = [
-    r"last\s*date[:\-\s]*([^\n<]{6,30})",
-    r"closing\s*date[:\-\s]*([^\n<]{6,30})",
-    r"apply\s*online\s*last\s*date[:\-\s]*([^\n<]{6,30})",
-    r"last\s*date\s*to\s*apply[:\-\s]*([^\n<]{6,30})",
-]
-HEADERS = {"User-Agent": "Mozilla/5.0 (VacancyBot)", "Accept-Language": "en-IN,en;q=0.9", "Cache-Control": "no-cache"}
 
 INDIAN_STATES = [
     "andhra pradesh","arunachal pradesh","assam","bihar","chhattisgarh","goa","gujarat","haryana","himachal pradesh",
@@ -71,17 +57,43 @@ INDIAN_STATES = [
 ALLOW_OUTSIDE_PATTERNS = [r"\bany\s+state\b", r"\ball\s+india\b", r"\bfrom\s+any\s+state\b", r"\bdomicile\s+not\s+required\b", r"\bopen\s+to\s+all\b"]
 RESTRICT_PAT = r"\b(domici(?:le|liary)|resident)\b.*?\b(only|required)\b"
 
+DATE_HINTS = [
+    r"last\s*date[:\-\s]*([^\n<]{6,30})",
+    r"closing\s*date[:\-\s]*([^\n<]{6,30})",
+    r"apply\s*online\s*last\s*date[:\-\s]*([^\n<]{6,30})",
+    r"last\s*date\s*to\s*apply[:\-\s]*([^\n<]{6,30})",
+]
+EXTENSION_HINTS = [
+    r"\bextension\b", r"\bextended\s+to\b", r"\blast\s*date\s*(?:extended|revised)\s*to\b", r"\bdate\s*extended\b"
+]
+
+HEADERS = {"User-Agent": "Mozilla/5.0 (VacancyBot)", "Accept-Language": "en-IN,en;q=0.9", "Cache-Control": "no-cache"}
+
 def norm(s): return re.sub(r"\s+", " ", (s or "")).strip()
-def fetch_html(url): r = requests.get(url, headers=HEADERS, timeout=40); r.raise_for_status(); return r.content
 def absolute(base, href): return href if (href and href.startswith("http")) else (urljoin(base, href) if href else None)
+
+def fetch_html(url):
+    r = requests.get(url, headers=HEADERS, timeout=40)
+    r.raise_for_status()
+    return r.content
+
+def head_ok(url):
+    try:
+        r = requests.head(url, headers=HEADERS, timeout=20, allow_redirects=True)
+        if r.status_code in (405, 501):
+            r = requests.get(url, headers=HEADERS, timeout=20, stream=True)
+        return 200 <= r.status_code < 300
+    except Exception:
+        return False
 
 def clean_title_for_id(title):
     t = norm(title).lower()
-    for pat in CORRIGENDUM_TAGS: t = re.sub(pat, "", t, flags=re.I)
-    return re.sub(r"[^a-z0-9\s]", "", t)
+    t = re.sub(r"\b(corrigendum|addendum|notice|update|extension|date\s*extended)\b", "", t, flags=re.I)
+    t = re.sub(r"[\(\)\[\]\-:|,]", " ", t)
+    t = re.sub(r"\b(recruitment|notification|advertisement|online\s*form|apply\s*online)\b", "", t)
+    return re.sub(r"[^a-z0-9\s]", "", t).strip()
 
-def make_id(org, title, href): return f"{org}:{abs(hash(clean_title_for_id(title)+'|'+(href or '')))%100000000}"
-
+def make_id(org, slug): return f"{org}:{abs(hash(org.lower()+'|'+slug))%100000000}"
 def passes_education(text): return any(re.search(p, (text or "").lower()) for p in INCLUDE_EDU)
 def passes_skill_rule(text):
     t = (text or "").lower()
@@ -90,7 +102,6 @@ def passes_skill_rule(text):
     return any(re.search(p, t) for p in ALLOWED_SKILLS)
 def passes_degree_exclusions(text): return not any(re.search(p, (text or "").lower()) for p in EXCLUDE_DEGREE)
 def is_recruitment(text): return not any(re.search(p, (text or "").lower()) for p in EXCLUDE_NON_RECRUITMENT)
-
 def is_all_india(text): return any(re.search(p, (text or "").lower()) for p in ALLOW_OUTSIDE_PATTERNS)
 def is_bihar_only(text): t=(text or "").lower(); return ("bihar" in t) and (re.search(RESTRICT_PAT, t) is not None)
 def other_state_only(text):
@@ -103,7 +114,7 @@ def eligible_by_domicile(org, detail_text):
     if is_all_india(detail_text): return True
     if ("bpsc" in (org or "").lower()) or is_bihar_only(detail_text): return True
     if other_state_only(detail_text): return False
-    return False  # silent non‑Bihar ⇒ exclude
+    return False
 
 def classify_level(text):
     t = (text or "").lower()
@@ -121,19 +132,17 @@ def extract_deadline(text):
     dt = dateparser.parse(text, settings={"PREFER_DATES_FROM": "future", "DATE_ORDER": "DMY"})
     return dt.date().isoformat() if dt and dt.date() >= UTC_NOW.date() else None
 
+def find_extension_date(text):
+    if any(re.search(p, text, flags=re.I) for p in EXTENSION_HINTS):
+        dt = dateparser.parse(text, settings={"PREFER_DATES_FROM": "future", "DATE_ORDER": "DMY"})
+        if dt: return dt.date().isoformat()
+    return None
+
 def should_keep(org, title_text, detail_text):
     combo = f"{title_text} — {detail_text}"
     return passes_education(combo) and passes_skill_rule(combo) and passes_degree_exclusions(combo) and is_recruitment(combo) and eligible_by_domicile(org, detail_text)
 
-def add_or_update(listings, item):
-    for i, x in enumerate(listings):
-        if x["id"] == item["id"]:
-            if (item.get("deadline") and not x.get("deadline")) or (item.get("extractedAt","") > x.get("extractedAt","")):
-                listings[i] = item
-            return
-    listings.append(item)
-
-def scrape_html_list(list_url, base, org, domicile):
+def scrape_html_list(list_url, base, org):
     items = []
     try:
         soup = BeautifulSoup(fetch_html(list_url), "html.parser")
@@ -142,70 +151,84 @@ def scrape_html_list(list_url, base, org, domicile):
             if len(title) < 8: continue
             href = absolute(base, a["href"])
             if not href: continue
+
             try:
                 detail = fetch_html(href)
                 detail_text = norm(BeautifulSoup(detail, "html.parser").get_text(" "))
             except Exception:
                 detail_text = title
-            if not should_keep(org, title, detail_text): continue
-            domicile_label = "Bihar" if (("bpsc" in org.lower()) or ("bihar" in detail_text.lower())) else "All India"
-            item = {
-                "id": make_id(org, title, href),
-                "title": title,
-                "organization": org,
-                "qualificationLevel": classify_level(f"{title} {detail_text}"),
-                "domicile": domicile_label,
-                "source": "official" if org not in {"CareerPower","SarkariExam","RojgarResult","SarkariResult"} else "aggregator",
-                "deadline": extract_deadline(detail_text),
-                "applyLink": href,
-                "pdfLink": href,
-                "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            }
-            add_or_update(items, item)
-    except Exception as e:
-        print(f"[WARN] {org} scrape error: {e}")
-    return items
 
-def scrape_rss(url, org, domicile):
-    items = []
-    try:
-        feed = feedparser.parse(url)
-        for e in feed.entries[:30]:
-            title = norm(e.get("title","")); link = e.get("link","")
-            if not title or not link: continue
-            try:
-                detail = fetch_html(link)
-                detail_text = norm(BeautifulSoup(detail, "html.parser").get_text(" "))
-            except Exception:
-                detail_text = title
             if not should_keep(org, title, detail_text): continue
-            domicile_label = "Bihar" if "bpsc" in org.lower() else "All India"
+
+            slug = clean_title_for_id(title)
+            domicile_label = "Bihar" if (("bpsc" in org.lower()) or ("bihar" in detail_text.lower())) else "All India"
+            deadline = extract_deadline(detail_text)
+            extension = find_extension_date(detail_text)
+            if extension: deadline = extension
+
             item = {
-                "id": make_id(org, title, link),
+                "id": make_id(org, slug),
+                "slug": slug,
                 "title": title,
                 "organization": org,
                 "qualificationLevel": classify_level(f"{title} {detail_text}"),
                 "domicile": domicile_label,
                 "source": "official",
-                "deadline": extract_deadline(detail_text),
-                "applyLink": link,
-                "pdfLink": link,
+                "deadline": deadline,
+                "applyLink": href,
+                "pdfLink": href,
                 "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
-            add_or_update(items, item)
+            item["_link_ok"] = head_ok(item["applyLink"] or item["pdfLink"])
+            items.append(item)
     except Exception as e:
-        print(f"[WARN] {org} RSS error: {e}")
+        print(f"[WARN] {org} scrape error: {e}")
     return items
 
-def scrape_all():
-    collected = []
-    for s in SOURCES:
-        print(f"Scraping: {s['name']}")
-        if s["type"] == "html":
-            collected.extend(scrape_html_list(s["url"], s["base"], s["name"], s["domicile"]))
-        elif s["type"] == "rss":
-            collected.extend(scrape_rss(s["url"], s["name"], s["domicile"]))
-    return collected
+def scrape_official_all():
+    out = []
+    for s in SOURCES_OFFICIAL:
+        print("Scraping official:", s["name"])
+        out.extend(scrape_html_list(s["url"], s["base"], s["name"]))
+    return out
+
+def scrape_aggregators_all():
+    out = []
+    for s in SOURCES_AGG:
+        print("Scraping aggregator:", s["name"])
+        items = scrape_html_list(s["url"], s["base"], s["name"])
+        for it in items:
+            it["source"] = "aggregator"
+            if it["domicile"] != "Bihar":
+                it["domicile"] = "All India"
+        out.extend(items)
+    return out
+
+def merge_with_fallback(official_items, aggregator_items):
+    by_slug = {}
+    for it in official_items:
+        by_slug.setdefault(it["slug"], it)
+
+    for agg in aggregator_items:
+        slug = agg["slug"]
+        if slug not in by_slug:
+            by_slug[slug] = agg
+            continue
+        off = by_slug[slug]
+        # Corrigendum/extension wins for deadline updates
+        if agg.get("deadline") and (not off.get("deadline")):
+            off["deadline"] = agg["deadline"]
+        # If official link is unhealthy, swap to aggregator link
+        if not off.get("_link_ok"):
+            off["applyLink"] = agg.get("applyLink") or off.get("applyLink")
+            off["pdfLink"] = agg.get("pdfLink") or off.get("pdfLink")
+            off["source"] = "aggregator"
+
+    merged = []
+    for it in by_slug.values():
+        it.pop("_link_ok", None)
+        merged.append(it)
+    return merged
 
 def drop_expired(listings):
     out = []
@@ -215,36 +238,8 @@ def drop_expired(listings):
             try: d = datetime.fromisoformat(dl)
             except Exception:
                 dt = dateparser.parse(dl); d = dt if isinstance(dt, datetime) else None
-            if d and d.date() < UTC_NOW.date(): continue
+            if d and d.date() < UTC_NOW.date():  # expired -> drop
+                continue
         if j.get("extractedAt"):
             try:
-                ext = datetime.fromisoformat(j["extractedAt"].replace("Z",""))
-                if ext < UTC_NOW - timedelta(days=120): continue
-            except Exception: pass
-        out.append(j)
-    return out
-
-def load_data():
-    base = {"jobListings": [], "transparencyInfo": {}}
-    if DATA_PATH.exists():
-        try: base = json.loads(DATA_PATH.read_text(encoding="utf-8"))
-        except Exception: pass
-    base.setdefault("jobListings", []); base.setdefault("transparencyInfo", {})
-    return base
-
-def save_data(data): DATA_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-
-def main():
-    data = load_data()
-    fresh = scrape_all()
-    by_id = {j["id"]: j for j in data["jobListings"]}
-    for x in fresh: by_id[x["id"]] = x
-    merged = drop_expired(list(by_id.values()))
-    data["jobListings"] = merged
-    data["transparencyInfo"]["lastUpdated"] = UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
-    data["transparencyInfo"]["totalListings"] = len(merged)
-    save_data(data)
-    print(f"Saved {len(merged)} listings")
-
-if __name__ == "__main__":
-    main()
+                ext = datetime
