@@ -1,4 +1,6 @@
 requests
 beautifulsoup4
-pdfplumber
-pyHanko[validation]
+feedparser
+dateparser
+
+
