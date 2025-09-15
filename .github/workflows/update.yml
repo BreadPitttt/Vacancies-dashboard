@@ -3,8 +3,7 @@ name: Nightly and Monday Recheck
 on:
   workflow_dispatch: {}
   schedule:
-    # UTC times; adjust to preference
-    - cron: '15 18 * * *'   # every day at 18:15 UTC
+    - cron: '15 18 * * *'   # daily at 18:15 UTC
     - cron: '15 18 * * 1'   # Mondays at 18:15 UTC
 
 permissions:
@@ -35,6 +34,12 @@ jobs:
       - name: Run scraper
         run: python scraper.py
 
+      - name: Validate JSON Schema
+        run: python validate.py
+
+      - name: Quality checks (links, dates, dups)
+        run: python qc_checks.py
+
       - name: Format data.json
         run: |
           python - << 'PY'
@@ -50,7 +55,7 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           if [[ -n "$(git status --porcelain data.json)" ]]; then
             git add data.json
-            git commit -m "chore(data): automated refresh"
+            git commit -m "chore(data): automated refresh with validation"
             git push
           else
             echo "No changes to commit."
