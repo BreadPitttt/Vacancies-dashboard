@@ -4,7 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Government Jobs Dashboard</title>
+  <meta name="robots" content="index,follow" />
   <link rel="stylesheet" href="style.css" />
+  <!-- Optional: Sentry (disabled until DSN provided) -->
+  <!--
+  <script src="https://browser.sentry-cdn.com/7.120.0/bundle.tracing.replay.min.js" crossorigin="anonymous"
+    onload="Sentry.init({ dsn: 'https://<public>@o<org>.ingest.sentry.io/<proj>', sampleRate: 1.0, tracesSampleRate: 0.0, replaysSessionSampleRate: 0.0, replaysOnErrorSampleRate: 1.0 });">
+  </script>
+  -->
 </head>
 <body>
   <header class="container">
@@ -14,35 +21,29 @@
   </header>
 
   <nav class="container pillbar" aria-label="Filters">
-    <!-- Education -->
     <button class="pill" data-filter="qual" data-value="Graduate" aria-pressed="false">Graduate</button>
     <button class="pill" data-filter="qual" data-value="12th" aria-pressed="false">12th</button>
     <button class="pill" data-filter="qual" data-value="10th" aria-pressed="false">10th</button>
 
-    <!-- Allowed extra skills -->
     <button class="pill" data-filter="skill" data-value="typing" aria-pressed="false">Typing</button>
     <button class="pill" data-filter="skill" data-value="computer" aria-pressed="false">Computer</button>
     <button class="pill" data-filter="skill" data-value="physical" aria-pressed="false">Physical</button>
 
-    <!-- Domicile -->
     <button class="pill" data-filter="state" data-value="All India" aria-pressed="false">All India</button>
     <button class="pill" data-filter="state" data-value="Bihar" aria-pressed="false">Bihar</button>
 
-    <!-- Source -->
     <button class="pill" data-filter="source" data-value="official" aria-pressed="false">Official</button>
     <button class="pill" data-filter="source" data-value="aggregator" aria-pressed="false">Aggregator</button>
 
-    <!-- Urgency (optional, populated by scraper if present) -->
     <button class="pill" data-filter="urgency" data-value="urgent" aria-pressed="false">Urgent</button>
     <button class="pill" id="clearFilters">Clear</button>
   </nav>
 
   <main class="container">
-    <!-- Active jobs list -->
     <section id="jobs" role="list" aria-label="Active vacancies"></section>
-    <!-- The Archive section will be created by app.js when needed -->
   </main>
 
+  <noscript><p class="container muted">JavaScript is required to load live data.</p></noscript>
   <script src="app.js" defer></script>
 </body>
 </html>
