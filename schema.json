@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vacancies data",
+  "type": "object",
+  "required": ["jobListings", "transparencyInfo"],
+  "properties": {
+    "transparencyInfo": {
+      "type": "object",
+      "properties": {
+        "lastUpdated": { "type": "string" },
+        "totalListings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "jobListings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id","title","organization","qualificationLevel","domicile","source"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 3 },
+          "organization": { "type": "string", "minLength": 2 },
+          "qualificationLevel": { "type": "string", "enum": ["10th","12th","Graduate"] },
+          "domicile": { "type": "string", "enum": ["All India","Bihar"] },
+          "source": { "type": "string", "enum": ["official","aggregator"] },
+          "deadline": { "type": ["string","null"] },
+          "applyLink": { "type": ["string","null"] },
+          "pdfLink": { "type": ["string","null"] }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}
