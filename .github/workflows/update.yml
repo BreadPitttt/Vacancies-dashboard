@@ -18,18 +18,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v6
-        with: { python-version: '3.11', cache: 'pip' }
+
+      # Use a valid setup-python version (v5.x)
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Run scraper
         run: python scraper.py
+
       - name: Validate JSON Schema
         run: python validate.py
+
       - name: Quality checks (links, dates, dups)
         run: python qc_checks.py
+
       - name: Generate health.json
         run: |
           python - << 'PY'
@@ -44,6 +53,7 @@ jobs:
           }
           pathlib.Path("health.json").write_text(json.dumps(health, ensure_ascii=False, indent=2), encoding="utf-8")
           PY
+
       - name: Format data.json
         run: |
           python - << 'PY'
@@ -52,6 +62,7 @@ jobs:
           data = json.loads(p.read_text(encoding="utf-8"))
           p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
           PY
+
       - name: Commit updated data.json and health.json if changed
         run: |
           git config user.name "actions-user"
