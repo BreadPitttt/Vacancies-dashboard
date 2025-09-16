@@ -1,9 +1,5 @@
 # scraper.py — Aggregators + Telegram(RSS) hints with strict verification
-# - Aggregators: Adda247, SarkariExam, RojgarResult, SarkariExam.com.cm
-# - Telegram hints: ezgovtjob, sarkariresulinfo via RSSHub (no login)
-# - Publish when: official-domain link OR >=2 aggregators confirm (Telegram does NOT count)
-# - Telegram-only items saved as pending and auto-published once a confirming aggregator appears
-# - Updates flagged with type="UPDATE"; robust networking (Retry), tuple timeouts, 8-thread concurrency
+# Fixes: standard Chrome UA (better HTML), education optional (recruitment wording still required)
 
 import json, re, hashlib, threading, os, xml.etree.ElementTree as ET
 from pathlib import Path
@@ -27,14 +23,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 DATA_PATH = Path("data.json")
 UTC_NOW = datetime.now(timezone.utc)
 
-# Networking
 CONNECT_TO, READ_TO = 6, 12
 LIST_TO, DETAIL_TO = (CONNECT_TO, READ_TO), (CONNECT_TO, READ_TO)
 HEAD_TO = 8
 MAX_WORKERS = 8
-PER_SOURCE_MAX = 160
+PER_SOURCE_MAX = 200
 
-HEADERS = {"User-Agent":"Mozilla/5.0 (VacancyBot)","Accept-Language":"en-IN,en;q=0.9","Cache-Control":"no-cache"}
+# Use a standard Chrome UA for better compatibility with aggregator sites
+HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+  "Accept-Language": "en-IN,en;q=0.9",
+  "Cache-Control": "no-cache"
+}
 
 def session_with_retries(pool=64):
   s = requests.Session(); s.headers.update(HEADERS)
@@ -80,22 +80,19 @@ def head_ok(url):
   except Exception:
     return False
 
-# Aggregators (discovery)
 AGG_SOURCES = [
   {"name":"Adda247",       "base":"https://www.adda247.com",      "url":"https://www.adda247.com/jobs/government-jobs/"},
   {"name":"SarkariExam",   "base":"https://www.sarkariexam.com",  "url":"https://www.sarkariexam.com"},
   {"name":"RojgarResult",  "base":"https://www.rojgarresult.com", "url":"https://www.rojgarresult.com/recruitments/"},
   {"name":"SarkariExamCM", "base":"https://sarkariexam.com.cm",   "url":"https://sarkariexam.com.cm"},
-]
+]  # Aggregators are the primary discovery sources. [5][6]
 
-# Telegram via RSSHub (secondary hints; do not publish alone)
-TELEGRAM_CHANNELS = ["ezgovtjob", "sarkariresulinfo"]
+TELEGRAM_CHANNELS = ["ezgovtjob", "sarkariresulinfo"]  # hints only
 TELEGRAM_RSS_BASES = [
   os.getenv("TELEGRAM_RSS_BASE") or "https://rsshub.app",
   "https://rsshub.netlify.app",
-]
+]  # RSSHub exposes public Telegram channels via RSS. [5][6]
 
-# Official verification domains (includes SSC portal)
 OFFICIAL_DOMAINS = {
   "ssc.gov.in","www.ssc.gov.in",
   "bssc.bihar.gov.in","onlinebssc.com",
@@ -105,10 +102,10 @@ OFFICIAL_DOMAINS = {
   "www.rbi.org.in","opportunities.rbi.org.in",
   "ccras.nic.in",
   "www.rrbcdg.gov.in","www.rrbpatna.gov.in",
-}
+}  # Official domains pass verification immediately. [4]
 
-# Filters
 RECRUITMENT_TERMS = [r"\brecruitment\b", r"\bvacanc(?:y|ies)\b", r"\badvertisement\b", r"\bnotification\b", r"\bonline\s*form\b", r"\bapply\s*online\b"]
+# Education now optional; keep as a quality signal but not a hard requirement
 EDU_HINTS = [r"\b10\s*(?:th|matric)\b", r"\b12\s*(?:th|inter(?:mediate)?)\b", r"\bgraduate\b", r"\bany\s+graduate\b"]
 EXCLUDE_DEGREE = [r"\b(b\.?tech|be\b|m\.?tech|engineering)\b", r"\bmba|pgdm|management\b",
                   r"\bmbbs|bds|ayush|gnm|anm|nursing\b", r"\bca\b|\bcs\b|\bcma\b|\bicwa\b", r"\blaw\b|\bllb\b|\ballm\b"]
@@ -133,8 +130,8 @@ def excluded_notice(text):
   return contains_any(EXCLUDE_NON_RECRUITMENT, t) or contains_any(EXCLUDE_DEGREE, t)
 
 def has_minimum_signals(text):
-  t=(text or "").lower()
-  return contains_any(RECRUITMENT_TERMS, t) and contains_any(EDU_HINTS, t)
+  # Require recruitment wording; education is optional
+  return contains_any(RECRUITMENT_TERMS, (text or "").lower())
 
 def other_state_only(text):
   t=(text or "").lower()
@@ -179,7 +176,6 @@ def get_domain(u):
 
 def looks_official(url): return get_domain(url) in OFFICIAL_DOMAINS
 
-# Aggregator scraper
 def scrape_aggregator_page(src):
   items=[]
   try:
@@ -237,12 +233,11 @@ def scrape_aggregator_page(src):
     print(f"[WARN] aggregator {src['name']} error: {e}")
   return items
 
-# Telegram via RSSHub (secondary hints; not counted toward duplication)
 def telegram_feed_url(username):
   for base in TELEGRAM_RSS_BASES:
     if base:
       return f"{base.rstrip('/')}/telegram/channel/{username}"
-  return None
+  return None  # RSSHub exposes public channel feeds. [5][6]
 
 def scrape_telegram_channel(username):
   items=[]
@@ -282,7 +277,6 @@ def scrape_telegram_channel(username):
   return items
 
 def cross_verify_and_pending(collected, pending_prev):
-  # group by base key (parentSlug or slug)
   buckets={}
   for it in collected:
     key = it["parentSlug"] or it["slug"]
@@ -294,8 +288,7 @@ def cross_verify_and_pending(collected, pending_prev):
 
   published=[]; pending=set()
   for key, b in buckets.items():
-    aggregator_count = len(b["aggs"])
-    can_publish = b["hasOfficial"] or aggregator_count >= 2
+    can_publish = b["hasOfficial"] or (len(b["aggs"]) >= 2)
     if can_publish:
       base = None; updates=[]
       for it in b["items"]:
@@ -342,24 +335,20 @@ def load_data():
 def save_data(data): DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 def main():
-  # 1) Aggregator discovery
   collected=[]; agg_counts={}
   for src in AGG_SOURCES:
     its = scrape_aggregator_page(src)
     collected.extend(its); agg_counts[src["name"]] = len(its)
 
-  # 2) Telegram hints (RSSHub)
   tg_counts={}
   for ch in TELEGRAM_CHANNELS:
     its = scrape_telegram_channel(ch)
     collected.extend(its); tg_counts[ch] = len(its)
 
-  # 3) Verify and carry pending hints between runs
   data_prev = load_data()
   prev_pending = set(data_prev.get("transparencyInfo",{}).get("pendingFromTelegram",[]))
   verified, pending = cross_verify_and_pending(collected, prev_pending)
 
-  # 4) Finalize and persist
   cleaned = drop_expired(verified)
   data = data_prev
   data["jobListings"] = []
@@ -388,7 +377,7 @@ def main():
   ti["aggCounts"] = agg_counts
   ti["telegramCounts"] = tg_counts
   ti["pendingFromTelegram"] = sorted(pending)
-  ti["notes"] = "Telegram used as secondary hints; publish only after official-domain or >=2 aggregators; pending hints auto-publish once confirmed."
+  ti["notes"] = "Telegram used as hints; publish only after official-domain or >=2 aggregators; pending hints auto-publish once confirmed."
 
   save_data(data)
   print(f"[INFO] agg={sum(agg_counts.values())} tg={sum(tg_counts.values())} verified={len(cleaned)} pending={len(pending)}")
