@@ -1,0 +1,146 @@
+# .github/workflows/data-pipeline.yml
+# This single file replaces both your nightly and weekly workflows.
+
+name: Data Pipeline
+
+on:
+  # This allows you to run the workflow manually from the Actions tab in GitHub.
+  workflow_dispatch: {}
+
+  # This section defines the two schedules.
+  schedule:
+    # 1. NIGHTLY: Runs every day at 18:15 UTC (which is 11:45 PM IST).
+    - cron: '15 18 * * *'
+    # 2. WEEKLY: Runs every Sunday at 20:30 UTC (which is Monday 2:00 AM IST).
+    # NOTE: The cron day '0' means Sunday. The time is set to hit after 2 AM IST on Monday.
+    - cron: '30 20 * * 0'
+
+# Permissions required for the workflow to write changes back to your repository.
+permissions:
+  contents: write
+
+# Prevents multiple runs of the same workflow from overlapping.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # This is the main job that does all the work.
+  scrape-and-validate:
+    # This is the intelligent part.
+    # It sets the timeout to 240 minutes for the weekly run and 120 minutes for all other runs.
+    timeout-minutes: ${{ github.event.schedule == '30 20 * * 0' && 240 || 120 }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Check out your repository's code.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # We need a full history to handle commits correctly.
+          fetch-depth: 0
+
+      # Step 2: Set up Python environment and cache dependencies to speed up future runs.
+      - name: Set up Python and cache dependencies
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # Step 3: Install all the Python packages needed by your scripts.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip certifi cloudscraper
+          pip install -r requirements.txt
+
+      # Step 4: Run the main scraper script.
+      - name: Run scraper
+        env:
+          # This environment variable is passed to your Python script.
+          # You could use this in scraper.py to know if it's a hard recheck, if needed.
+          IS_HARD_RECHECK: ${{ github.event.schedule == '30 20 * * 0' }}
+          TELEGRAM_RSS_BASE: ${{ vars.TELEGRAM_RSS_BASE }} # Your secret for the RSS base URL
+          PYTHONUNBUFFERED: "1"
+        run: python scraper.py
+
+      # Step 5: Run the validation script to ensure data.json has the correct structure.
+      - name: Validate JSON Schema
+        run: python validate.py
+
+      # Step 6: Run your quality control script.
+      - name: Quality checks (links, dates, dups)
+        run: python qc_checks.py
+      
+      # Step 7: Generate the health.json file for monitoring.
+      # This combines two previous steps into one for efficiency.
+      - name: Generate and Format Data Files
+        run: |
+          python - << 'PY'
+          import json, datetime, pathlib
+          
+          data_path = pathlib.Path("data.json")
+          health_path = pathlib.Path("health.json")
+          
+          # Load data.json
+          data = json.loads(data_path.read_text(encoding="utf-8"))
+          
+          # Create health.json content
+          ti = data.get("transparencyInfo", {})
+          health = {"ok": True, "checkedAt": datetime.datetime.utcnow().isoformat() + "Z", **ti}
+          health_path.write_text(json.dumps(health, indent=2, ensure_ascii=False), encoding="utf-8")
+          
+          # Re-format data.json to ensure consistent indentation
+          data_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+          PY
+
+      # Step 8: Commit and push the changes if any files were modified.
+      - name: Commit and Push Changes
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions-bot@users.noreply.github.com"
+          
+          # Check if data.json or health.json have changed.
+          if ! git diff --quiet data.json health.json; then
+            git add data.json health.json
+            
+            # Set a different commit message for the weekly run.
+            COMMIT_MSG="chore(data): Nightly data refresh"
+            if [ "${{ github.event.schedule }}" == "30 20 * * 0" ]; then
+              COMMIT_MSG="chore(data): Weekly hard recheck"
+            fi
+            
+            git commit -m "$COMMIT_MSG"
+            
+            # This pull/push sequence is very robust and avoids most common errors.
+            git pull --rebase
+            git push
+            echo "Data changes committed and pushed."
+          else
+            echo "No data changes to commit."
+          fi
+  
+  # The Lighthouse job remains mostly the same.
+  lighthouse:
+    runs-on: ubuntu-latest
+    needs: scrape-and-validate # This job will only run if the scrape job succeeds.
+    if: ${{ github.event_name != 'workflow_dispatch' && vars.PAGES_URL != '' }} # Only run on a schedule, not on manual runs.
+    
+    steps:
+      - name: Audit homepage with Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            ${{ vars.PAGES_URL }}
+          budgetPath: ./.github/lighthouse/budget.json
+          uploadArtifacts: true
+          
+      - name: Check health.json endpoint
+        run: |
+          base_url="${{ vars.PAGES_URL }}"
+          health_url="$base_url/health.json"
+          http_code=$(curl -s -o /dev/null -w "%{http_code}" "$health_url")
+          if [ "$http_code" -ne 200 ]; then
+            echo "Error: health.json is not accessible (HTTP Status: $http_code)"
+            exit 1
+          fi
+          echo "health.json is available online (HTTP 200)."
