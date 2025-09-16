@@ -1,4 +1,4 @@
-# scraper.py — Robust publish with dict guards, lighter fetch, 403/429 tolerance, and confidence labels
+# scraper.py — Aggregator-first publishing with schema-compliant 'source', confidence labels, and Telegram(RSS) fallbacks
 
 import json, re, hashlib, threading, os, xml.etree.ElementTree as ET
 from pathlib import Path
@@ -8,12 +8,9 @@ from urllib.parse import urljoin, urlparse
 import requests
 from requests.adapters import HTTPAdapter
 try:
-    from urllib3.util.retry import Retry
+    from urllib3.util import Retry
 except Exception:
-    try:
-        from urllib3.util import Retry
-    except Exception:
-        Retry = None
+    Retry = None
 
 from bs4 import BeautifulSoup, UnicodeDammit
 import dateparser
@@ -27,7 +24,7 @@ CONNECT_TO, READ_TO = 5, 9
 LIST_TO, DETAIL_TO = (CONNECT_TO, READ_TO), (CONNECT_TO, READ_TO)
 HEAD_TO = 6
 MAX_WORKERS = 10
-PER_SOURCE_MAX = 140  # tighter cap to stay fast
+PER_SOURCE_MAX = 140
 
 HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
@@ -71,24 +68,25 @@ def soup_from_resp(resp):
   try: return BeautifulSoup(html, "lxml")
   except Exception: return BeautifulSoup(html, "html.parser")
 
-# Trusted aggregators
+# Trusted aggregators (discovery)
 AGG_SOURCES = [
   {"name":"Adda247",       "base":"https://www.adda247.com",      "url":"https://www.adda247.com/jobs/government-jobs/"},
   {"name":"SarkariExam",   "base":"https://www.sarkariexam.com",  "url":"https://www.sarkariexam.com"},
   {"name":"RojgarResult",  "base":"https://www.rojgarresult.com", "url":"https://www.rojgarresult.com/recruitments/"},
   {"name":"SarkariExamCM", "base":"https://sarkariexam.com.cm",   "url":"https://sarkariexam.com.cm"},
-]  # Regularly updated hubs. [9][3][4][10]
+]
 
 # Telegram hints via RSSHub (no login)
 TELEGRAM_CHANNELS = ["ezgovtjob", "sarkariresulinfo"]  # hints only
 TELEGRAM_RSS_BASES = [
   os.getenv("TELEGRAM_RSS_BASE") or "https://rsshub.app",
   "https://rsshub.netlify.app",
-]  # Public/self-hosted RSSHub instances for /telegram/channel/:username. [5][6]
+  "https://rsshub.rssforever.com",
+]
 
-# Official verification
+# Official verification domains (includes SSC portal)
 OFFICIAL_DOMAINS = {
-  "ssc.gov.in","www.ssc.gov.in",  # SSC portal [11]
+  "ssc.gov.in","www.ssc.gov.in",
   "bssc.bihar.gov.in","onlinebssc.com",
   "dsssb.delhi.gov.in","dsssbonline.nic.in",
   "www.ibps.in",
@@ -132,9 +130,9 @@ def scrape_aggregator_page(src):
     try:
       soup = soup_from_resp(fetch(src["url"], LIST_TO))
     except requests.HTTPError as e:
-      if getattr(e.response, "status_code", 0) in (403, 429):
-        print(f"[AGG] {src['name']}: {e.response.status_code} blocked, skipping quickly")
-        return items
+      code = getattr(e.response, "status_code", 0)
+      if code in (403, 429):
+        print(f"[AGG] {src['name']}: {code} blocked, skipping quickly"); return items
       raise
     if soup is None:
       print(f"[AGG] {src['name']}: non-HTML"); return items
@@ -144,7 +142,8 @@ def scrape_aggregator_page(src):
       href = absolute(src["base"], a["href"]); title = norm(a.get_text(" "))
       if not href or len(title) < 6: continue
       raw += 1
-      if is_joblike(f"{title} {href}"): anchors.append((title, href)); hinted += 1
+      if is_joblike(f"{title} {href}"):
+        anchors.append((title, href)); hinted += 1
       if len(anchors) >= PER_SOURCE_MAX: break
 
     def enrich(pair):
@@ -183,45 +182,43 @@ def scrape_aggregator_page(src):
 
 def telegram_feed_url(username):
   for base in TELEGRAM_RSS_BASES:
-    if base: return f"{base.rstrip('/')}/telegram/channel/{username}"
-  return None
+    if base: yield f"{base.rstrip('/')}/telegram/channel/{username}"
 
 def scrape_telegram_channel(username):
   items=[]; kept=0
-  try:
-    url = telegram_feed_url(username)
-    if not url: return items
-    root = ET.fromstring(fetch(url, LIST_TO).content)
-    def tx(node, tag):
-      el = node.find(tag); return norm(el.text) if (el is not None and el.text) else ""
-    for it in root.findall(".//item"):
-      title = tx(it,"title"); link = tx(it,"link"); desc = tx(it,"description")
-      combo = norm(f"{title} {desc}")
-      if len(title) < 6 or not is_joblike(combo): continue
-      key = norm_key(title)
-      items.append({
-        "key": key,
-        "slug": hashlib.sha1(f"Telegram:{username}|{key}".encode("utf-8")).hexdigest()[:12],
-        "title": title,
-        "organization": f"Telegram:{username}",
-        "applyLink": link or None,
-        "pdfLink": link or None,
-        "deadline": extract_deadline(combo),
-        "domicile": "Bihar" if "bihar" in combo.lower() else "All India",
-        "sourceType": "telegram",
-        "source": f"Telegram:{username}",
-        "isUpdate": is_update(combo),
-        "updateSummary": title if is_update(combo) else None,
-        "detailText": combo
-      }); kept += 1
-    print(f"[TG ] {username}: kept={kept}")
-  except requests.HTTPError as e:
-    print(f"[WARN] telegram {username} HTTP {getattr(e.response,'status_code',0)}; skipping")
-  except requests.RequestException as e:
-    print(f"[WARN] telegram {username} network: {e}")
-  except Exception as e:
-    print(f"[WARN] telegram {username} parse: {e}")
-  return items  # Consumed through RSSHub to avoid login and API limits. [5][6]
+  for url in telegram_feed_url(username):
+    try:
+      root = ET.fromstring(fetch(url, LIST_TO).content)
+      def tx(node, tag):
+        el = node.find(tag); return norm(el.text) if (el is not None and el.text) else ""
+      for it in root.findall(".//item"):
+        title = tx(it,"title"); link = tx(it,"link"); desc = tx(it,"description")
+        combo = norm(f"{title} {desc}")
+        if len(title) < 6 or not is_joblike(combo): continue
+        key = norm_key(title)
+        items.append({
+          "key": key,
+          "slug": hashlib.sha1(f"Telegram:{username}|{key}".encode("utf-8")).hexdigest()[:12],
+          "title": title,
+          "organization": f"Telegram:{username}",
+          "applyLink": link or None,
+          "pdfLink": link or None,
+          "deadline": extract_deadline(combo),
+          "domicile": "Bihar" if "bihar" in combo.lower() else "All India",
+          "sourceType": "telegram",
+          "source": f"Telegram:{username}",
+          "isUpdate": is_update(combo),
+          "updateSummary": title if is_update(combo) else None,
+          "detailText": combo
+        }); kept += 1
+      print(f"[TG ] {username}@{url}: kept={kept}"); return items
+    except requests.HTTPError as e:
+      print(f"[WARN] telegram {username}@{url} HTTP {getattr(e.response,'status_code',0)}; trying next")
+    except requests.RequestException as e:
+      print(f"[WARN] telegram {username}@{url} network: {e}; trying next")
+    except Exception as e:
+      print(f"[WARN] telegram {username}@{url} parse: {e}; trying next")
+  print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items
 
 def merge_and_mark(collected, prev_pending):
   buckets={}
@@ -234,7 +231,7 @@ def merge_and_mark(collected, prev_pending):
 
   published=[]; pending=set()
   for key, b in buckets.items():
-    # decide confidence
+    # confidence
     if b["hasOfficial"]:
       verifiedBy = "official"
     elif len(b["aggs"]) >= 2:
@@ -248,14 +245,17 @@ def merge_and_mark(collected, prev_pending):
       if b["tele"]: pending.add(key)
       continue
 
-    # pick representative aggregator dict safely
+    # pick representative safely
     rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator" and not x.get("isUpdate")), None)
     if rep is None: rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator"), None)
     if rep is None: rep = next((x for x in b["items"] if isinstance(x, dict)), None)
-    if not isinstance(rep, dict):
-      continue  # guard against malformed group
+    if not isinstance(rep, dict): 
+      continue
 
     sources = sorted({x["source"] for x in b["items"] if x.get("sourceType")=="aggregator"})
+    # Map to schema enum: 'official' or 'aggregator'
+    schema_source = "official" if verifiedBy == "official" else "aggregator"
+
     rep_rec = {
       "id": rep["slug"],
       "slug": rep["slug"],
@@ -263,8 +263,8 @@ def merge_and_mark(collected, prev_pending):
       "organization": "/".join(sources) if sources else rep["organization"],
       "qualificationLevel": "Graduate",
       "domicile": rep["domicile"],
-      "source": "published",
-      "verifiedBy": verifiedBy,
+      "source": schema_source,       # schema-compliant enum
+      "verifiedBy": verifiedBy,      # confidence field (UI use)
       "type": "VACANCY",
       "updateSummary": None,
       "relatedTo": None,
@@ -275,16 +275,16 @@ def merge_and_mark(collected, prev_pending):
     }
     published.append(rep_rec)
 
-    # attach updates if any
+    # attach updates with same enum-compliant source
     for u in (x for x in b["items"] if x.get("isUpdate")):
       upd = rep_rec.copy()
       upd["id"] = u["slug"]; upd["slug"] = u["slug"]; upd["title"] = "[UPDATE] " + u["title"]
       upd["type"] = "UPDATE"; upd["updateSummary"] = u.get("updateSummary"); upd["relatedTo"] = rep_rec["slug"]
       upd["deadline"] = u.get("deadline") or rep_rec["deadline"]
       upd["applyLink"] = u.get("applyLink") or rep_rec["applyLink"]; upd["pdfLink"] = u.get("pdfLink") or rep_rec["pdfLink"]
+      upd["source"] = schema_source  # keep within {'official','aggregator'}
       published.append(upd)
 
-  # carry telegram-only hints forward
   pending_now = (prev_pending or set()) | pending
   for rec in published:
     if rec["slug"] in pending_now: pending_now.remove(rec["slug"])
@@ -332,8 +332,7 @@ def main():
   ti["aggCounts"] = agg_counts
   ti["telegramCounts"] = tg_counts
   ti["pendingFromTelegram"] = sorted(pending)
-  ti["notes"] = "Publishes single-agg items; verifiedBy in {official,multi-aggregator,single-aggregator}; Telegram is hint only."
-
+  ti["notes"] = "Schema-compliant source; verifiedBy in {official,multi-aggregator,single-aggregator}; Telegram is hint-only with RSSHub fallbacks."
   save_data(data)
   print(f"[INFO] agg_total={sum(agg_counts.values())} tg_total={sum(tg_counts.values())} published={len(cleaned)} pending={len(pending)}")
 
