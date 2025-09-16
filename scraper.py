@@ -1,6 +1,10 @@
-# scraper.py — production-ready: explicit decoding, lxml parser, shorter connect/read timeouts,
-# retry-hardening with robust urllib3 Retry import, non-HTML skip, per-source caps,
-# 8-thread concurrent detail fetch, and relaxed domicile filter. All try blocks have matching except.
+# scraper.py — relaxed filters + fast/stable I/O:
+# - Explicit decoding (UnicodeDammit) and lxml parser
+# - Tuple connect/read timeouts + Retry on 429/5xx
+# - 8-thread concurrent detail fetch with thread-local Sessions
+# - Allow-by-default domicile (exclude only explicit “other state only”)
+# - Education match is optional (no longer required)
+# - Per-source counts added to transparencyInfo for debugging
 
 import json, re, hashlib, threading
 from pathlib import Path
@@ -9,16 +13,13 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
-
-# Robust Retry import across environments (preferred path first, safe fallback)
 try:
-    from urllib3.util.retry import Retry  # preferred in urllib3 2.x
+    from urllib3.util.retry import Retry
 except Exception:
     try:
-        from urllib3.util import Retry    # some environments export here
+        from urllib3.util import Retry
     except Exception:
-        Retry = None  # proceed without retries if not available
-# refs: urllib3 util.retry docs + common requests pattern for HTTPAdapter(max_retries=Retry(...))
+        Retry = None  # proceed without retries
 
 from bs4 import BeautifulSoup, UnicodeDammit
 import dateparser
@@ -29,13 +30,13 @@ DATA_PATH = Path("data.json")
 UTC_NOW = datetime.now(timezone.utc)
 
 # Tunables
-CONNECT_TO = 6          # seconds (connect)
-READ_TO    = 12         # seconds (read)
+CONNECT_TO = 6
+READ_TO    = 12
 LIST_TO    = (CONNECT_TO, READ_TO)
 DETAIL_TO  = (CONNECT_TO, READ_TO)
 HEAD_TO    = 8
 MAX_WORKERS = 8
-PER_SOURCE_MAX = 120     # bound total work per source
+PER_SOURCE_MAX = 120
 
 SOURCES_OFFICIAL = [
     {"name": "SSC", "base": "https://ssc.gov.in", "url": "https://ssc.gov.in"},
@@ -48,7 +49,6 @@ SOURCES_OFFICIAL = [
     {"name": "NIACL", "base": "https://www.newindia.co.in", "url": "https://www.newindia.co.in/recruitment"},
     {"name": "UIIC", "base": "https://www.uiic.co.in", "url": "https://www.uiic.co.in/web/careers/recruitment"},
 ]
-
 SOURCES_AGG = [
     {"name": "CareerPower", "base": "https://www.adda247.com", "url": "https://www.adda247.com/jobs/government-jobs/"},
     {"name": "SarkariExam", "base": "https://www.sarkariexam.com", "url": "https://www.sarkariexam.com"},
@@ -56,55 +56,37 @@ SOURCES_AGG = [
     {"name": "SarkariResult", "base": "https://sarkariresult.com.cm", "url": "https://sarkariresult.com.cm/latest-jobs/"},
 ]
 
-INCLUDE_EDU = [
-    r"\bany\s+graduate\b",
-    r"\bgraduate\s+in\s+any\s+(discipline|stream)\b",
-    r"\bany\s+degree\b",
-    r"\b12(?:th|th\s*pass| intermediate| senior\s+secondary)\b",
-    r"\b10(?:th|th\s*pass| matric)\b",
+# Optional matches (not required anymore)
+EDU_HINTS = [
+    r"\bany\s+graduate\b", r"\bgraduate\s+in\s+any\s+(discipline|stream)\b", r"\bany\s+degree\b",
+    r"\b12(?:th|th\s*pass| intermediate| senior\s+secondary)\b", r"\b10(?:th|th\s*pass| matric)\b",
 ]
 
-ALLOWED_SKILLS = [
-    r"\btyping\b", r"\bcomputer(?!\s*science)\b", r"\bpet\b", r"\bpst\b",
-    r"\bphysical\b", r"\bms\s*office\b", r"\bccc\b", r"\bdca\b"
-]
-
-DISALLOWED_SKILLS = [
-    r"\b(programming|coding|java|python|autocad|cad|sap|oracle|network|hardware|software|tally|marketing|sales|management)\b",
-    r"\bcertificate|licen[cs]e|diploma\b"
-]
-
+# Keep strong exclusions to limit noise
+ALLOWED_SKILLS = [r"\btyping\b", r"\bcomputer(?!\s*science)\b", r"\bpet\b", r"\bpst\b", r"\bphysical\b", r"\bms\s*office\b", r"\bccc\b", r"\bdca\b"]
+DISALLOWED_SKILLS = [r"\b(programming|coding|java|python|autocad|cad|sap|oracle|network|hardware|software|tally|marketing|sales|management)\b", r"\bcertificate|licen[cs]e|diploma\b"]
 EXCLUDE_DEGREE = [
-    r"\b(b\.?tech|be\b|m\.?tech|engineering)\b", r"\bmba|pgdm|management\b",
-    r"\blaw\b|\bllb\b|\ballm\b", r"\bnursing\b|\bgnm\b|\banm\b|\bpharma|bpharm|mpharm\b",
-    r"\bmca\b|\bbca\b|\bcomputer\s+science\b|\bit\b", r"\b(b\.?ed|bed)\b",
-    r"\b(diploma|iti)\b", r"\bca\b|\bcs\b|\bcma\b|\bicwa\b", r"\bmedical|mbbs|bds|ayush|veterinary\b",
+    r"\b(b\.?tech|be\b|m\.?tech|engineering)\b", r"\bmba|pgdm|management\b", r"\blaw\b|\bllb\b|\ballm\b",
+    r"\bnursing\b|\bgnm\b|\banm\b|\bpharma|bpharm|mpharm\b", r"\bmca\b|\bbca\b|\bcomputer\s+science\b|\bit\b",
+    r"\b(b\.?ed|bed)\b", r"\b(diploma|iti)\b", r"\bca\b|\bcs\b|\bcma\b|\bicwa\b", r"\bmedical|mbbs|bds|ayush|veterinary\b",
 ]
-
-EXCLUDE_NON_RECRUITMENT = [
-    r"\badmit\s*card\b", r"\bresult\b", r"\banswer\s*key\b", r"\bexam\s*date\b", r"\bsyllabus\b"
-]
+EXCLUDE_NON_RECRUITMENT = [r"\badmit\s*card\b", r"\bresult\b", r"\banswer\s*key\b", r"\bexam\s*date\b", r"\bsyllabus\b"]
 
 INDIAN_STATES = [
     "andhra pradesh","arunachal pradesh","assam","bihar","chhattisgarh","goa","gujarat","haryana","himachal pradesh",
     "jharkhand","karnataka","kerala","madhya pradesh","maharashtra","manipur","meghalaya","mizoram","nagaland","odisha",
     "punjab","rajasthan","sikkim","tamil nadu","telangana","tripura","uttar pradesh","uttarakhand","west bengal",
 ]
-
 ALLOW_OUTSIDE_PATTERNS = [r"\bany\s+state\b", r"\ball\s+india\b", r"\bfrom\s+any\s+state\b", r"\bdomicile\s+not\s+required\b", r"\bopen\s+to\s+all\b"]
 RESTRICT_PAT = r"\b(domici(?:le|liary)|resident)\b.*?\b(only|required)\b"
 
 HEADERS = {"User-Agent":"Mozilla/5.0 (VacancyBot)","Accept-Language":"en-IN,en;q=0.9","Cache-Control":"no-cache"}
 
 def session_with_retries(pool=64):
-  s = requests.Session()
-  s.headers.update(HEADERS)
+  s = requests.Session(); s.headers.update(HEADERS)
   if Retry:
-    retry = Retry(
-        total=2, connect=2, read=2, backoff_factor=0.4,
-        status_forcelist=[429,500,502,503,504],
-        allowed_methods={"GET","HEAD"}
-    )
+    retry = Retry(total=2, connect=2, read=2, backoff_factor=0.4,
+                  status_forcelist=[429,500,502,503,504], allowed_methods={"GET","HEAD"})
     adapter = HTTPAdapter(max_retries=retry, pool_connections=pool, pool_maxsize=pool)
   else:
     adapter = HTTPAdapter(pool_connections=pool, pool_maxsize=pool)
@@ -113,7 +95,6 @@ def session_with_retries(pool=64):
 
 HTTP = session_with_retries()
 _thread_local = threading.local()
-
 def thread_session():
   if not hasattr(_thread_local, "s"):
     _thread_local.s = session_with_retries()
@@ -123,14 +104,14 @@ def norm(s): return re.sub(r"\s+"," ",(s or "")).strip()
 def absolute(base, href): return href if (href and href.startswith("http")) else (urljoin(base, href) if href else None)
 
 def fetch(url, timeout):
-  r = HTTP.get(url, timeout=timeout)     # tuple timeouts: (connect, read)
+  r = HTTP.get(url, timeout=timeout)  # tuple timeouts (connect, read)
   r.raise_for_status()
   return r
 
 def decode_html_bytes(resp):
   enc = resp.encoding or getattr(resp, "apparent_encoding", None) or "utf-8"
   dammit = UnicodeDammit(resp.content, is_html=True, known_definite_encodings=[enc, "utf-8", "windows-1252", "iso-8859-1"])
-  return dammit.unicode_markup
+  return dammit.unicode_markup  # Unicode for BeautifulSoup
 
 def head_ok(url):
   try:
@@ -152,12 +133,11 @@ def make_id(org, slug):
   h = hashlib.sha1(f"{org.lower()}|{slug}".encode("utf-8")).hexdigest()[:12]
   return f"{org}:{h}"
 
-def passes_education(text): return any(re.search(p,(text or "").lower()) for p in INCLUDE_EDU)
+def optional_education(text): return any(re.search(p,(text or "").lower()) for p in EDU_HINTS)
 def passes_skill_rule(text):
   t=(text or "").lower()
-  if not re.search(r"\b(skill|certificate|course|experience|typing|computer|pet|pst|physical)\b",t): return True
   if any(re.search(p,t) for p in DISALLOWED_SKILLS): return False
-  return any(re.search(p,t) for p in ALLOWED_SKILLS)
+  return True if not re.search(r"\b(skill|certificate|course|experience|typing|computer|pet|pst|physical)\b",t) else any(re.search(p,t) for p in ALLOWED_SKILLS)
 def passes_degree_exclusions(text): return not any(re.search(p,(text or "").lower()) for p in EXCLUDE_DEGREE)
 def is_recruitment(text): return not any(re.search(p,(text or "").lower()) for p in EXCLUDE_NON_RECRUITMENT)
 
@@ -172,12 +152,11 @@ def other_state_only(text):
     if re.search(rf"\b{re.escape(st)}\b.*{RESTRICT_PAT}",t) or re.search(rf"{RESTRICT_PAT}.*\b{re.escape(st)}\b",t): return True
   return False
 
-# RELAXED: allow by default unless explicitly “other state only”
 def eligible_by_domicile(org, detail_text):
   if other_state_only(detail_text): return False
   if is_all_india(detail_text): return True
   if ("bpsc" in (org or "").lower()) or is_bihar_only(detail_text): return True
-  return True
+  return True  # allow by default
 
 def classify_level(text):
   t=(text or "").lower()
@@ -230,12 +209,11 @@ def soup_from_resp(resp):
     return BeautifulSoup(html, "html.parser")
 
 def scrape_html_list(list_url, base, org):
-  items=[]
+  items=[]; sel=0
   try:
     if not robots_allowed(list_url):
       print(f"[INFO] robots disallow list: {list_url}")
       return items
-
     list_resp = fetch(list_url, LIST_TO)
     soup = soup_from_resp(list_resp)
     if soup is None: return items
@@ -251,26 +229,26 @@ def scrape_html_list(list_url, base, org):
       if len(title) < 8: 
         continue
       anchors.append((title, href))
-      if len(anchors) >= PER_SOURCE_MAX:
+      if len(anchors) >= PER_SOURCE_MAX: 
         break
 
     def fetch_detail(pair):
       title, href = pair
       s = thread_session()
-      if not robots_allowed(href):
+      if not robots_allowed(href): 
         return None
       try:
         resp = s.get(href, timeout=DETAIL_TO)
         resp.raise_for_status()
         dsoup = soup_from_resp(resp)
+        # If not HTML (e.g., PDF), use title as detail text
         detail_text = norm(dsoup.get_text(" ")) if dsoup is not None else title
       except Exception:
         detail_text = title
 
       combo=f"{title} — {detail_text}"
-      if not (passes_education(combo) and passes_skill_rule(combo) and
-              passes_degree_exclusions(combo) and is_recruitment(combo) and
-              eligible_by_domicile(org, detail_text)):
+      # Education is optional; strong exclusions + domicile gate + recruitment gate apply
+      if not (passes_skill_rule(combo) and passes_degree_exclusions(combo) and is_recruitment(combo) and eligible_by_domicile(org, detail_text)):
         return None
 
       slug=clean_title_for_id(title)
@@ -289,37 +267,30 @@ def scrape_html_list(list_url, base, org):
         "applyLink": href,
         "pdfLink": href,
         "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "hasEduHint": bool(optional_education(combo)),
       }
       it["_link_ok"]=head_ok(it["applyLink"] or it["pdfLink"])
       return it
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-      futures = [ex.submit(fetch_detail, pair) for pair in anchors]
-      for fut in as_completed(futures):
+      for fut in as_completed([ex.submit(fetch_detail, pair) for pair in anchors]):
         it = fut.result()
-        if it: items.append(it)
-
+        if it: items.append(it); sel += 1
+    print(f"[SRC] {org}: anchors={len(anchors)} selected={sel}")
   except Exception as e:
     print(f"[WARN] {org} scrape error: {e}")
   return items
 
-def scrape_official_all():
-  out=[]
-  for s in SOURCES_OFFICIAL:
-    print("Scraping official:", s["name"])
-    out.extend(scrape_html_list(s["url"], s["base"], s["name"]))
-  return out
-
-def scrape_aggregators_all():
-  out=[]
-  for s in SOURCES_AGG:
-    print("Scraping aggregator:", s["name"])
+def scrape_group(sources, tag):
+  out=[]; counts={}
+  for s in sources:
+    print(f"Scraping {tag}:", s["name"])
     items=scrape_html_list(s["url"], s["base"], s["name"])
     for it in items:
-      it["source"]="aggregator"
-      if it["domicile"]!="Bihar": it["domicile"]="All India"
-    out.extend(items)
-  return out
+      it["source"]=tag
+      if tag=="aggregator" and it["domicile"]!="Bihar": it["domicile"]="All India"
+    out.extend(items); counts[s["name"]]=len(items)
+  return out, counts
 
 def merge_with_fallback(official_items, aggregator_items):
   by_slug={}
@@ -367,15 +338,17 @@ def load_data():
 def save_data(data): DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 def main():
-  official=scrape_official_all()
-  aggs=scrape_aggregators_all()
+  official, off_counts = scrape_group(SOURCES_OFFICIAL, "official")
+  aggs, agg_counts = scrape_group(SOURCES_AGG, "aggregator")
   merged=merge_with_fallback(official, aggs)
   cleaned=drop_expired(merged)
 
   data=load_data()
   data["jobListings"]=cleaned
-  data["transparencyInfo"]["lastUpdated"]=UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
-  data["transparencyInfo"]["totalListings"]=len(cleaned)
+  ti=data["transparencyInfo"]
+  ti["lastUpdated"]=UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
+  ti["totalListings"]=len(cleaned)
+  ti["sourceCounts"]={"official": off_counts, "aggregator": agg_counts}
   save_data(data)
   print(f"[INFO] merged={len(merged)} cleaned={len(cleaned)} at {UTC_NOW.isoformat()}")
 
