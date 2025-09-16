@@ -1,6 +1,6 @@
 # scraper.py — production-ready: explicit decoding, lxml parser, shorter connect/read timeouts,
-# retry-hardening, non-HTML skip, per-source caps, and 8-thread concurrent detail fetch.
-# Includes relaxed domicile filter to avoid dropping valid listings and added summary logs.
+# retry-hardening with robust urllib3 Retry import, non-HTML skip, per-source caps,
+# 8-thread concurrent detail fetch, and relaxed domicile filter. All try blocks have matching except.
 
 import json, re, hashlib, threading
 from pathlib import Path
@@ -9,12 +9,16 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
-from urllib3.util_retry import Retry  # some runners expose as urllib3.util.retry; guard below
+
+# Robust Retry import across environments (preferred path first, safe fallback)
 try:
-    from urllib3.util import Retry as _Retry
-    Retry = _Retry
+    from urllib3.util.retry import Retry  # preferred in urllib3 2.x
 except Exception:
-    pass
+    try:
+        from urllib3.util import Retry    # some environments export here
+    except Exception:
+        Retry = None  # proceed without retries if not available
+# refs: urllib3 util.retry docs + common requests pattern for HTTPAdapter(max_retries=Retry(...))
 
 from bs4 import BeautifulSoup, UnicodeDammit
 import dateparser
@@ -95,12 +99,15 @@ HEADERS = {"User-Agent":"Mozilla/5.0 (VacancyBot)","Accept-Language":"en-IN,en;q
 def session_with_retries(pool=64):
   s = requests.Session()
   s.headers.update(HEADERS)
-  retry = Retry(
-      total=2, connect=2, read=2, backoff_factor=0.4,
-      status_forcelist=[429,500,502,503,504],
-      allowed_methods={"GET","HEAD"}
-  )
-  adapter = HTTPAdapter(max_retries=retry, pool_connections=pool, pool_maxsize=pool)
+  if Retry:
+    retry = Retry(
+        total=2, connect=2, read=2, backoff_factor=0.4,
+        status_forcelist=[429,500,502,503,504],
+        allowed_methods={"GET","HEAD"}
+    )
+    adapter = HTTPAdapter(max_retries=retry, pool_connections=pool, pool_maxsize=pool)
+  else:
+    adapter = HTTPAdapter(pool_connections=pool, pool_maxsize=pool)
   s.mount("http://", adapter); s.mount("https://", adapter)
   return s
 
