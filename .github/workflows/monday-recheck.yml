@@ -1,7 +1,9 @@
 name: Monday Hard Recheck
 
 on:
-  - cron: '10 21 * * 0'
+  schedule:
+    # 02:40 AM IST every Monday == 21:10 UTC every Sunday
+    - cron: '10 21 * * 0'
   workflow_dispatch: {}
 
 permissions:
@@ -17,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.11'
