@@ -2,48 +2,38 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Government Jobs Dashboard</title>
-  <meta name="robots" content="index,follow" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vacancies Dashboard</title>
+  <meta name="description" content="General-competition government vacancies for Any Graduate, 12th, and 10th." />
   <link rel="stylesheet" href="style.css" />
-  <!-- Optional: Sentry (disabled until DSN provided) -->
-  <!--
-  <script src="https://browser.sentry-cdn.com/7.120.0/bundle.tracing.replay.min.js" crossorigin="anonymous"
-    onload="Sentry.init({ dsn: 'https://<public>@o<org>.ingest.sentry.io/<proj>', sampleRate: 1.0, tracesSampleRate: 0.0, replaysSessionSampleRate: 0.0, replaysOnErrorSampleRate: 1.0 });">
-  </script>
-  -->
 </head>
 <body>
-  <header class="container">
-    <h1>Government Jobs Dashboard</h1>
-    <p class="muted">Bihar & All India Vacancies</p>
-    <p id="status" aria-live="polite">Loading jobs…</p>
+  <header class="site-header">
+    <h1>Vacancies Dashboard</h1>
+    <p class="subtitle">General Vacancy — Any Graduate, 12th, 10th</p>
   </header>
 
-  <nav class="container pillbar" aria-label="Filters">
-    <button class="pill" data-filter="qual" data-value="Graduate" aria-pressed="false">Graduate</button>
-    <button class="pill" data-filter="qual" data-value="12th" aria-pressed="false">12th</button>
-    <button class="pill" data-filter="qual" data-value="10th" aria-pressed="false">10th</button>
-
-    <button class="pill" data-filter="skill" data-value="typing" aria-pressed="false">Typing</button>
-    <button class="pill" data-filter="skill" data-value="computer" aria-pressed="false">Computer</button>
-    <button class="pill" data-filter="skill" data-value="physical" aria-pressed="false">Physical</button>
-
-    <button class="pill" data-filter="state" data-value="All India" aria-pressed="false">All India</button>
-    <button class="pill" data-filter="state" data-value="Bihar" aria-pressed="false">Bihar</button>
-
-    <button class="pill" data-filter="source" data-value="official" aria-pressed="false">Official</button>
-    <button class="pill" data-filter="source" data-value="aggregator" aria-pressed="false">Aggregator</button>
-
-    <button class="pill" data-filter="urgency" data-value="urgent" aria-pressed="false">Urgent</button>
-    <button class="pill" id="clearFilters">Clear</button>
-  </nav>
+  <!-- Health/status banner -->
+  <div id="status-banner" class="status-banner">
+    <div class="status-line">
+      <span class="pill" id="health-pill">Loading…</span>
+      <span id="last-updated">Last updated: —</span>
+      <span id="total-listings">Listings: —</span>
+    </div>
+  </div>
 
   <main class="container">
-    <section id="jobs" role="list" aria-label="Active vacancies"></section>
+    <!-- Your existing page content goes here.
+         Example placeholder for where you render job listings -->
+    <div id="jobs-root"></div>
   </main>
 
-  <noscript><p class="container muted">JavaScript is required to load live data.</p></noscript>
-  <script src="app.js" defer></script>
+  <footer class="site-footer">
+    <p>
+      Data refreshed automatically by GitHub Actions. See transparency in <code>health.json</code>.
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
 </body>
 </html>
