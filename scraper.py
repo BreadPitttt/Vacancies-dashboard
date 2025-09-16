@@ -49,7 +49,7 @@ def session_with_retries(pool=64):
   else:
     adapter = HTTPAdapter(pool_connections=pool, pool_maxsize=pool)
   s.mount("http://", adapter); s.mount("https://", adapter)
-  return s  # HTTPAdapter + Retry is the recommended resilient pattern. [13][10][19]
+  return s  # HTTPAdapter + Retry is the recommended resilient pattern. [5][6]
 
 HTTP = session_with_retries()
 _thread_local = threading.local()
@@ -82,7 +82,7 @@ AGG_SOURCES = [
   {"name":"SarkariExam",   "base":"https://www.sarkariexam.com",  "url":"https://www.sarkariexam.com"},
   {"name":"RojgarResult",  "base":"https://www.rojgarresult.com", "url":"https://www.rojgarresult.com/recruitments/"},
   {"name":"SarkariExamCM", "base":"https://sarkariexam.com.cm",   "url":"https://sarkariexam.com.cm"},
-]  # Aggregator coverage for live recruitments and notices. [21]
+]
 
 # Telegram hints via RSSHub (no login)
 TELEGRAM_CHANNELS = ["ezgovtjob", "sarkariresulinfo"]  # hints only
@@ -90,7 +90,7 @@ TELEGRAM_RSS_BASES = [
   os.getenv("TELEGRAM_RSS_BASE") or "https://rsshub.app",
   "https://rsshub.netlify.app",
   "https://rsshub.rssforever.com",
-]  # /telegram/channel/:username per docs; multiple instances for fallback. [6][12][18]
+]  # /telegram/channel/:username per docs; multiple instances for fallback. [3][4][7]
 
 # Official verification domains (includes SSC portal)
 OFFICIAL_DOMAINS = {
@@ -111,13 +111,13 @@ EXCLUDE_NOISE = [r"\badmit\s*card\b", r"\banswer\s*key\b", r"\bresult\b", r"\bsy
 UPDATE_TERMS = [r"\bcorrigendum\b", r"\baddendum\b", r"\bamendment\b", r"\brevised\b", r"\bdate\s*(?:extended|extension)\b", r"\bpostponed\b", r"\brescheduled\b", r"\bedit\s*window\b"]
 def contains_any(patterns, text): return any(re.search(p, (text or "").lower()) for p in patterns)
 def is_update(text): return contains_any(UPDATE_TERMS, text)
-def is_joblike(text): return contains_any(RECRUITMENT_TERMS, text) and not contains_any(EXCLUDE_NOISE, text)  # broad but precise. [21]
+def is_joblike(text): return contains_any(RECRUITMENT_TERMS, text) and not contains_any(EXCLUDE_NOISE, text)
 
 # Exclude non-vacancies like SSC OTR
 def is_non_vacancy(text):
   t = (text or "").lower()
-  if re.search(r"\b(otr|one\s*time\s*registration|registration\s*process)\b", t): 
-    return True  # OTR is a profile step, not a recruitment. [22][23]
+  if re.search(r"\b(otr|one\s*time\s*registration|registration\s*process)\b", t):
+    return True  # OTR is a profile step, not a recruitment. [8][9]
   return False
 
 # Domicile guard: show All-India or Bihar-only; exclude other state-only
@@ -151,16 +151,20 @@ def _month_word_fix(s):
 
 def parse_application_window(text):
   t=_month_word_fix(norm(text or ""))
+  # Range: 'Application 24 June 2025 - 14 July 2025' or 'Online Registration 24 June - 14 July 2025'
   pat_range=re.compile(r"(application|online\s*registration|apply\s*online|registration)[^\.:\n]{0,30}"
                        r"(\d{1,2}\s+[a-z]+(?:\s+\d{4})?)\s*[-to]+\s*(\d{1,2}\s+[a-z]+(?:\s+\d{4})?)", re.I)
   m=pat_range.search(t)
   if m:
     s_str,e_str=m.group(2),m.group(3)
-    if re.search(r"\d{4}",e_str) and not re.search(r"\d{4}",s_str):
-      s_str=f"{s_str} {re.search(r'\\d{4}',e_str).group(0)}"
+    # If year missing on start, borrow from end without backslashes inside f-string
+    end_year_match = re.search(r"\d{4}", e_str)
+    if end_year_match and not re.search(r"\d{4}", s_str):
+      s_str = s_str + " " + end_year_match.group(0)
     s_dt=dateparser.parse(s_str, settings={"DATE_ORDER":"DMY"})
     e_dt=dateparser.parse(e_str, settings={"DATE_ORDER":"DMY"})
     return (s_dt.date().isoformat() if s_dt else None, e_dt.date().isoformat() if e_dt else None)
+  # Single 'Last Date 14 July 2025'
   m2=re.compile(r"(last\s*date|closing\s*date)[^\.:\n]{0,30}(\d{1,2}\s+[a-z]+(?:\s+\d{4})?)", re.I).search(t)
   if m2:
     e_dt=dateparser.parse(m2.group(2), settings={"DATE_ORDER":"DMY"})
@@ -171,9 +175,8 @@ def extract_deadline(text):
   _,e = parse_application_window(text or "")
   if e: return e
   dt = dateparser.parse(text or "", settings={"PREFER_DATES_FROM":"future","DATE_ORDER":"DMY"})
-  return dt.date().isoformat() if (dt and dt.date() >= datetime.now().date()) else None  # open-window enforcement is applied later. [24]
+  return dt.date().isoformat() if (dt and dt.date() >= datetime.now().date()) else None
 
-# Official-domain check
 def looks_official(url):
   try: return urlparse(url or "").netloc.lower() in OFFICIAL_DOMAINS
   except Exception: return False
@@ -207,11 +210,11 @@ def scrape_aggregator_page(src):
         if ds is not None: detail_text = norm(ds.get_text(" "))
       except Exception: pass
       combo = f"{title} — {detail_text}"
-      if is_non_vacancy(combo): return None  # drop OTR/registration pages. [22][23]
-      if other_state_only(combo): return None  # exclude other state-only.
+      if is_non_vacancy(combo): return None
+      if other_state_only(combo): return None
       key_base = norm_key(title)
       upd = is_update(combo)
-      unique_key = f"{key_base}|upd" if upd else key_base  # distinct keys for updates (no id collisions).
+      unique_key = f"{key_base}|upd" if upd else key_base
       return {
         "key": key_base,
         "uniqueKey": unique_key,
@@ -239,7 +242,7 @@ def scrape_aggregator_page(src):
 
 def telegram_feed_urls(username):
   for base in TELEGRAM_RSS_BASES:
-    if base: yield f"{base.rstrip('/')}/telegram/channel/{username}"  # documented route. [6][9]
+    if base: yield f"{base.rstrip('/')}/telegram/channel/{username}"  # documented route. [3][10]
 
 def scrape_telegram_channel(username):
   items=[]; kept=0
@@ -279,7 +282,7 @@ def scrape_telegram_channel(username):
       print(f"[WARN] telegram {username}@{url} network: {e}; trying next")
     except Exception as e:
       print(f"[WARN] telegram {username}@{url} parse: {e}; trying next")
-  print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items  # Fall back behavior. [15]
+  print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items  # Fall back behavior. [11]
 
 def merge_and_mark(collected, prev_pending):
   # group by base key for cross-source verification
@@ -311,11 +314,11 @@ def merge_and_mark(collected, prev_pending):
     rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator" and not x.get("isUpdate")), None)
     if rep is None: rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator"), None)
     if rep is None: rep = next((x for x in b["items"] if isinstance(x, dict)), None)
-    if not isinstance(rep, dict): 
+    if not isinstance(rep, dict):
       continue
 
     sources = sorted({x["source"] for x in b["items"] if x.get("sourceType")=="aggregator"})
-    schema_source = "official" if verifiedBy == "official" else "aggregator"  # enum-safe. [1][3][5]
+    schema_source = "official" if verifiedBy == "official" else "aggregator"  # enum-safe. [2]
 
     # compute unique id from sources + uniqueKey
     base_id = hashlib.sha1(f"{'|'.join(sources)}|{rep['uniqueKey']}".encode("utf-8")).hexdigest()[:12]
@@ -399,7 +402,7 @@ def filter_open_only(listings):
   today=datetime.now().date(); out=[]
   for rec in listings:
     dl = rec.get("deadline")
-    if not dl: 
+    if not dl:
       continue  # conservative: no explicit deadline => don't publish
     try:
       d = dateparser.parse(dl).date()
@@ -407,7 +410,7 @@ def filter_open_only(listings):
       continue
     if d >= today:
       out.append(rec)
-  return out  # ensures only open vacancies appear (e.g., suppress expired SBI PO). [25][26]
+  return out  # ensures only open vacancies appear. 
 
 def main():
   collected=[]; agg_counts={}; tg_counts={}
