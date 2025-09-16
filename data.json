@@ -1,7 +1,7 @@
 {
   "jobListings": [],
   "transparencyInfo": {
-    "lastUpdated": "2025-09-16T18:35:31Z",
+    "lastUpdated": "2025-09-16T19:32:10Z",
     "totalListings": 0,
     "sourceCounts": {
       "official": {
@@ -38,9 +38,9 @@
       "DSSSB_Notice": 0,
       "BPSC": 0
     },
-    "runStartedAt": "2025-09-16T18:35:31Z",
-    "runEndedAt": "2025-09-16T19:21:45Z",
-    "runDurationSec": 2774.47,
+    "runStartedAt": "2025-09-16T19:32:10Z",
+    "runEndedAt": "2025-09-16T20:19:07Z",
+    "runDurationSec": 2817.06,
     "perSourceMetrics": {
       "Adda247": {
         "ok": 0,
@@ -54,7 +54,7 @@
           "HTTPSConnectionPool(host='www.adda247.com', port=443): Max retries exceeded with url: /jobs/government-jobs/ (Caused by ResponseError('too many 403 error responses'))"
         ],
         "durations": [
-          222.66842341423035
+          222.9964861869812
         ]
       },
       "SarkariExam": {
@@ -69,7 +69,7 @@
           "HTTPSConnectionPool(host='www.sarkariexam.com', port=443): Max retries exceeded with url: / (Caused by ResponseError('too many 403 error responses'))"
         ],
         "durations": [
-          228.30369591712952
+          225.75683665275574
         ]
       },
       "RojgarResult": {
@@ -84,7 +84,7 @@
           "HTTPSConnectionPool(host='www.rojgarresult.com', port=443): Max retries exceeded with url: /recruitments/ (Caused by ResponseError('too many 403 error responses'))"
         ],
         "durations": [
-          223.0560519695282
+          223.6398057937622
         ]
       },
       "ResultBharat": {
@@ -93,11 +93,11 @@
         "skipped_due_cb": 0,
         "not_modified": 0,
         "raw": 256,
-        "hinted": 70,
+        "hinted": 69,
         "kept": 0,
         "error_samples": [],
         "durations": [
-          40.87113690376282
+          53.4448561668396
         ]
       },
       "DSSSB_Notice": {
@@ -109,10 +109,10 @@
         "hinted": 0,
         "kept": 0,
         "error_samples": [
-          "HTTPSConnectionPool(host='dsssb.delhi.gov.in', port=443): Max retries exceeded with url: /notice-of-exam (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x7fbb1433a310>, 'Connection to dsssb.delhi.gov.in timed out. (connect timeout=12)'))"
+          "HTTPSConnectionPool(host='dsssb.delhi.gov.in', port=443): Max retries exceeded with url: /notice-of-exam (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x7f66ca2c6a90>, 'Connection to dsssb.delhi.gov.in timed out. (connect timeout=12)'))"
         ],
         "durations": [
-          504.4266347885132
+          506.06042766571045
         ]
       },
       "RRB_Chandigarh": {
@@ -125,7 +125,7 @@
         "kept": 1,
         "error_samples": [],
         "durations": [
-          300.1144344806671
+          344.758957862854
         ]
       },
       "BPSC": {
@@ -138,7 +138,7 @@
         "kept": 0,
         "error_samples": [],
         "durations": [
-          2774.4653565883636
+          2817.050465106964
         ]
       },
       "TG:ezgovtjob": {
@@ -151,7 +151,7 @@
         "kept": 0,
         "error_samples": [],
         "durations": [
-          2.4002859592437744
+          2.493502378463745
         ]
       }
     },
