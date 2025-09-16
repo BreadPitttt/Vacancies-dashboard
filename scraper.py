@@ -1,8 +1,4 @@
-# scraper.py — Aggregator-first publishing with confidence and Telegram hints
-# - Publishes any vacancy that meets parameters from one trusted aggregator
-# - verifiedBy: "official" (has official-domain URL), "multi-aggregator" (≥2 aggregators), or "single-aggregator"
-# - De-duplicates by a normalized key; Telegram (ezgovtjob, sarkariresulinfo) is a hint only and never publishes alone
-# - Standard Chrome UA, tuple timeouts, Retry, lxml parsing, verbose per-source logs
+# scraper.py — Robust publish with dict guards, lighter fetch, 403/429 tolerance, and confidence labels
 
 import json, re, hashlib, threading, os, xml.etree.ElementTree as ET
 from pathlib import Path
@@ -27,11 +23,11 @@ DATA_PATH = Path("data.json")
 UTC_NOW = datetime.now(timezone.utc)
 
 # Networking
-CONNECT_TO, READ_TO = 6, 12
+CONNECT_TO, READ_TO = 5, 9
 LIST_TO, DETAIL_TO = (CONNECT_TO, READ_TO), (CONNECT_TO, READ_TO)
-HEAD_TO = 8
-MAX_WORKERS = 8
-PER_SOURCE_MAX = 220
+HEAD_TO = 6
+MAX_WORKERS = 10
+PER_SOURCE_MAX = 140  # tighter cap to stay fast
 
 HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
@@ -75,24 +71,24 @@ def soup_from_resp(resp):
   try: return BeautifulSoup(html, "lxml")
   except Exception: return BeautifulSoup(html, "html.parser")
 
-# Aggregators (discovery)
+# Trusted aggregators
 AGG_SOURCES = [
   {"name":"Adda247",       "base":"https://www.adda247.com",      "url":"https://www.adda247.com/jobs/government-jobs/"},
   {"name":"SarkariExam",   "base":"https://www.sarkariexam.com",  "url":"https://www.sarkariexam.com"},
   {"name":"RojgarResult",  "base":"https://www.rojgarresult.com", "url":"https://www.rojgarresult.com/recruitments/"},
   {"name":"SarkariExamCM", "base":"https://sarkariexam.com.cm",   "url":"https://sarkariexam.com.cm"},
-]  # Trusted sources routinely post live vacancies and notices. [3][15][8][11]
+]  # Regularly updated hubs. [9][3][4][10]
 
-# Telegram hints (RSSHub)
-TELEGRAM_CHANNELS = ["ezgovtjob", "sarkariresulinfo"]
+# Telegram hints via RSSHub (no login)
+TELEGRAM_CHANNELS = ["ezgovtjob", "sarkariresulinfo"]  # hints only
 TELEGRAM_RSS_BASES = [
   os.getenv("TELEGRAM_RSS_BASE") or "https://rsshub.app",
   "https://rsshub.netlify.app",
-]  # Public instances expose /telegram/channel/:username without login. [25][26]
+]  # Public/self-hosted RSSHub instances for /telegram/channel/:username. [5][6]
 
-# Official verification domains (include SSC portal)
+# Official verification
 OFFICIAL_DOMAINS = {
-  "ssc.gov.in","www.ssc.gov.in",
+  "ssc.gov.in","www.ssc.gov.in",  # SSC portal [11]
   "bssc.bihar.gov.in","onlinebssc.com",
   "dsssb.delhi.gov.in","dsssbonline.nic.in",
   "www.ibps.in",
@@ -100,9 +96,9 @@ OFFICIAL_DOMAINS = {
   "www.rbi.org.in","opportunities.rbi.org.in",
   "ccras.nic.in",
   "www.rrbcdg.gov.in","www.rrbpatna.gov.in",
-}  # Authoritative sources for confirmation. [23]
+}
 
-# Filters (broad but precise)
+# Filters
 RECRUITMENT_TERMS = [r"\brecruitment\b", r"\bvacanc(?:y|ies)\b", r"\badvertisement\b", r"\bnotification\b", r"\bonline\s*form\b", r"\bapply\s*online\b"]
 EXCLUDE_NOISE = [r"\badmit\s*card\b", r"\banswer\s*key\b", r"\bresult\b", r"\bsyllabus\b", r"\bcalendar\b", r"\bwebinar\b", r"\bwellness\b"]
 UPDATE_TERMS = [r"\bcorrigendum\b", r"\baddendum\b", r"\bamendment\b", r"\brevised\b", r"\bdate\s*(?:extended|extension)\b", r"\bpostponed\b", r"\brescheduled\b", r"\bedit\s*window\b"]
@@ -113,10 +109,10 @@ def is_joblike(text): return contains_any(RECRUITMENT_TERMS, text) and not conta
 
 def norm_key(title):
   t = norm(title).lower()
-  t = re.sub(r"(recruitment|notification|advertisement|apply\s*online|online\s*form|\b202\d|\b202\d\d)"," ",t)
+  t = re.sub(r"(recruitment|notification|advertisement|apply\s*online|online\s*form|\b20\d{2})"," ",t)
   t = re.sub(r"[^a-z0-9\s]", " ", t)
   tokens = [w for w in t.split() if len(w) > 2]
-  return " ".join(tokens[:14])  # stable, fuzzy-ish key across aggregators
+  return " ".join(tokens[:14])
 
 def extract_deadline(text):
   m = re.search(r"(last\s*date|closing\s*date)[^\n]{0,20}(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4})", (text or ""), flags=re.I)
@@ -133,16 +129,22 @@ def looks_official(url):
 def scrape_aggregator_page(src):
   items=[]; raw=0; hinted=0; kept=0
   try:
-    soup = soup_from_resp(fetch(src["url"], LIST_TO))
+    try:
+      soup = soup_from_resp(fetch(src["url"], LIST_TO))
+    except requests.HTTPError as e:
+      if getattr(e.response, "status_code", 0) in (403, 429):
+        print(f"[AGG] {src['name']}: {e.response.status_code} blocked, skipping quickly")
+        return items
+      raise
     if soup is None:
       print(f"[AGG] {src['name']}: non-HTML"); return items
+
     anchors=[]
     for a in soup.find_all("a", href=True):
       href = absolute(src["base"], a["href"]); title = norm(a.get_text(" "))
       if not href or len(title) < 6: continue
       raw += 1
-      if is_joblike(f"{title} {href}"):
-        anchors.append((title, href)); hinted += 1
+      if is_joblike(f"{title} {href}"): anchors.append((title, href)); hinted += 1
       if len(anchors) >= PER_SOURCE_MAX: break
 
     def enrich(pair):
@@ -213,12 +215,15 @@ def scrape_telegram_channel(username):
         "detailText": combo
       }); kept += 1
     print(f"[TG ] {username}: kept={kept}")
+  except requests.HTTPError as e:
+    print(f"[WARN] telegram {username} HTTP {getattr(e.response,'status_code',0)}; skipping")
+  except requests.RequestException as e:
+    print(f"[WARN] telegram {username} network: {e}")
   except Exception as e:
-    print(f"[WARN] telegram {username} error: {e}")
-  return items  # Telegram is consumed via RSSHub to avoid login/limits. [25][26]
+    print(f"[WARN] telegram {username} parse: {e}")
+  return items  # Consumed through RSSHub to avoid login and API limits. [5][6]
 
 def merge_and_mark(collected, prev_pending):
-  # group by normalized key (fuzzy-ish across sites)
   buckets={}
   for it in collected:
     b = buckets.setdefault(it["key"], {"aggs": set(), "hasOfficial": False, "tele": False, "items": []})
@@ -229,7 +234,7 @@ def merge_and_mark(collected, prev_pending):
 
   published=[]; pending=set()
   for key, b in buckets.items():
-    # confidence determination
+    # decide confidence
     if b["hasOfficial"]:
       verifiedBy = "official"
     elif len(b["aggs"]) >= 2:
@@ -237,21 +242,20 @@ def merge_and_mark(collected, prev_pending):
     elif len(b["aggs"]) == 1:
       verifiedBy = "single-aggregator"
     else:
-      verifiedBy = None  # telegram-only
+      verifiedBy = None
 
     if verifiedBy is None:
       if b["tele"]: pending.add(key)
       continue
 
-    # choose a representative aggregator item (or fallback first item)
-    rep = None; updates=[]
-    for it in b["items"]:
-      if it["sourceType"] == "aggregator" and not it["isUpdate"] and rep is None: rep = it
-      if it["isUpdate"]: updates.append(it)
-    if rep is None: rep = b["items"]
+    # pick representative aggregator dict safely
+    rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator" and not x.get("isUpdate")), None)
+    if rep is None: rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator"), None)
+    if rep is None: rep = next((x for x in b["items"] if isinstance(x, dict)), None)
+    if not isinstance(rep, dict):
+      continue  # guard against malformed group
 
-    # publish the representative vacancy plus updates
-    sources = sorted({x["source"] for x in b["items"] if x["sourceType"]=="aggregator"})
+    sources = sorted({x["source"] for x in b["items"] if x.get("sourceType")=="aggregator"})
     rep_rec = {
       "id": rep["slug"],
       "slug": rep["slug"],
@@ -271,7 +275,8 @@ def merge_and_mark(collected, prev_pending):
     }
     published.append(rep_rec)
 
-    for u in updates:
+    # attach updates if any
+    for u in (x for x in b["items"] if x.get("isUpdate")):
       upd = rep_rec.copy()
       upd["id"] = u["slug"]; upd["slug"] = u["slug"]; upd["title"] = "[UPDATE] " + u["title"]
       upd["type"] = "UPDATE"; upd["updateSummary"] = u.get("updateSummary"); upd["relatedTo"] = rep_rec["slug"]
@@ -282,15 +287,13 @@ def merge_and_mark(collected, prev_pending):
   # carry telegram-only hints forward
   pending_now = (prev_pending or set()) | pending
   for rec in published:
-    k = rec["slug"]  # slug is key-derived
-    if k in pending_now: pending_now.discard(k)
+    if rec["slug"] in pending_now: pending_now.remove(rec["slug"])
   return published, pending_now
 
 def load_data():
   base={"jobListings": [], "transparencyInfo": {}}
-  p = DATA_PATH
-  if p.exists():
-    try: base=json.loads(p.read_text(encoding="utf-8"))
+  if DATA_PATH.exists():
+    try: base=json.loads(DATA_PATH.read_text(encoding="utf-8"))
     except Exception: pass
   base.setdefault("jobListings",[]); base.setdefault("transparencyInfo",{})
   return base
@@ -298,8 +301,7 @@ def load_data():
 def save_data(data): DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 def drop_expired(listings):
-  out=[]
-  today = datetime.now().date()
+  out=[]; today = datetime.now().date()
   for j in listings:
     dl=j.get("deadline")
     if dl:
