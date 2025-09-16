@@ -3,6 +3,7 @@ General Vacancy
 
 [![Nightly and Monday Recheck](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/update.yml/badge.svg?branch=main)](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/update.yml)
 [![pages-build-deployment](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/pages/pages-build-deployment/badge.svg?branch=main)](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/pages/pages-build-deployment)
+[![Nightly Recheck](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/update.yml/badge.svg)](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/update.yml)
 
 ## About
 A lightweight dashboard that shows general‑competition government vacancies for Any Graduate, 12th, and 10th, allowing only typing/computer/physical skills; technical/management/professional degrees are excluded by the scraper rules.  
