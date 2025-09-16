@@ -1,10 +1,10 @@
-name: Nightly and Monday Recheck
+name: Nightly Recheck
 
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: '15 18 * * *'   # daily, UTC
-    - cron: '15 18 * * 1'   # Mondays, UTC
+    # Daily at 18:15 UTC (no Monday special here)
+    - cron: '15 18 * * *'
 
 permissions:
   contents: write
@@ -33,7 +33,7 @@ jobs:
       - name: Run scraper
         env:
           PYTHONUNBUFFERED: "1"
-          TELEGRAM_RSS_BASE: ${{ vars.TELEGRAM_RSS_BASE }}
+          TELEGRAM_RSS_BASE: ${{ vars.TELEGRAM_RSS_BASE }}  # optional self-hosted RSSHub
         run: python scraper.py
 
       - name: Validate JSON Schema
@@ -54,6 +54,7 @@ jobs:
             "lastUpdated": ti.get("lastUpdated"),
             "totalListings": ti.get("totalListings"),
             "aggCounts": ti.get("aggCounts"),
+            "officialCounts": ti.get("officialCounts"),
             "telegramCounts": ti.get("telegramCounts"),
             "pendingFromTelegram": ti.get("pendingFromTelegram"),
           }
@@ -75,7 +76,7 @@ jobs:
           CHANGED="$(git status --porcelain data.json health.json)"
           if [[ -n "$CHANGED" ]]; then
             git add data.json health.json
-            git commit -m "chore(data): nightly refresh with verification"
+            git commit -m "chore(data): nightly refresh"
             git push
           else
             echo "No changes to commit."
@@ -87,6 +88,7 @@ jobs:
     if: ${{ vars.PAGES_URL != '' }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Audit homepage with Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
@@ -94,6 +96,7 @@ jobs:
             ${{ vars.PAGES_URL }}
           budgetPath: ./.github/lighthouse/budget.json
           uploadArtifacts: true
+
       - name: Check health.json exists (HTTP 200)
         run: |
           base="${{ vars.PAGES_URL }}"; base="${base%/}"
