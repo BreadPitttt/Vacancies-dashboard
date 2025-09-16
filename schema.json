@@ -1,35 +1,80 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vacancies data",
+  "title": "Vacancies Dashboard Data Schema",
   "type": "object",
   "required": ["jobListings", "transparencyInfo"],
   "properties": {
-    "transparencyInfo": {
-      "type": "object",
-      "properties": {
-        "lastUpdated": { "type": "string" },
-        "totalListings": { "type": "integer", "minimum": 0 }
-      }
-    },
     "jobListings": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id","title","organization","qualificationLevel","domicile","source"],
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "organization",
+          "qualificationLevel",
+          "domicile",
+          "source",
+          "type",
+          "extractedAt"
+        ],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "title": { "type": "string", "minLength": 3 },
-          "organization": { "type": "string", "minLength": 2 },
-          "qualificationLevel": { "type": "string", "enum": ["10th","12th","Graduate"] },
-          "domicile": { "type": "string", "enum": ["All India","Bihar"] },
-          "source": { "type": "string", "enum": ["official","aggregator"] },
-          "deadline": { "type": ["string","null"] },
-          "applyLink": { "type": ["string","null"] },
-          "pdfLink": { "type": ["string","null"] }
+          "id": { "type": "string" },
+          "slug": { "type": "string" },
+          "title": { "type": "string" },
+          "organization": { "type": "string" },
+          "qualificationLevel": { "type": "string", "enum": ["10th Pass", "12th Pass", "Graduate"] },
+          "domicile": { "type": "string", "enum": ["All India", "Bihar"] },
+          "source": { "type": "string", "enum": ["official", "aggregator"] },
+          "verifiedBy": { "type": "string", "enum": ["official", "multi-aggregator", "single-aggregator"] },
+          "type": { "type": "string", "enum": ["VACANCY", "UPDATE"] },
+          "updateSummary": { "type": ["string", "null"] },
+          "relatedTo": { "type": ["string", "null"] },
+          "deadline": { "type": ["string", "null"], "format": "date" },
+          "applyLink": { "type": ["string", "null"], "pattern": "^(https?://).+" },
+          "pdfLink": { "type": ["string", "null"], "pattern": "^(https?://).+" },
+          "extractedAt": { "type": "string", "format": "date-time" }
         },
         "additionalProperties": true
       }
+    },
+    "transparencyInfo": {
+      "type": "object",
+      "required": ["lastUpdated", "totalListings"],
+      "properties": {
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "totalListings": { "type": "number" },
+        "aggCounts": { "type": "object", "additionalProperties": { "type": "number" } },
+        "officialCounts": { "type": "object", "additionalProperties": { "type": "number" } },
+        "telegramCounts": { "type": "object", "additionalProperties": { "type": "number" } },
+        "pendingFromTelegram": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" },
+        "runStartedAt": { "type": "string", "format": "date-time" },
+        "runEndedAt": { "type": "string", "format": "date-time" },
+        "runDurationSec": { "type": "number" },
+        "successRatePct": { "type": "number" },
+        "perSourceMetrics": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "ok": { "type": "number" },
+              "fail": { "type": "number" },
+              "skipped_due_cb": { "type": "number" },
+              "not_modified": { "type": "number" },
+              "raw": { "type": "number" },
+              "hinted": { "type": "number" },
+              "kept": { "type": "number" },
+              "error_samples": { "type": "array", "items": { "type": "string" } },
+              "durations": { "type": "array", "items": { "type": "number" } }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
     }
   },
-  "additionalProperties": false
+  "additionalProperties": true
 }
