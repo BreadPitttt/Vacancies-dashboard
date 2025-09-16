@@ -3,8 +3,8 @@ name: Nightly and Monday Recheck
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: '15 18 * * *'   # UTC nightly
-    - cron: '15 18 * * 1'   # Additional Monday run (UTC)
+    - cron: '15 18 * * *'
+    - cron: '15 18 * * 1'
 
 permissions:
   contents: write
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   scrape:
-    timeout-minutes: 30  # Fail fast instead of waiting up to the 360‑minute default [15][12]
+    timeout-minutes: 60  # hard cap per job; default is 360 if unset [17]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,7 +71,7 @@ jobs:
   lighthouse:
     runs-on: ubuntu-latest
     needs: scrape
-    if: ${{ vars.PAGES_URL != '' }}  # Only runs after setting PAGES_URL repository variable [7]
+    if: ${{ vars.PAGES_URL != '' }}  # enable by setting PAGES_URL variable
     steps:
       - uses: actions/checkout@v4
       - name: Audit URLs using Lighthouse CI
