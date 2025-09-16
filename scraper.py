@@ -1,4 +1,4 @@
-# scraper.py — Robust networking (longer timeouts, retries, CA bundle, CF + scoped SSL fallback) + resilient discovery.
+# scraper.py — Fixes SSLError exception path; retains robust networking and all filters.
 
 import os, re, json, hashlib, threading, xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -13,7 +13,6 @@ try:
 except Exception:
     Retry = None
 
-# Optional Cloudflare-aware fallback
 try:
     import cloudscraper
     CF = cloudscraper.create_scraper()
@@ -23,7 +22,7 @@ except Exception:
 DATA_PATH = Path("data.json")
 UTC_NOW = datetime.now(timezone.utc)
 
-# Timeouts tuned for public portals (connect 12s, read 35s)
+# Timeouts for public portals (connect 12s, read 35s)
 CONNECT_TO, READ_TO = 12, 35
 LIST_TO, DETAIL_TO = (CONNECT_TO, READ_TO), (CONNECT_TO, READ_TO)
 MAX_WORKERS = 10
@@ -38,7 +37,7 @@ HEADERS = {
 def session_with_retries(pool=64):
   s = requests.Session()
   s.headers.update(HEADERS)
-  s.verify = certifi.where()  # modern CA bundle for SSL verification [4][1][3]
+  s.verify = certifi.where()
   if Retry:
     retry = Retry(
       total=5, connect=4, read=4,
@@ -50,7 +49,7 @@ def session_with_retries(pool=64):
   else:
     adapter = HTTPAdapter(pool_connections=pool, pool_maxsize=pool)
   s.mount("http://", adapter); s.mount("https://", adapter)
-  return s  # Requests + HTTPAdapter + Retry per best practice. [4][22]
+  return s
 
 HTTP = session_with_retries()
 _thread_local = threading.local()
@@ -74,7 +73,7 @@ def soup_from_resp(resp):
   try: return BeautifulSoup(html, "lxml")
   except Exception: return BeautifulSoup(html, "html.parser")
 
-OFFICIAL_SSL_FALLBACK = {"bpsc.bihar.gov.in"}  # last‑resort verify=False retry scoped to BPSC if certifi still fails [23][24]
+OFFICIAL_SSL_FALLBACK = {"bpsc.bihar.gov.in"}
 
 def fetch(url, timeout):
   host = urlparse(url or "").netloc.lower()
@@ -82,35 +81,34 @@ def fetch(url, timeout):
     r = HTTP.get(url, timeout=timeout)
     r.raise_for_status()
     return r
-  except requests.SSLError:
+  except requests.exceptions.SSLError: # CORRECTED: Use requests.exceptions.SSLError
     if any(h in host for h in OFFICIAL_SSL_FALLBACK):
       r2 = requests.get(url, headers=HEADERS, timeout=sum(timeout), verify=False)
       r2.raise_for_status()
       return r2
     raise
-  except requests.HTTPError as e:
-    code = getattr(e.response, "status_code", 0)
+  except requests.exceptions.RequestException as e:
+    code = getattr(e.response, "status_code", 0) if hasattr(e, "response") else 0
     if code == 403 and CF:
-      r2 = CF.get(url, timeout=sum(timeout))
-      if getattr(r2, "status_code", 0) == 200:
-        return r2
+      try:
+        r2 = CF.get(url, timeout=sum(timeout))
+        if getattr(r2, "status_code", 0) == 200:
+          return r2
+      except Exception:
+        pass
     raise
 
-# Aggregators + Official sources
 AGG_SOURCES = [
   {"name":"Adda247",       "base":"https://www.adda247.com",      "url":"https://www.adda247.com/jobs/government-jobs/"},
   {"name":"SarkariExam",   "base":"https://www.sarkariexam.com",  "url":"https://www.sarkariexam.com"},
   {"name":"RojgarResult",  "base":"https://www.rojgarresult.com", "url":"https://www.rojgarresult.com/recruitments/"},
   {"name":"ResultBharat",  "base":"https://www.resultbharat.com", "url":"https://www.resultbharat.com"},
-]  # CF fallback helps with 403 on some aggregators. [22]
-
+]
 OFFICIAL_SOURCES = [
   {"name":"DSSSB_Notice",   "base":"https://dsssb.delhi.gov.in", "url":"https://dsssb.delhi.gov.in/notice-of-exam"},
   {"name":"RRB_Chandigarh", "base":"https://www.rrbcdg.gov.in",  "url":"https://www.rrbcdg.gov.in"},
   {"name":"BPSC",           "base":"https://bpsc.bihar.gov.in",  "url":"https://bpsc.bihar.gov.in"},
-]  # Official discovery reduces misses when blogs change HTML. [25][26][27]
-
-# Telegram hints via RSSHub (multi‑instance fallback)
+]
 def env_channels():
   raw=os.getenv("TELEGRAM_CHANNELS","").strip()
   return [x for x in raw.split(",") if x] or ["ezgovtjob"]
@@ -119,45 +117,36 @@ TELEGRAM_RSS_BASES = [
   os.getenv("TELEGRAM_RSS_BASE") or "https://rsshub.app",
   "https://rsshub.netlify.app",
   "https://rsshub.rssforever.com",
-]  # /telegram/channel/:username route per docs and public instances. [7][13][18]
-
+]
 OFFICIAL_DOMAINS = {
   "dsssb.delhi.gov.in","dsssbonline.nic.in",
   "www.rrbcdg.gov.in","rrbcdg.gov.in",
   "bpsc.bihar.gov.in","www.bpsc.bihar.gov.in",
   "ssc.gov.in","www.ssc.gov.in",
-}  # Used to mark verifiedBy as official when links are on these hosts. [25][26][27]
-
-# Vacancy signals and exclusions
+}
 RECRUITMENT_TERMS = [r"\brecruitment\b", r"\bvacanc(?:y|ies)\b", r"\badvertisement\b", r"\bnotification\b", r"\bonline\s*form\b", r"\bapply\s*online\b"]
 EXCLUDE_NOISE = [r"\badmit\s*card\b", r"\banswer\s*key\b", r"\bresult\b", r"\bsyllabus\b", r"\bcalendar\b", r"\bwebinar\b", r"\bwellness\b"]
 UPDATE_TERMS = [r"\bcorrigendum\b", r"\baddendum\b", r"\bamendment\b", r"\brevised\b", r"\bdate\s*(?:extended|extension)\b", r"\bpostponed\b", r"\brescheduled\b", r"\bedit\s*window\b"]
 def contains_any(patterns, text): return any(re.search(p, (text or "").lower()) for p in patterns)
 def is_update(text): return contains_any(UPDATE_TERMS, text)
 def is_joblike(text): return contains_any(RECRUITMENT_TERMS, text) and not contains_any(EXCLUDE_NOISE, text)
-
-# Exclude non‑vacancies like SSC OTR
 def is_non_vacancy(text):
-  return bool(re.search(r"\b(otr|one\s*time\s*registration|registration\s*process)\b", (text or "").lower()))  # OTR is not a vacancy. [7]
-
-# Domicile guard: allow All‑India or Bihar‑only; exclude other state‑only when explicitly “domicile/resident only”
+  return bool(re.search(r"\b(otr|one\s*time\s*registration|registration\s*process)\b", (text or "").lower()))
 INDIAN_STATES = ["andhra pradesh","arunachal pradesh","assam","bihar","chhattisgarh","goa","gujarat","haryana","himachal pradesh","jharkhand","karnataka","kerala","madhya pradesh","maharashtra","manipur","meghalaya","mizoram","nagaland","odisha","punjab","rajasthan","sikkim","tamil nadu","telangana","tripura","uttar pradesh","uttarakhand","west bengal"]
 def other_state_only(text):
   t=(text or "").lower()
-  if not re.search(r"\b(domici(?:le|liary)|resident)\b", t): return False  # Ignore plain state lists like RRB zones. [26]
+  if not re.search(r"\b(domici(?:le|liary)|resident)\b", t): return False
   for st in INDIAN_STATES:
     if st=="bihar": continue
     if re.search(rf"\b{re.escape(st)}\b.*\bonly\b", t) or re.search(rf"\bonly\b.*\b{re.escape(st)}\b", t): return True
   return False
-
-# Strict education filter: only 10th/12th/any Graduate (exclude PG/professional)
 ALLOWED_EDU = [r"\b10\s*th\b", r"\bmatric\b", r"\b12\s*th\b", r"\binter(?:mediate)?\b", r"\bany\s+graduate\b", r"\bgraduate\b", r"\bbachelor(?:'s)?\s+degree\b"]
 EXCLUDE_EDU = [
   r"\bmaster'?s\b|\bm\.?\s?sc\b|\bm\.?\s?a\b|\bm\.?\s?com\b", r"\bmba\b|\bpgdm\b",
   r"\b(b\.?tech|be)\b|\bm\.?tech\b|\bengineering\b", r"\bmca\b|\bbca\b",
   r"\blaw\b|\bllb\b|\bllm\b", r"\bca\b|\bcfa\b|\bcs\b|\bicwa\b|\bcma\b",
   r"\bmbbs\b|\bbds\b|\bnursing\b|\bgnm\b|\banm\b|\bpharm\b", r"\bphd\b|\bdoctorate\b"
-]  # Excludes IFSCA/other PG/professional drives. [11]
+]
 ALLOW_SKILLS = [r"\btyping\b", r"\bsteno\b", r"\bcomputer\s+(?:certificate|knowledge|literacy|proficiency)\b", r"\bccc\b|\bnielit\b|\bdoeacc\b|\b'o?\s*level\b", r"\bpet\b|\bpst\b|\bphysical\b"]
 EXCLUDE_TECH = [r"\bpython\b|\bjava\b|\bjavascript\b|\bc\+\+\b|\bnode\.?js\b|\breact\b|\bangular\b|\b\.net\b", r"\bautocad\b|\bmatlab\b|\bsolidworks\b|\bcatia\b|\bsap\b"]
 def education_allowed(text):
@@ -230,17 +219,16 @@ def scrape_generic_list(src, treat_as="aggregator"):
 
     for title, href in anchors:
       detail_text = title + " — " + soup_text(href)
-      combo = detail_text
-      if is_non_vacancy(combo) or other_state_only(combo) or not education_allowed(combo): continue
-      key_base = norm_key(title); upd = is_update(combo); unique_key = f"{key_base}|upd" if upd else key_base
+      if is_non_vacancy(detail_text) or other_state_only(detail_text) or not education_allowed(detail_text): continue
+      key_base = norm_key(title); upd = is_update(detail_text); unique_key = f"{key_base}|upd" if upd else key_base
       items.append({
         "key": key_base, "uniqueKey": unique_key, "title": title,
         "organization": src["name"], "applyLink": href, "pdfLink": href,
-        "deadline": extract_deadline(combo),
-        "domicile": "Bihar" if "bihar" in combo.lower() else "All India",
+        "deadline": extract_deadline(detail_text),
+        "domicile": "Bihar" if "bihar" in detail_text.lower() else "All India",
         "sourceType": treat_as, "source": src["name"],
         "isUpdate": upd, "updateSummary": title if upd else None,
-        "detailText": combo
+        "detailText": detail_text
       }); kept += 1
     print(f"[{treat_as.upper()}] {src['name']}: raw={raw} hinted={hinted} kept={kept}")
   except Exception as e:
@@ -252,7 +240,7 @@ def scrape_official_page(src):   return scrape_generic_list(src, "official")
 
 def telegram_feed_urls(username):
   for base in TELEGRAM_RSS_BASES:
-    if base: yield f"{base.rstrip('/')}/telegram/channel/{username}"  # documented route [7][10]
+    if base: yield f"{base.rstrip('/')}/telegram/channel/{username}"
 
 def scrape_telegram_channel(username):
   items=[]; kept=0
@@ -277,13 +265,11 @@ def scrape_telegram_channel(username):
           "detailText": combo
         }); kept += 1
       print(f"[TG ] {username}@{url}: kept={kept}"); return items
-    except requests.HTTPError as e:
-      print(f"[WARN] telegram {username}@{url} HTTP {getattr(e.response,'status_code',0)}; trying next")
-    except requests.RequestException as e:
+    except requests.exceptions.RequestException as e:
       print(f"[WARN] telegram {username}@{url} network: {e}; trying next")
     except Exception as e:
       print(f"[WARN] telegram {username}@{url} parse: {e}; trying next")
-  print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items  # does not block runs [13][18]
+  print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items
 
 def merge_and_mark(collected, prev_pending):
   buckets={}
@@ -294,46 +280,33 @@ def merge_and_mark(collected, prev_pending):
     if it["sourceType"] == "telegram":   b["tele"] = True
     if looks_official(it.get("applyLink")) or looks_official(it.get("pdfLink")): b["hasOfficial"] = True
     b["items"].append(it)
-
   published=[]; pending=set(); seen_ids=set()
   for key, b in buckets.items():
-    if b["hasOfficial"] or len(b["off"])>0:
-      verifiedBy = "official"
-    elif len(b["aggs"]) >= 2:
-      verifiedBy = "multi-aggregator"
-    elif len(b["aggs"]) == 1:
-      verifiedBy = "single-aggregator"
-    else:
-      verifiedBy = None
+    if b["hasOfficial"] or len(b["off"])>0: verifiedBy = "official"
+    elif len(b["aggs"]) >= 2: verifiedBy = "multi-aggregator"
+    elif len(b["aggs"]) == 1: verifiedBy = "single-aggregator"
+    else: verifiedBy = None
     if verifiedBy is None:
       if b["tele"]: pending.add(key)
       continue
-
-    rep = next((x for x in b["items"] if x.get("sourceType")=="official" and not x.get("isUpdate")), None)
-    if rep is None: rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator" and not x.get("isUpdate")), None)
-    if rep is None: rep = next((x for x in b["items"] if x.get("sourceType") in ("official","aggregator")), None)
+    rep = next((x for x in b["items"] if x.get("sourceType")=="official" and not x.get("isUpdate")), None) or \
+          next((x for x in b["items"] if x.get("sourceType")=="aggregator" and not x.get("isUpdate")), None) or \
+          next((x for x in b["items"] if x.get("sourceType") in ("official","aggregator")), None)
     if not isinstance(rep, dict): continue
-
     sources = sorted({x["source"] for x in b["items"] if x.get("sourceType") in ("official","aggregator")})
-    schema_source = "official" if verifiedBy == "official" else "aggregator"  # enum‑safe for schema [4]
-
+    schema_source = "official" if verifiedBy == "official" else "aggregator"
     base_id = hashlib.sha1(f"{'|'.join(sources)}|{rep['uniqueKey']}".encode("utf-8")).hexdigest()[:12]
     rid = base_id; n=1
     while rid in seen_ids:
       rid = hashlib.sha1(f"{base_id}|{n}".encode("utf-8")).hexdigest()[:12]; n+=1
     seen_ids.add(rid)
-
     rep_rec = {
-      "id": rid, "slug": rid, "title": rep["title"],
-      "organization": "/".join(sources) if sources else rep["organization"],
-      "qualificationLevel": "Graduate", "domicile": rep["domicile"],
-      "source": schema_source, "verifiedBy": verifiedBy, "type": "VACANCY",
-      "updateSummary": None, "relatedTo": None,
-      "deadline": rep.get("deadline"), "applyLink": rep.get("applyLink"), "pdfLink": rep.get("pdfLink"),
-      "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+      "id": rid, "slug": rid, "title": rep["title"], "organization": "/".join(sources) if sources else rep["organization"],
+      "qualificationLevel": "Graduate", "domicile": rep["domicile"], "source": schema_source, "verifiedBy": verifiedBy,
+      "type": "VACANCY", "updateSummary": None, "relatedTo": None, "deadline": rep.get("deadline"),
+      "applyLink": rep.get("applyLink"), "pdfLink": rep.get("pdfLink"), "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     published.append(rep_rec)
-
     for u in (x for x in b["items"] if x.get("isUpdate")):
       up_base = hashlib.sha1(f"{'|'.join(sources)}|{u['uniqueKey']}".encode("utf-8")).hexdigest()[:12]
       uid = up_base; m=1
@@ -341,11 +314,9 @@ def merge_and_mark(collected, prev_pending):
         uid = hashlib.sha1(f"{up_base}|{m}".encode("utf-8")).hexdigest()[:12]; m+=1
       seen_ids.add(uid)
       upd = {
-        "id": uid, "slug": uid, "title": "[UPDATE] " + u["title"],
-        "organization": rep_rec["organization"],
-        "qualificationLevel": "Graduate", "domicile": rep["domicile"],
-        "source": schema_source, "verifiedBy": verifiedBy, "type": "UPDATE",
-        "updateSummary": u.get("updateSummary"), "relatedTo": rep_rec["slug"],
+        "id": uid, "slug": uid, "title": "[UPDATE] " + u["title"], "organization": rep_rec["organization"],
+        "qualificationLevel": "Graduate", "domicile": rep["domicile"], "source": schema_source, "verifiedBy": verifiedBy,
+        "type": "UPDATE", "updateSummary": u.get("updateSummary"), "relatedTo": rep_rec["slug"],
         "deadline": u.get("deadline") or rep_rec["deadline"],
         "applyLink": u.get("applyLink") or rep_rec["applyLink"], "pdfLink": u.get("pdfLink") or rep_rec["pdfLink"],
         "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -369,8 +340,7 @@ def drop_expired(listings):
     dl=j.get("deadline")
     if dl:
       try:
-        d = dateparser.parse(dl).date()
-        if d < today: continue
+        if dateparser.parse(dl).date() < today: continue
       except Exception: pass
     out.append(j)
   return out
@@ -380,30 +350,24 @@ def filter_open_only(listings):
   for rec in listings:
     dl = rec.get("deadline")
     if not dl: continue
-    try: d = dateparser.parse(dl).date()
+    try:
+      if dateparser.parse(dl).date() >= today: out.append(rec)
     except Exception: continue
-    if d >= today: out.append(rec)
-  return out  # Enforces “open window only.” [4]
+  return out
 
 def main():
   collected=[]; agg_counts={}; off_counts={}; tg_counts={}
-
   for src in AGG_SOURCES:
     its = scrape_aggregator_page(src); collected.extend(its); agg_counts[src["name"]] = len(its)
-
   for src in OFFICIAL_SOURCES:
     its = scrape_official_page(src); collected.extend(its); off_counts[src["name"]] = len(its)
-
   for ch in TELEGRAM_CHANNELS:
     its = scrape_telegram_channel(ch); collected.extend(its); tg_counts[ch] = len(its)
-
   prev = load_data()
   prev_pending = set(prev.get("transparencyInfo",{}).get("pendingFromTelegram",[]))
   published, pending = merge_and_mark(collected, prev_pending)
-
   open_only = filter_open_only(published)
   cleaned = drop_expired(open_only)
-
   data = prev
   data["jobListings"] = cleaned
   ti = data.setdefault("transparencyInfo",{})
@@ -413,7 +377,7 @@ def main():
   ti["officialCounts"] = off_counts
   ti["telegramCounts"] = tg_counts
   ti["pendingFromTelegram"] = sorted(pending)
-  ti["notes"] = "Resilient networking (timeouts/retries/CA/CF, scoped SSL fallback), Telegram fallbacks; open-window only; strict eligibility; enum-safe source."
+  ti["notes"] = "Robust networking; open-window only; strict eligibility; enum-safe source; official discovery + aggregators + Telegram."
   save_data(data)
   print(f"[INFO] agg_total={sum(agg_counts.values())} off_total={sum(off_counts.values())} tg_total={sum(tg_counts.values())} published={len(cleaned)} pending={len(pending)}")
 
