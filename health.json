@@ -1,21 +1,41 @@
 {
   "ok": true,
-  "checkedAt": "2025-09-16T16:28:52Z",
-  "lastUpdated": "2025-09-16T16:19:10Z",
+  "checkedAt": "2025-09-16T17:35:25Z",
+  "lastUpdated": "2025-09-16T16:41:13Z",
   "totalListings": 0,
+  "sourceCounts": {
+    "official": {
+      "SSC": 0,
+      "SSC-ER": 36,
+      "IBPS": 0,
+      "RRB-CDG": 0,
+      "RRB-Patna": 0,
+      "BPSC": 0,
+      "LIC": 2,
+      "NIACL": 0,
+      "UIIC": 0
+    },
+    "aggregator": {
+      "CareerPower": 0,
+      "SarkariExam": 0,
+      "RojgarResult": 0,
+      "SarkariResult": 0
+    }
+  },
   "aggCounts": {
     "Adda247": 0,
     "SarkariExam": 0,
     "RojgarResult": 0,
     "ResultBharat": 0
   },
+  "notes": "Robust networking; open-window only; strict eligibility; enum-safe source; official discovery + aggregators + Telegram.",
+  "telegramCounts": {
+    "ezgovtjob": 0
+  },
+  "pendingFromTelegram": [],
   "officialCounts": {
     "DSSSB_Notice": 0,
     "RRB_Chandigarh": 1,
     "BPSC": 0
-  },
-  "telegramCounts": {
-    "ezgovtjob": 0
-  },
-  "pendingFromTelegram": []
+  }
 }

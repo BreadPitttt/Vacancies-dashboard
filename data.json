@@ -1,7 +1,7 @@
 {
   "jobListings": [],
   "transparencyInfo": {
-    "lastUpdated": "2025-09-16T16:19:10Z",
+    "lastUpdated": "2025-09-16T16:41:13Z",
     "totalListings": 0,
     "sourceCounts": {
       "official": {
@@ -28,7 +28,7 @@
       "RojgarResult": 0,
       "ResultBharat": 0
     },
-    "notes": "Resilient networking (timeouts/retries/CA/CF, scoped SSL fallback), Telegram fallbacks; open-window only; strict eligibility; enum-safe source.",
+    "notes": "Robust networking; open-window only; strict eligibility; enum-safe source; official discovery + aggregators + Telegram.",
     "telegramCounts": {
       "ezgovtjob": 0
     },
