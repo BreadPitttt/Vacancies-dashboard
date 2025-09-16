@@ -15,25 +15,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  scrape-and-validate:
-    strategy:
-      fail-fast: false
-      matrix:
-        mode:
-          - name: nightly
-            timeout: 120
-            is_weekly: false
-          - name: weekly
-            timeout: 240
-            is_weekly: true
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'schedule' && (
-        (matrix.mode.name == 'nightly' && contains(github.event.schedule, '17 18')) ||
-        (matrix.mode.name == 'weekly'  && contains(github.event.schedule, '28 20'))
-      ))
+  nightly:
+    # Run on manual dispatch OR if scheduled entry is the nightly cron
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && contains(github.event.schedule, '17 18'))
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.mode.timeout }}
+    timeout-minutes: 120
 
     steps:
       - name: Checkout repository
@@ -41,24 +27,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Derive schedule flags
+      - name: Derive flags
         id: flags
-        shell: bash
         run: |
-          IS_WEEKLY="${{ matrix.mode.is_weekly }}"
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            if [[ "${{ github.event.schedule }}" == *"28 20"* ]]; then
-              IS_WEEKLY=true
-            else
-              IS_WEEKLY=false
-            fi
-          fi
-          echo "is_weekly=$IS_WEEKLY" >> "$GITHUB_OUTPUT"
-          if $IS_WEEKLY; then
-            echo "run_label=Weekly hard recheck" >> "$GITHUB_OUTPUT"
-          else
-            echo "run_label=Nightly recheck" >> "$GITHUB_OUTPUT"
-          fi
+          echo "is_weekly=false" >> "$GITHUB_OUTPUT"
+          echo "run_label=Nightly recheck" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python and cache dependencies
         uses: actions/setup-python@v5
@@ -129,12 +102,7 @@ jobs:
           except Exception as e:
             reason = f"read_error: {e}"
           ti = data.get("transparencyInfo", {}) if 'data' in locals() else {}
-          health = {
-            "ok": bool(ok),
-            "reason": reason,
-            "checkedAt": datetime.datetime.utcnow().isoformat() + "Z",
-            **ti
-          }
+          health = { "ok": bool(ok), "reason": reason, "checkedAt": datetime.datetime.utcnow().isoformat() + "Z", **ti }
           health_path.write_text(json.dumps(health, indent=2, ensure_ascii=False), encoding="utf-8")
           if 'data' in locals():
             data_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -145,7 +113,7 @@ jobs:
       - name: Upload artifacts (data.json, health.json)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.mode.name }}-artifacts
+          name: nightly-artifacts
           path: |
             data.json
             health.json
@@ -186,7 +154,7 @@ jobs:
               `Reason: ${reason}`,
               `Artifacts: ${artifacts}`
             ].join('\\n');
-            core.summary.addHeading('Vacancies Data Pipeline').addRaw(body, true).write();
+            core.summary.addHeading('Vacancies Data Pipeline (Nightly)').addRaw(body, true).write();
 
       - name: Open issue if health not OK
         if: steps.health.outcome == 'success'
@@ -199,23 +167,176 @@ jobs:
             try { health = JSON.parse(fs.readFileSync('health.json', 'utf8')); } catch {}
             if (health.ok === true) { core.info('Health OK; skipping issue.'); return; }
             const artifacts = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-            const title = `[Data Pipeline] Health not OK - ${new Date().toISOString()}`;
+            const title = `[Data Pipeline][Nightly] Health not OK - ${new Date().toISOString()}`;
             const body = [
               `Health status: ${JSON.stringify(health, null, 2)}`,
               '',
               `Artifacts (data.json, health.json): ${artifacts}`,
             ].join('\\n');
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title,
-              body,
-              labels: ['pipeline', 'investigate']
-            });
+            await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body, labels: ['pipeline','investigate'] });
+
+  weekly:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && contains(github.event.schedule, '28 20'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Derive flags
+        id: flags
+        run: |
+          echo "is_weekly=true" >> "$GITHUB_OUTPUT"
+          echo "run_label=Weekly hard recheck" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python and cache dependencies
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run scraper
+        id: scrape
+        env:
+          PYTHONUNBUFFERED: "1"
+          IS_HARD_RECHECK: ${{ steps.flags.outputs.is_weekly }}
+          TELEGRAM_RSS_BASE: ${{ secrets.TELEGRAM_RSS_BASE }}
+          MAX_WORKERS: ${{ vars.MAX_WORKERS }}
+          PER_SOURCE_MAX: ${{ vars.PER_SOURCE_MAX }}
+          CONNECT_TIMEOUT: ${{ vars.CONNECT_TIMEOUT }}
+          READ_TIMEOUT: ${{ vars.READ_TIMEOUT }}
+          RETRY_TOTAL: ${{ vars.RETRY_TOTAL }}
+          RETRY_CONNECT: ${{ vars.RETRY_CONNECT }}
+          RETRY_READ: ${{ vars.RETRY_READ }}
+          BACKOFF_FACTOR: ${{ vars.BACKOFF_FACTOR }}
+          MAX_BACKOFF_SECONDS: ${{ vars.MAX_BACKOFF_SECONDS }}
+          PER_HOST_RPM: ${{ vars.PER_HOST_RPM }}
+          BASELINE_SLEEP_S: ${{ vars.BASELINE_SLEEP_S }}
+          JITTER_MIN: ${{ vars.JITTER_MIN }}
+          JITTER_MAX: ${{ vars.JITTER_MAX }}
+          CB_FAILURE_THRESHOLD: ${{ vars.CB_FAILURE_THRESHOLD }}
+          CB_OPEN_SECONDS: ${{ vars.CB_OPEN_SECONDS }}
+          CB_HALF_OPEN_PROBE: ${{ vars.CB_HALF_OPEN_PROBE }}
+        run: |
+          set -e
+          python scraper.py
+
+      - name: Validate JSON Schema
+        id: validate
+        run: |
+          set -e
+          python validate.py
+
+      - name: Quality checks (links, dates, dups)
+        id: qc
+        run: |
+          set +e
+          python qc_checks.py
+          echo "qc_exit=$?" >> $GITHUB_OUTPUT
+
+      - name: Generate and Format Data Files with Health
+        id: health
+        run: |
+          set -e
+          python - << 'PY'
+          import json, datetime, pathlib, os
+          data_path = pathlib.Path("data.json")
+          health_path = pathlib.Path("health.json")
+          ok = False
+          reason = None
+          qc_exit = os.environ.get("QC_EXIT", "0")
+          try:
+            data = json.loads(data_path.read_text(encoding="utf-8"))
+            size_ok = len(json.dumps(data).encode("utf-8")) > 200
+            ok = (qc_exit == "0") and size_ok and len(data.get("jobListings", [])) >= 0
+            reason = None if ok else f"qc_exit={qc_exit}, size_ok={size_ok}"
+          except Exception as e:
+            reason = f"read_error: {e}"
+          ti = data.get("transparencyInfo", {}) if 'data' in locals() else {}
+          health = { "ok": bool(ok), "reason": reason, "checkedAt": datetime.datetime.utcnow().isoformat() + "Z", **ti }
+          health_path.write_text(json.dumps(health, indent=2, ensure_ascii=False), encoding="utf-8")
+          if 'data' in locals():
+            data_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+          PY
+        env:
+          QC_EXIT: ${{ steps.qc.outputs.qc_exit }}
+
+      - name: Upload artifacts (data.json, health.json)
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-artifacts
+          path: |
+            data.json
+            health.json
+          retention-days: 7
+
+      - name: Commit and Push Changes (manual and scheduled)
+        run: |
+          set -e
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions-bot@users.noreply.github.com"
+          if ! git diff --quiet -- data.json health.json; then
+            git add data.json health.json
+            COMMIT_MSG="chore(data): ${{ steps.flags.outputs.run_label }}"
+            git commit -m "$COMMIT_MSG"
+            git pull --rebase
+            git push
+          else
+            echo "No data changes to commit."
+          fi
+
+      - name: Post run summary
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let health = {};
+            try { health = JSON.parse(fs.readFileSync('health.json', 'utf8')); } catch {}
+            const ok = health.ok === true;
+            const total = health.totalListings ?? 'n/a';
+            const rate = health.successRatePct ?? 'n/a';
+            const reason = health.reason ?? 'n/a';
+            const artifacts = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const body = [
+              `Run: ${ok ? 'OK' : 'NOT OK'}`,
+              `Listings: ${total}`,
+              `Source success rate: ${rate}%`,
+              `Reason: ${reason}`,
+              `Artifacts: ${artifacts}`
+            ].join('\\n');
+            core.summary.addHeading('Vacancies Data Pipeline (Weekly)').addRaw(body, true).write();
+
+      - name: Open issue if health not OK
+        if: steps.health.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let health = {};
+            try { health = JSON.parse(fs.readFileSync('health.json', 'utf8')); } catch {}
+            if (health.ok === true) { core.info('Health OK; skipping issue.'); return; }
+            const artifacts = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const title = `[Data Pipeline][Weekly] Health not OK - ${new Date().toISOString()}`;
+            const body = [
+              `Health status: ${JSON.stringify(health, null, 2)}`,
+              '',
+              `Artifacts (data.json, health.json): ${artifacts}`,
+            ].join('\\n');
+            await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body, labels: ['pipeline','investigate'] });
 
   lighthouse:
     runs-on: ubuntu-latest
-    needs: scrape-and-validate
+    needs: [nightly, weekly]
     if: ${{ vars.PAGES_URL != '' }}
     steps:
       - name: Wait for Pages cache (retry)
