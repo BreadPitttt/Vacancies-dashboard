@@ -1,4 +1,5 @@
-# scraper.py — Aggregator-first publishing with schema-compliant 'source', confidence labels, and Telegram(RSS) fallbacks
+# scraper.py — Aggregator-first publishing with schema-compliant 'source',
+# confidence labels, Telegram(RSS) multi-endpoint fallbacks, and resilient networking.
 
 import json, re, hashlib, threading, os, xml.etree.ElementTree as ET
 from pathlib import Path
@@ -180,13 +181,13 @@ def scrape_aggregator_page(src):
     print(f"[WARN] aggregator {src['name']} error: {e}")
   return items
 
-def telegram_feed_url(username):
+def telegram_feed_urls(username):
   for base in TELEGRAM_RSS_BASES:
     if base: yield f"{base.rstrip('/')}/telegram/channel/{username}"
 
 def scrape_telegram_channel(username):
   items=[]; kept=0
-  for url in telegram_feed_url(username):
+  for url in telegram_feed_urls(username):
     try:
       root = ET.fromstring(fetch(url, LIST_TO).content)
       def tx(node, tag):
@@ -231,7 +232,6 @@ def merge_and_mark(collected, prev_pending):
 
   published=[]; pending=set()
   for key, b in buckets.items():
-    # confidence
     if b["hasOfficial"]:
       verifiedBy = "official"
     elif len(b["aggs"]) >= 2:
@@ -245,7 +245,6 @@ def merge_and_mark(collected, prev_pending):
       if b["tele"]: pending.add(key)
       continue
 
-    # pick representative safely
     rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator" and not x.get("isUpdate")), None)
     if rep is None: rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator"), None)
     if rep is None: rep = next((x for x in b["items"] if isinstance(x, dict)), None)
@@ -253,8 +252,7 @@ def merge_and_mark(collected, prev_pending):
       continue
 
     sources = sorted({x["source"] for x in b["items"] if x.get("sourceType")=="aggregator"})
-    # Map to schema enum: 'official' or 'aggregator'
-    schema_source = "official" if verifiedBy == "official" else "aggregator"
+    schema_source = "official" if verifiedBy == "official" else "aggregator"   # enum-safe
 
     rep_rec = {
       "id": rep["slug"],
@@ -263,8 +261,8 @@ def merge_and_mark(collected, prev_pending):
       "organization": "/".join(sources) if sources else rep["organization"],
       "qualificationLevel": "Graduate",
       "domicile": rep["domicile"],
-      "source": schema_source,       # schema-compliant enum
-      "verifiedBy": verifiedBy,      # confidence field (UI use)
+      "source": schema_source,       # JSON Schema enum-compliant
+      "verifiedBy": verifiedBy,      # confidence for UI
       "type": "VACANCY",
       "updateSummary": None,
       "relatedTo": None,
@@ -275,14 +273,13 @@ def merge_and_mark(collected, prev_pending):
     }
     published.append(rep_rec)
 
-    # attach updates with same enum-compliant source
     for u in (x for x in b["items"] if x.get("isUpdate")):
       upd = rep_rec.copy()
       upd["id"] = u["slug"]; upd["slug"] = u["slug"]; upd["title"] = "[UPDATE] " + u["title"]
       upd["type"] = "UPDATE"; upd["updateSummary"] = u.get("updateSummary"); upd["relatedTo"] = rep_rec["slug"]
       upd["deadline"] = u.get("deadline") or rep_rec["deadline"]
       upd["applyLink"] = u.get("applyLink") or rep_rec["applyLink"]; upd["pdfLink"] = u.get("pdfLink") or rep_rec["pdfLink"]
-      upd["source"] = schema_source  # keep within {'official','aggregator'}
+      upd["source"] = schema_source  # keep enum-safe
       published.append(upd)
 
   pending_now = (prev_pending or set()) | pending
