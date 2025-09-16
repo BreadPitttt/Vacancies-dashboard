@@ -17,9 +17,9 @@ HTTP = session_with_retries()
 
 def head_ok(url):
     try:
-        r = HTTP.head(url, timeout=20, allow_redirects=True)
+        r = HTTP.head(url, timeout=10, allow_redirects=True)
         if r.status_code in (405, 501):
-            r = HTTP.get(url, timeout=20, stream=True)
+            r = HTTP.get(url, timeout=10, stream=True)
         return 200 <= r.status_code < 300
     except Exception:
         return False
