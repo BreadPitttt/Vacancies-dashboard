@@ -1,7 +1,7 @@
 {
   "jobListings": [],
   "transparencyInfo": {
-    "lastUpdated": "2025-09-16T07:45:54Z",
+    "lastUpdated": "2025-09-16T07:54:10Z",
     "totalListings": 0,
     "sourceCounts": {
       "official": {
@@ -23,14 +23,14 @@
       }
     },
     "aggCounts": {
-      "Adda247": 0,
+      "Adda247": 66,
       "SarkariExam": 0,
-      "RojgarResult": 0,
-      "SarkariExamCM": 4
+      "RojgarResult": 200,
+      "SarkariExamCM": 2
     },
-    "notes": "Telegram used as hints; publish only after official-domain or >=2 aggregators; pending hints auto-publish once confirmed.",
+    "notes": "Aggregators publish; Telegram only hints; require official-domain or >=2 aggregators to publish.",
     "telegramCounts": {
-      "ezgovtjob": 1,
+      "ezgovtjob": 0,
       "sarkariresulinfo": 0
     },
     "pendingFromTelegram": [
