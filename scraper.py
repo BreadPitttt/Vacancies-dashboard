@@ -1,18 +1,17 @@
-# scraper.py — Fixes SSLError exception path; retains robust networking and all filters.
-
+# scraper.py — MODIFIED: Now includes concurrency, dynamic qualification, and simplified filtering.
 import os, re, json, hashlib, threading, xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
-
 import requests, certifi, dateparser
 from bs4 import BeautifulSoup, UnicodeDammit
 from requests.adapters import HTTPAdapter
+from concurrent.futures import ThreadPoolExecutor # CHANGE 1: Import ThreadPoolExecutor for concurrency
+
 try:
     from urllib3.util import Retry
 except Exception:
     Retry = None
-
 try:
     import cloudscraper
     CF = cloudscraper.create_scraper()
@@ -21,13 +20,11 @@ except Exception:
 
 DATA_PATH = Path("data.json")
 UTC_NOW = datetime.now(timezone.utc)
-
 # Timeouts for public portals (connect 12s, read 35s)
 CONNECT_TO, READ_TO = 12, 35
 LIST_TO, DETAIL_TO = (CONNECT_TO, READ_TO), (CONNECT_TO, READ_TO)
 MAX_WORKERS = 10
 PER_SOURCE_MAX = 160
-
 HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
   "Accept-Language": "en-IN,en;q=0.9",
@@ -53,6 +50,7 @@ def session_with_retries(pool=64):
 
 HTTP = session_with_retries()
 _thread_local = threading.local()
+
 def thread_session():
   if not hasattr(_thread_local, "s"):
     _thread_local.s = session_with_retries()
@@ -81,7 +79,7 @@ def fetch(url, timeout):
     r = HTTP.get(url, timeout=timeout)
     r.raise_for_status()
     return r
-  except requests.exceptions.SSLError: # CORRECTED: Use requests.exceptions.SSLError
+  except requests.exceptions.SSLError:
     if any(h in host for h in OFFICIAL_SSL_FALLBACK):
       r2 = requests.get(url, headers=HEADERS, timeout=sum(timeout), verify=False)
       r2.raise_for_status()
@@ -109,9 +107,11 @@ OFFICIAL_SOURCES = [
   {"name":"RRB_Chandigarh", "base":"https://www.rrbcdg.gov.in",  "url":"https://www.rrbcdg.gov.in"},
   {"name":"BPSC",           "base":"https://bpsc.bihar.gov.in",  "url":"https://bpsc.bihar.gov.in"},
 ]
+
 def env_channels():
   raw=os.getenv("TELEGRAM_CHANNELS","").strip()
   return [x for x in raw.split(",") if x] or ["ezgovtjob"]
+
 TELEGRAM_CHANNELS = env_channels()
 TELEGRAM_RSS_BASES = [
   os.getenv("TELEGRAM_RSS_BASE") or "https://rsshub.app",
@@ -127,11 +127,13 @@ OFFICIAL_DOMAINS = {
 RECRUITMENT_TERMS = [r"\brecruitment\b", r"\bvacanc(?:y|ies)\b", r"\badvertisement\b", r"\bnotification\b", r"\bonline\s*form\b", r"\bapply\s*online\b"]
 EXCLUDE_NOISE = [r"\badmit\s*card\b", r"\banswer\s*key\b", r"\bresult\b", r"\bsyllabus\b", r"\bcalendar\b", r"\bwebinar\b", r"\bwellness\b"]
 UPDATE_TERMS = [r"\bcorrigendum\b", r"\baddendum\b", r"\bamendment\b", r"\brevised\b", r"\bdate\s*(?:extended|extension)\b", r"\bpostponed\b", r"\brescheduled\b", r"\bedit\s*window\b"]
+
 def contains_any(patterns, text): return any(re.search(p, (text or "").lower()) for p in patterns)
 def is_update(text): return contains_any(UPDATE_TERMS, text)
 def is_joblike(text): return contains_any(RECRUITMENT_TERMS, text) and not contains_any(EXCLUDE_NOISE, text)
 def is_non_vacancy(text):
   return bool(re.search(r"\b(otr|one\s*time\s*registration|registration\s*process)\b", (text or "").lower()))
+
 INDIAN_STATES = ["andhra pradesh","arunachal pradesh","assam","bihar","chhattisgarh","goa","gujarat","haryana","himachal pradesh","jharkhand","karnataka","kerala","madhya pradesh","maharashtra","manipur","meghalaya","mizoram","nagaland","odisha","punjab","rajasthan","sikkim","tamil nadu","telangana","tripura","uttar pradesh","uttarakhand","west bengal"]
 def other_state_only(text):
   t=(text or "").lower()
@@ -140,6 +142,7 @@ def other_state_only(text):
     if st=="bihar": continue
     if re.search(rf"\b{re.escape(st)}\b.*\bonly\b", t) or re.search(rf"\bonly\b.*\b{re.escape(st)}\b", t): return True
   return False
+
 ALLOWED_EDU = [r"\b10\s*th\b", r"\bmatric\b", r"\b12\s*th\b", r"\binter(?:mediate)?\b", r"\bany\s+graduate\b", r"\bgraduate\b", r"\bbachelor(?:'s)?\s+degree\b"]
 EXCLUDE_EDU = [
   r"\bmaster'?s\b|\bm\.?\s?sc\b|\bm\.?\s?a\b|\bm\.?\s?com\b", r"\bmba\b|\bpgdm\b",
@@ -149,6 +152,7 @@ EXCLUDE_EDU = [
 ]
 ALLOW_SKILLS = [r"\btyping\b", r"\bsteno\b", r"\bcomputer\s+(?:certificate|knowledge|literacy|proficiency)\b", r"\bccc\b|\bnielit\b|\bdoeacc\b|\b'o?\s*level\b", r"\bpet\b|\bpst\b|\bphysical\b"]
 EXCLUDE_TECH = [r"\bpython\b|\bjava\b|\bjavascript\b|\bc\+\+\b|\bnode\.?js\b|\breact\b|\bangular\b|\b\.net\b", r"\bautocad\b|\bmatlab\b|\bsolidworks\b|\bcatia\b|\bsap\b"]
+
 def education_allowed(text):
   t=(text or "").lower()
   if any(re.search(p, t) for p in EXCLUDE_EDU): return False
@@ -216,7 +220,6 @@ def scrape_generic_list(src, treat_as="aggregator"):
       raw += 1
       if treat_as=="official" or is_joblike(f"{title} {href}"): anchors.append((title, href)); hinted += 1
       if len(anchors) >= PER_SOURCE_MAX: break
-
     for title, href in anchors:
       detail_text = title + " — " + soup_text(href)
       if is_non_vacancy(detail_text) or other_state_only(detail_text) or not education_allowed(detail_text): continue
@@ -271,6 +274,17 @@ def scrape_telegram_channel(username):
       print(f"[WARN] telegram {username}@{url} parse: {e}; trying next")
   print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items
 
+# CHANGE 2: New helper function to determine qualification level from text
+def infer_qualification(text):
+    t = (text or "").lower()
+    if any(re.search(p, t) for p in [r"\b10\s*th\b", r"\bmatric\b"]):
+        return "10th Pass"
+    if any(re.search(p, t) for p in [r"\b12\s*th\b", r"\binter(?:mediate)?\b"]):
+        return "12th Pass"
+    if any(re.search(p, t) for p in [r"\bany\s+graduate\b", r"\bgraduate\b", r"\bbachelor(?:'s)?\s+degree\b"]):
+        return "Graduate"
+    return "Graduate" # Default to Graduate if nothing specific is found
+
 def merge_and_mark(collected, prev_pending):
   buckets={}
   for it in collected:
@@ -302,7 +316,9 @@ def merge_and_mark(collected, prev_pending):
     seen_ids.add(rid)
     rep_rec = {
       "id": rid, "slug": rid, "title": rep["title"], "organization": "/".join(sources) if sources else rep["organization"],
-      "qualificationLevel": "Graduate", "domicile": rep["domicile"], "source": schema_source, "verifiedBy": verifiedBy,
+      # CHANGE 2: Use the new helper function to set the qualification level
+      "qualificationLevel": infer_qualification(rep["detailText"]),
+      "domicile": rep["domicile"], "source": schema_source, "verifiedBy": verifiedBy,
       "type": "VACANCY", "updateSummary": None, "relatedTo": None, "deadline": rep.get("deadline"),
       "applyLink": rep.get("applyLink"), "pdfLink": rep.get("pdfLink"), "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
@@ -315,7 +331,9 @@ def merge_and_mark(collected, prev_pending):
       seen_ids.add(uid)
       upd = {
         "id": uid, "slug": uid, "title": "[UPDATE] " + u["title"], "organization": rep_rec["organization"],
-        "qualificationLevel": "Graduate", "domicile": rep["domicile"], "source": schema_source, "verifiedBy": verifiedBy,
+        # CHANGE 2: Also use it for updates
+        "qualificationLevel": infer_qualification(u["detailText"]),
+        "domicile": rep["domicile"], "source": schema_source, "verifiedBy": verifiedBy,
         "type": "UPDATE", "updateSummary": u.get("updateSummary"), "relatedTo": rep_rec["slug"],
         "deadline": u.get("deadline") or rep_rec["deadline"],
         "applyLink": u.get("applyLink") or rep_rec["applyLink"], "pdfLink": u.get("pdfLink") or rep_rec["pdfLink"],
@@ -334,17 +352,6 @@ def load_data():
 
 def save_data(data): DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-def drop_expired(listings):
-  out=[]; today = datetime.now().date()
-  for j in listings:
-    dl=j.get("deadline")
-    if dl:
-      try:
-        if dateparser.parse(dl).date() < today: continue
-      except Exception: pass
-    out.append(j)
-  return out
-
 def filter_open_only(listings):
   today=datetime.now().date(); out=[]
   for rec in listings:
@@ -355,31 +362,54 @@ def filter_open_only(listings):
     except Exception: continue
   return out
 
+# CHANGE 1 & 3: The main function is completely replaced with this new, concurrent version.
+# It's faster and no longer has the redundant `drop_expired` function call.
 def main():
-  collected=[]; agg_counts={}; off_counts={}; tg_counts={}
-  for src in AGG_SOURCES:
-    its = scrape_aggregator_page(src); collected.extend(its); agg_counts[src["name"]] = len(its)
-  for src in OFFICIAL_SOURCES:
-    its = scrape_official_page(src); collected.extend(its); off_counts[src["name"]] = len(its)
-  for ch in TELEGRAM_CHANNELS:
-    its = scrape_telegram_channel(ch); collected.extend(its); tg_counts[ch] = len(its)
-  prev = load_data()
-  prev_pending = set(prev.get("transparencyInfo",{}).get("pendingFromTelegram",[]))
-  published, pending = merge_and_mark(collected, prev_pending)
-  open_only = filter_open_only(published)
-  cleaned = drop_expired(open_only)
-  data = prev
-  data["jobListings"] = cleaned
-  ti = data.setdefault("transparencyInfo",{})
-  ti["lastUpdated"] = UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
-  ti["totalListings"] = len(cleaned)
-  ti["aggCounts"] = agg_counts
-  ti["officialCounts"] = off_counts
-  ti["telegramCounts"] = tg_counts
-  ti["pendingFromTelegram"] = sorted(pending)
-  ti["notes"] = "Robust networking; open-window only; strict eligibility; enum-safe source; official discovery + aggregators + Telegram."
-  save_data(data)
-  print(f"[INFO] agg_total={sum(agg_counts.values())} off_total={sum(off_counts.values())} tg_total={sum(tg_counts.values())} published={len(cleaned)} pending={len(pending)}")
+    collected = []
+    agg_counts, off_counts, tg_counts = {}, {}, {}
 
-if __name__=="__main__":
-  main()
+    # This block runs all scraping functions at the same time, not one by one.
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        # Give all the scraping tasks to the executor "thread pool"
+        agg_futures = {executor.submit(scrape_aggregator_page, src): src for src in AGG_SOURCES}
+        off_futures = {executor.submit(scrape_official_page, src): src for src in OFFICIAL_SOURCES}
+        tg_futures = {executor.submit(scrape_telegram_channel, ch): ch for ch in TELEGRAM_CHANNELS}
+
+        # Collect the results as they finish
+        all_futures = {**agg_futures, **off_futures, **tg_futures}
+        for future in all_futures:
+            try:
+                its = future.result()
+                collected.extend(its)
+                # Correctly attribute counts
+                if future in agg_futures:
+                    agg_counts[agg_futures[future]["name"]] = len(its)
+                elif future in off_futures:
+                    off_counts[off_futures[future]["name"]] = len(its)
+                elif future in tg_futures:
+                    tg_counts[tg_futures[future]] = len(its)
+            except Exception as e:
+                print(f"[ERROR] A scraping task failed: {e}")
+
+    prev = load_data()
+    prev_pending = set(prev.get("transparencyInfo", {}).get("pendingFromTelegram", []))
+    published, pending = merge_and_mark(collected, prev_pending)
+
+    # CHANGE 3: The call to drop_expired() is removed. This one function does the job.
+    open_only = filter_open_only(published)
+
+    data = prev
+    data["jobListings"] = open_only
+    ti = data.setdefault("transparencyInfo", {})
+    ti["lastUpdated"] = UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
+    ti["totalListings"] = len(open_only)
+    ti["aggCounts"] = agg_counts
+    ti["officialCounts"] = off_counts
+    ti["telegramCounts"] = tg_counts
+    ti["pendingFromTelegram"] = sorted(pending)
+    ti["notes"] = "Robust networking; open-window only; strict eligibility; enum-safe source; official discovery + aggregators + Telegram."
+    save_data(data)
+    print(f"[INFO] collected={len(collected)} agg_total={sum(agg_counts.values())} off_total={sum(off_counts.values())} tg_total={sum(tg_counts.values())} published={len(open_only)} pending={len(pending)}")
+
+if __name__ == "__main__":
+    main()
