@@ -1,26 +1,8 @@
 {
-  "jobListings": [
-    {
-      "id": "c3ab53b556df",
-      "slug": "c3ab53b556df",
-      "title": "Patna High Court Stenographer Online Form 2025 for 111 Post",
-      "organization": "RojgarResult",
-      "qualificationLevel": "Graduate",
-      "domicile": "Bihar",
-      "source": "aggregator",
-      "verifiedBy": "single-aggregator",
-      "type": "VACANCY",
-      "updateSummary": null,
-      "relatedTo": null,
-      "deadline": "2025-09-21",
-      "applyLink": "https://www.rojgarresult.com/phc-stenographer-august-2025/",
-      "pdfLink": "https://www.rojgarresult.com/phc-stenographer-august-2025/",
-      "extractedAt": "2025-09-16T15:47:11Z"
-    }
-  ],
+  "jobListings": [],
   "transparencyInfo": {
-    "lastUpdated": "2025-09-16T15:47:11Z",
-    "totalListings": 1,
+    "lastUpdated": "2025-09-16T16:19:10Z",
+    "totalListings": 0,
     "sourceCounts": {
       "official": {
         "SSC": 0,
@@ -43,17 +25,17 @@
     "aggCounts": {
       "Adda247": 0,
       "SarkariExam": 0,
-      "RojgarResult": 18,
+      "RojgarResult": 0,
       "ResultBharat": 0
     },
-    "notes": "Resilient networking (timeouts/retries/CA/CF), Telegram fallbacks; open-window only; strict eligibility; enum-safe source.",
+    "notes": "Resilient networking (timeouts/retries/CA/CF, scoped SSL fallback), Telegram fallbacks; open-window only; strict eligibility; enum-safe source.",
     "telegramCounts": {
       "ezgovtjob": 0
     },
     "pendingFromTelegram": [],
     "officialCounts": {
       "DSSSB_Notice": 0,
-      "RRB_Chandigarh": 0,
+      "RRB_Chandigarh": 1,
       "BPSC": 0
     }
   }
