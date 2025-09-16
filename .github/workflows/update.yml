@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   scrape:
-    timeout-minutes: 60  # hard cap per job; default is 360 if unset [17]
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,7 +71,7 @@ jobs:
   lighthouse:
     runs-on: ubuntu-latest
     needs: scrape
-    if: ${{ vars.PAGES_URL != '' }}  # enable by setting PAGES_URL variable
+    if: ${{ vars.PAGES_URL != '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Audit URLs using Lighthouse CI
