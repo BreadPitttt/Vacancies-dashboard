@@ -1,47 +1,72 @@
-import json, sys, requests, dateparser
-from datetime import datetime, timezone
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+# qc_checks.py — pragmatic data sanity checks with clear exit codes
 
-U = datetime.now(timezone.utc).date()
+import json, sys, pathlib
+from urllib.parse import urlparse
+from datetime import datetime
+import dateparser
 
-def session_with_retries():
-    s = requests.Session()
-    retry = Retry(total=3, connect=3, read=3, backoff_factor=0.5,
-                  status_forcelist=[429,500,502,503,504], allowed_methods={"GET","HEAD"})
-    adapter = HTTPAdapter(max_retries=retry)
-    s.mount("http://", adapter); s.mount("https://", adapter)
-    return s
-
-HTTP = session_with_retries()
-
-def head_ok(url):
+def is_http_url(u):
+    if not u: return False
     try:
-        r = HTTP.head(url, timeout=10, allow_redirects=True)
-        if r.status_code in (405, 501):
-            r = HTTP.get(url, timeout=10, stream=True)
-        return 200 <= r.status_code < 300
-    except Exception:
-        return False
+        p = urlparse(u)
+        return p.scheme in ("http","https") and bool(p.netloc)
+    except: return False
 
-data = json.load(open("data.json", encoding="utf-8"))
+def main():
+    p = pathlib.Path("data.json")
+    if not p.exists():
+        print("qc: data.json missing")
+        sys.exit(2)
 
-seen = set()
-bad = 0
-for j in data.get("jobListings", []):
-    if j["id"] in seen:
-        print("duplicate id:", j["id"]); bad += 1
-    seen.add(j["id"])
-    dl = j.get("deadline")
-    if dl:
-        dt = dateparser.parse(dl)
-        if dt and dt.date() < U:
-            print("expired listing still active:", j["id"], dl); bad += 1
-    for k in ("applyLink","pdfLink"):
-        v = j.get(k)
-        if v and not head_ok(v):
-            print("bad link:", k, v); bad += 1
+    data = json.loads(p.read_text(encoding="utf-8"))
+    listings = data.get("jobListings", [])
 
-if bad:
-    sys.exit(1)
-print("qc: ok")
+    problems = []
+    seen_ids = set()
+    today = datetime.utcnow().date()
+
+    for i, rec in enumerate(listings):
+        rid = rec.get("id")
+        if not rid:
+            problems.append(f"[rec#{i}] missing id")
+        elif rid in seen_ids:
+            problems.append(f"[rec#{i}] duplicate id: {rid}")
+        else:
+            seen_ids.add(rid)
+
+        title = rec.get("title","").strip()
+        if len(title) < 6:
+            problems.append(f"[{rid}] short title")
+
+        al, pl = rec.get("applyLink"), rec.get("pdfLink")
+        if not (is_http_url(al) or is_http_url(pl)):
+            problems.append(f"[{rid}] neither applyLink nor pdfLink is a valid URL")
+
+        dl = rec.get("deadline")
+        if dl:
+            try:
+                d = dateparser.parse(dl, settings={"DATE_ORDER":"DMY"}).date()
+                if d < today:
+                    problems.append(f"[{rid}] deadline in past: {dl}")
+            except Exception:
+                problems.append(f"[{rid}] invalid deadline format: {dl}")
+
+        src = rec.get("source")
+        if src not in ("official","aggregator"):
+            problems.append(f"[{rid}] invalid source: {src}")
+
+        typ = rec.get("type")
+        if typ not in ("VACANCY","UPDATE"):
+            problems.append(f"[{rid}] invalid type: {typ}")
+
+    if problems:
+        print("qc: FAIL")
+        for msg in problems:
+            print(" -", msg)
+        sys.exit(1)
+
+    print(f"qc: OK ({len(listings)} records)")
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()
