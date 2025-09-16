@@ -82,6 +82,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Audit only HTML pages
       - name: Audit homepage with Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
@@ -90,10 +91,13 @@ jobs:
           budgetPath: ./.github/lighthouse/budget.json
           uploadArtifacts: true
 
+      # Verify JSON endpoint separately (no Lighthouse on JSON)
       - name: Check health.json exists (HTTP 200)
+        env:
+          PAGES_URL: ${{ vars.PAGES_URL }}
         run: |
           set -e
-          URL="${{ vars.PAGES_URL%/ }}/health.json"
+          URL="${PAGES_URL%/}/health.json"
           echo "Checking $URL"
           code=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
           if [ "$code" != "200" ]; then
