@@ -1,7 +1,12 @@
 name: Data Pipeline
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force_mode:
+        description: "Optional: force run mode (nightly|weekly)"
+        required: false
+        default: ""
   schedule:
     - cron: '17 18 * * *' # nightly, 18:17 UTC ≈ 11:47 PM IST
     - cron: '28 20 * * 0' # weekly,  20:28 UTC Sunday ≈ Monday 02:58 AM IST
@@ -15,11 +20,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  nightly:
-    # Run on manual dispatch OR if scheduled entry is the nightly cron
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && contains(github.event.schedule, '17 18'))
+  pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 240  # upper bound; we’ll set effective timeouts per mode inside steps
 
     steps:
       - name: Checkout repository
@@ -27,11 +30,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Derive flags
-        id: flags
+      - name: Decide mode (nightly or weekly)
+        id: decide
+        shell: bash
         run: |
-          echo "is_weekly=false" >> "$GITHUB_OUTPUT"
-          echo "run_label=Nightly recheck" >> "$GITHUB_OUTPUT"
+          # Default to nightly
+          MODE="nightly"
+          TIMEOUT=120
+          IS_WEEKLY=false
+
+          # If scheduled, infer from cron string
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [[ "${{ github.event.schedule }}" == *"28 20"* ]]; then
+              MODE="weekly"; TIMEOUT=240; IS_WEEKLY=true
+            else
+              MODE="nightly"; TIMEOUT=120; IS_WEEKLY=false
+            fi
+          fi
+
+          # Allow manual override via workflow_dispatch input
+          if [ -n "${{ github.event.inputs.force_mode }}" ]; then
+            fm="${{ github.event.inputs.force_mode }}"
+            if [ "$fm" = "weekly" ]; then MODE="weekly"; TIMEOUT=240; IS_WEEKLY=true; fi
+            if [ "$fm" = "nightly" ]; then MODE="nightly"; TIMEOUT=120; IS_WEEKLY=false; fi
+          fi
+
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "timeout=$TIMEOUT" >> "$GITHUB_OUTPUT"
+          echo "is_weekly=$IS_WEEKLY" >> "$GITHUB_OUTPUT"
+          if $IS_WEEKLY; then
+            echo "run_label=Weekly hard recheck" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_label=Nightly recheck" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Python and cache dependencies
         uses: actions/setup-python@v5
@@ -48,7 +79,7 @@ jobs:
         id: scrape
         env:
           PYTHONUNBUFFERED: "1"
-          IS_HARD_RECHECK: ${{ steps.flags.outputs.is_weekly }}
+          IS_HARD_RECHECK: ${{ steps.decide.outputs.is_weekly }}
           TELEGRAM_RSS_BASE: ${{ secrets.TELEGRAM_RSS_BASE }}
           MAX_WORKERS: ${{ vars.MAX_WORKERS }}
           PER_SOURCE_MAX: ${{ vars.PER_SOURCE_MAX }}
@@ -67,8 +98,10 @@ jobs:
           CB_OPEN_SECONDS: ${{ vars.CB_OPEN_SECONDS }}
           CB_HALF_OPEN_PROBE: ${{ vars.CB_HALF_OPEN_PROBE }}
         run: |
-          set -e
-          python scraper.py
+          # Soft timeout enforcement per mode using timeout(1) so the job-level 240 min cap is never hit.
+          TO=${{ steps.decide.outputs.timeout }}
+          echo "Running mode=${{ steps.decide.outputs.mode }} with per-step timeout=${TO}m"
+          timeout "${TO}m" python scraper.py
 
       - name: Validate JSON Schema
         id: validate
@@ -113,20 +146,20 @@ jobs:
       - name: Upload artifacts (data.json, health.json)
         uses: actions/upload-artifact@v4
         with:
-          name: nightly-artifacts
+          name: ${{ steps.decide.outputs.mode }}-artifacts
           path: |
             data.json
             health.json
           retention-days: 7
 
-      - name: Commit and Push Changes (manual and scheduled)
+      - name: Commit and Push Changes (always)
         run: |
           set -e
           git config user.name "GitHub Actions Bot"
           git config user.email "actions-bot@users.noreply.github.com"
           if ! git diff --quiet -- data.json health.json; then
             git add data.json health.json
-            COMMIT_MSG="chore(data): ${{ steps.flags.outputs.run_label }}"
+            COMMIT_MSG="chore(data): ${{ steps.decide.outputs.run_label }}"
             git commit -m "$COMMIT_MSG"
             git pull --rebase
             git push
@@ -147,17 +180,19 @@ jobs:
             const rate = health.successRatePct ?? 'n/a';
             const reason = health.reason ?? 'n/a';
             const artifacts = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const mode = `${{ steps.decide.outputs.mode }}`;
             const body = [
+              `Mode: ${mode}`,
               `Run: ${ok ? 'OK' : 'NOT OK'}`,
               `Listings: ${total}`,
               `Source success rate: ${rate}%`,
               `Reason: ${reason}`,
               `Artifacts: ${artifacts}`
             ].join('\\n');
-            core.summary.addHeading('Vacancies Data Pipeline (Nightly)').addRaw(body, true).write();
+            core.summary.addHeading(`Vacancies Data Pipeline (${mode})`).addRaw(body, true).write();
 
-      - name: Open issue if health not OK
-        if: steps.health.outcome == 'success'
+      - name: Open issue if health not OK (scheduled only)
+        if: github.event_name == 'schedule' && steps.health.outcome == 'success'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -167,166 +202,8 @@ jobs:
             try { health = JSON.parse(fs.readFileSync('health.json', 'utf8')); } catch {}
             if (health.ok === true) { core.info('Health OK; skipping issue.'); return; }
             const artifacts = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-            const title = `[Data Pipeline][Nightly] Health not OK - ${new Date().toISOString()}`;
-            const body = [
-              `Health status: ${JSON.stringify(health, null, 2)}`,
-              '',
-              `Artifacts (data.json, health.json): ${artifacts}`,
-            ].join('\\n');
-            await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body, labels: ['pipeline','investigate'] });
-
-  weekly:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && contains(github.event.schedule, '28 20'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 240
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Derive flags
-        id: flags
-        run: |
-          echo "is_weekly=true" >> "$GITHUB_OUTPUT"
-          echo "run_label=Weekly hard recheck" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Python and cache dependencies
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run scraper
-        id: scrape
-        env:
-          PYTHONUNBUFFERED: "1"
-          IS_HARD_RECHECK: ${{ steps.flags.outputs.is_weekly }}
-          TELEGRAM_RSS_BASE: ${{ secrets.TELEGRAM_RSS_BASE }}
-          MAX_WORKERS: ${{ vars.MAX_WORKERS }}
-          PER_SOURCE_MAX: ${{ vars.PER_SOURCE_MAX }}
-          CONNECT_TIMEOUT: ${{ vars.CONNECT_TIMEOUT }}
-          READ_TIMEOUT: ${{ vars.READ_TIMEOUT }}
-          RETRY_TOTAL: ${{ vars.RETRY_TOTAL }}
-          RETRY_CONNECT: ${{ vars.RETRY_CONNECT }}
-          RETRY_READ: ${{ vars.RETRY_READ }}
-          BACKOFF_FACTOR: ${{ vars.BACKOFF_FACTOR }}
-          MAX_BACKOFF_SECONDS: ${{ vars.MAX_BACKOFF_SECONDS }}
-          PER_HOST_RPM: ${{ vars.PER_HOST_RPM }}
-          BASELINE_SLEEP_S: ${{ vars.BASELINE_SLEEP_S }}
-          JITTER_MIN: ${{ vars.JITTER_MIN }}
-          JITTER_MAX: ${{ vars.JITTER_MAX }}
-          CB_FAILURE_THRESHOLD: ${{ vars.CB_FAILURE_THRESHOLD }}
-          CB_OPEN_SECONDS: ${{ vars.CB_OPEN_SECONDS }}
-          CB_HALF_OPEN_PROBE: ${{ vars.CB_HALF_OPEN_PROBE }}
-        run: |
-          set -e
-          python scraper.py
-
-      - name: Validate JSON Schema
-        id: validate
-        run: |
-          set -e
-          python validate.py
-
-      - name: Quality checks (links, dates, dups)
-        id: qc
-        run: |
-          set +e
-          python qc_checks.py
-          echo "qc_exit=$?" >> $GITHUB_OUTPUT
-
-      - name: Generate and Format Data Files with Health
-        id: health
-        run: |
-          set -e
-          python - << 'PY'
-          import json, datetime, pathlib, os
-          data_path = pathlib.Path("data.json")
-          health_path = pathlib.Path("health.json")
-          ok = False
-          reason = None
-          qc_exit = os.environ.get("QC_EXIT", "0")
-          try:
-            data = json.loads(data_path.read_text(encoding="utf-8"))
-            size_ok = len(json.dumps(data).encode("utf-8")) > 200
-            ok = (qc_exit == "0") and size_ok and len(data.get("jobListings", [])) >= 0
-            reason = None if ok else f"qc_exit={qc_exit}, size_ok={size_ok}"
-          except Exception as e:
-            reason = f"read_error: {e}"
-          ti = data.get("transparencyInfo", {}) if 'data' in locals() else {}
-          health = { "ok": bool(ok), "reason": reason, "checkedAt": datetime.datetime.utcnow().isoformat() + "Z", **ti }
-          health_path.write_text(json.dumps(health, indent=2, ensure_ascii=False), encoding="utf-8")
-          if 'data' in locals():
-            data_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-          PY
-        env:
-          QC_EXIT: ${{ steps.qc.outputs.qc_exit }}
-
-      - name: Upload artifacts (data.json, health.json)
-        uses: actions/upload-artifact@v4
-        with:
-          name: weekly-artifacts
-          path: |
-            data.json
-            health.json
-          retention-days: 7
-
-      - name: Commit and Push Changes (manual and scheduled)
-        run: |
-          set -e
-          git config user.name "GitHub Actions Bot"
-          git config user.email "actions-bot@users.noreply.github.com"
-          if ! git diff --quiet -- data.json health.json; then
-            git add data.json health.json
-            COMMIT_MSG="chore(data): ${{ steps.flags.outputs.run_label }}"
-            git commit -m "$COMMIT_MSG"
-            git pull --rebase
-            git push
-          else
-            echo "No data changes to commit."
-          fi
-
-      - name: Post run summary
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let health = {};
-            try { health = JSON.parse(fs.readFileSync('health.json', 'utf8')); } catch {}
-            const ok = health.ok === true;
-            const total = health.totalListings ?? 'n/a';
-            const rate = health.successRatePct ?? 'n/a';
-            const reason = health.reason ?? 'n/a';
-            const artifacts = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-            const body = [
-              `Run: ${ok ? 'OK' : 'NOT OK'}`,
-              `Listings: ${total}`,
-              `Source success rate: ${rate}%`,
-              `Reason: ${reason}`,
-              `Artifacts: ${artifacts}`
-            ].join('\\n');
-            core.summary.addHeading('Vacancies Data Pipeline (Weekly)').addRaw(body, true).write();
-
-      - name: Open issue if health not OK
-        if: steps.health.outcome == 'success'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            let health = {};
-            try { health = JSON.parse(fs.readFileSync('health.json', 'utf8')); } catch {}
-            if (health.ok === true) { core.info('Health OK; skipping issue.'); return; }
-            const artifacts = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-            const title = `[Data Pipeline][Weekly] Health not OK - ${new Date().toISOString()}`;
+            const mode = `${{ steps.decide.outputs.mode }}`;
+            const title = `[Data Pipeline][${mode}] Health not OK - ${new Date().toISOString()}`;
             const body = [
               `Health status: ${JSON.stringify(health, null, 2)}`,
               '',
@@ -336,7 +213,7 @@ jobs:
 
   lighthouse:
     runs-on: ubuntu-latest
-    needs: [nightly, weekly]
+    needs: pipeline
     if: ${{ vars.PAGES_URL != '' }}
     steps:
       - name: Wait for Pages cache (retry)
