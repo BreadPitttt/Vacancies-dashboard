@@ -1,5 +1,9 @@
-# scraper.py — Aggregator-first publishing with schema-compliant 'source',
-# confidence labels, Telegram(RSS) multi-endpoint fallbacks, and resilient networking.
+# scraper.py — Aggregator-first publishing with:
+# - unique IDs for updates (no duplicate ids),
+# - schema-compliant 'source' enum,
+# - verifiedBy confidence field,
+# - Telegram(RSS) multi-endpoint fallbacks,
+# - resilient requests Session + HTTPAdapter + Retry with short timeouts.
 
 import json, re, hashlib, threading, os, xml.etree.ElementTree as ET
 from pathlib import Path
@@ -85,7 +89,7 @@ TELEGRAM_RSS_BASES = [
   "https://rsshub.rssforever.com",
 ]
 
-# Official verification domains (includes SSC portal)
+# Official verification domains
 OFFICIAL_DOMAINS = {
   "ssc.gov.in","www.ssc.gov.in",
   "bssc.bihar.gov.in","onlinebssc.com",
@@ -155,10 +159,13 @@ def scrape_aggregator_page(src):
         if ds is not None: detail_text = norm(ds.get_text(" "))
       except Exception: pass
       combo = f"{title} — {detail_text}"
-      key = norm_key(title)
+      key_base = norm_key(title)
+      upd = is_update(combo)
+      # updates get distinct uniqueKey -> no id collisions
+      unique_key = f"{key_base}|upd" if upd else key_base
       return {
-        "key": key,
-        "slug": hashlib.sha1(f"{src['name']}|{key}".encode("utf-8")).hexdigest()[:12],
+        "key": key_base,           # group key
+        "uniqueKey": unique_key,   # unique per item
         "title": title,
         "organization": src["name"],
         "applyLink": href,
@@ -167,8 +174,8 @@ def scrape_aggregator_page(src):
         "domicile": "Bihar" if "bihar" in combo.lower() else "All India",
         "sourceType": "aggregator",
         "source": src["name"],
-        "isUpdate": is_update(combo),
-        "updateSummary": title if is_update(combo) else None,
+        "isUpdate": upd,
+        "updateSummary": title if upd else None,
         "detailText": combo
       }
 
@@ -196,10 +203,12 @@ def scrape_telegram_channel(username):
         title = tx(it,"title"); link = tx(it,"link"); desc = tx(it,"description")
         combo = norm(f"{title} {desc}")
         if len(title) < 6 or not is_joblike(combo): continue
-        key = norm_key(title)
+        key_base = norm_key(title)
+        upd = is_update(combo)
+        unique_key = f"{key_base}|upd" if upd else key_base
         items.append({
-          "key": key,
-          "slug": hashlib.sha1(f"Telegram:{username}|{key}".encode("utf-8")).hexdigest()[:12],
+          "key": key_base,
+          "uniqueKey": unique_key,
           "title": title,
           "organization": f"Telegram:{username}",
           "applyLink": link or None,
@@ -208,8 +217,8 @@ def scrape_telegram_channel(username):
           "domicile": "Bihar" if "bihar" in combo.lower() else "All India",
           "sourceType": "telegram",
           "source": f"Telegram:{username}",
-          "isUpdate": is_update(combo),
-          "updateSummary": title if is_update(combo) else None,
+          "isUpdate": upd,
+          "updateSummary": title if upd else None,
           "detailText": combo
         }); kept += 1
       print(f"[TG ] {username}@{url}: kept={kept}"); return items
@@ -222,6 +231,7 @@ def scrape_telegram_channel(username):
   print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items
 
 def merge_and_mark(collected, prev_pending):
+  # group by base key for cross-source verification
   buckets={}
   for it in collected:
     b = buckets.setdefault(it["key"], {"aggs": set(), "hasOfficial": False, "tele": False, "items": []})
@@ -230,8 +240,9 @@ def merge_and_mark(collected, prev_pending):
     if looks_official(it.get("applyLink")) or looks_official(it.get("pdfLink")): b["hasOfficial"] = True
     b["items"].append(it)
 
-  published=[]; pending=set()
+  published=[]; pending=set(); seen_ids=set()
   for key, b in buckets.items():
+    # confidence
     if b["hasOfficial"]:
       verifiedBy = "official"
     elif len(b["aggs"]) >= 2:
@@ -245,6 +256,7 @@ def merge_and_mark(collected, prev_pending):
       if b["tele"]: pending.add(key)
       continue
 
+    # pick representative aggregator record
     rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator" and not x.get("isUpdate")), None)
     if rep is None: rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator"), None)
     if rep is None: rep = next((x for x in b["items"] if isinstance(x, dict)), None)
@@ -252,17 +264,25 @@ def merge_and_mark(collected, prev_pending):
       continue
 
     sources = sorted({x["source"] for x in b["items"] if x.get("sourceType")=="aggregator"})
-    schema_source = "official" if verifiedBy == "official" else "aggregator"   # enum-safe
+    schema_source = "official" if verifiedBy == "official" else "aggregator"  # enum-safe
+
+    # compute unique id from sources + uniqueKey
+    base_id = hashlib.sha1(f"{'|'.join(sources)}|{rep['uniqueKey']}".encode("utf-8")).hexdigest()[:12]
+    rid = base_id
+    n=1
+    while rid in seen_ids:
+      rid = hashlib.sha1(f"{base_id}|{n}".encode("utf-8")).hexdigest()[:12]; n+=1
+    seen_ids.add(rid)
 
     rep_rec = {
-      "id": rep["slug"],
-      "slug": rep["slug"],
+      "id": rid,
+      "slug": rid,
       "title": rep["title"],
       "organization": "/".join(sources) if sources else rep["organization"],
       "qualificationLevel": "Graduate",
       "domicile": rep["domicile"],
-      "source": schema_source,       # JSON Schema enum-compliant
-      "verifiedBy": verifiedBy,      # confidence for UI
+      "source": schema_source,
+      "verifiedBy": verifiedBy,
       "type": "VACANCY",
       "updateSummary": None,
       "relatedTo": None,
@@ -273,19 +293,34 @@ def merge_and_mark(collected, prev_pending):
     }
     published.append(rep_rec)
 
+    # attach updates
     for u in (x for x in b["items"] if x.get("isUpdate")):
-      upd = rep_rec.copy()
-      upd["id"] = u["slug"]; upd["slug"] = u["slug"]; upd["title"] = "[UPDATE] " + u["title"]
-      upd["type"] = "UPDATE"; upd["updateSummary"] = u.get("updateSummary"); upd["relatedTo"] = rep_rec["slug"]
-      upd["deadline"] = u.get("deadline") or rep_rec["deadline"]
-      upd["applyLink"] = u.get("applyLink") or rep_rec["applyLink"]; upd["pdfLink"] = u.get("pdfLink") or rep_rec["pdfLink"]
-      upd["source"] = schema_source  # keep enum-safe
+      up_base = hashlib.sha1(f"{'|'.join(sources)}|{u['uniqueKey']}".encode("utf-8")).hexdigest()[:12]
+      uid = up_base; m=1
+      while uid in seen_ids:
+        uid = hashlib.sha1(f"{up_base}|{m}".encode("utf-8")).hexdigest()[:12]; m+=1
+      seen_ids.add(uid)
+
+      upd = {
+        "id": uid,
+        "slug": uid,
+        "title": "[UPDATE] " + u["title"],
+        "organization": rep_rec["organization"],
+        "qualificationLevel": "Graduate",
+        "domicile": rep["domicile"],
+        "source": schema_source,
+        "verifiedBy": verifiedBy,
+        "type": "UPDATE",
+        "updateSummary": u.get("updateSummary"),
+        "relatedTo": rep_rec["slug"],
+        "deadline": u.get("deadline") or rep_rec["deadline"],
+        "applyLink": u.get("applyLink") or rep_rec["applyLink"],
+        "pdfLink": u.get("pdfLink") or rep_rec["pdfLink"],
+        "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+      }
       published.append(upd)
 
-  pending_now = (prev_pending or set()) | pending
-  for rec in published:
-    if rec["slug"] in pending_now: pending_now.remove(rec["slug"])
-  return published, pending_now
+  return published, pending
 
 def load_data():
   base={"jobListings": [], "transparencyInfo": {}}
@@ -329,7 +364,7 @@ def main():
   ti["aggCounts"] = agg_counts
   ti["telegramCounts"] = tg_counts
   ti["pendingFromTelegram"] = sorted(pending)
-  ti["notes"] = "Schema-compliant source; verifiedBy in {official,multi-aggregator,single-aggregator}; Telegram is hint-only with RSSHub fallbacks."
+  ti["notes"] = "Unique ids for updates; schema-safe source; verifiedBy confidence; Telegram via RSSHub fallbacks."
   save_data(data)
   print(f"[INFO] agg_total={sum(agg_counts.values())} tg_total={sum(tg_counts.values())} published={len(cleaned)} pending={len(pending)}")
 
