@@ -1,6 +1,8 @@
-requests
-beautifulsoup4
-feedparser
-dateparser
-jsonschema
-lxml
+requests>=2.31.0
+urllib3>=2.2.0
+certifi>=2024.2.2
+beautifulsoup4>=4.12.3
+lxml>=5.2.1
+dateparser>=1.2.0
+cloudscraper>=1.2.71
+jsonschema>=4.22.0
