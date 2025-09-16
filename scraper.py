@@ -39,8 +39,8 @@ MAX_WORKERS = 8
 PER_SOURCE_MAX = 120
 
 SOURCES_OFFICIAL = [
+   SOURCES_OFFICIAL = [
     {"name": "SSC", "base": "https://ssc.gov.in", "url": "https://ssc.gov.in"},
-    {"name": "SSC-ER", "base": "https://sscer.org", "url": "https://sscer.org"},
     {"name": "IBPS", "base": "https://www.ibps.in", "url": "https://www.ibps.in"},
     {"name": "RRB-CDG", "base": "https://www.rrbcdg.gov.in", "url": "https://www.rrbcdg.gov.in"},
     {"name": "RRB-Patna", "base": "https://www.rrbpatna.gov.in", "url": "https://www.rrbpatna.gov.in"},
@@ -49,6 +49,7 @@ SOURCES_OFFICIAL = [
     {"name": "NIACL", "base": "https://www.newindia.co.in", "url": "https://www.newindia.co.in/recruitment"},
     {"name": "UIIC", "base": "https://www.uiic.co.in", "url": "https://www.uiic.co.in/web/careers/recruitment"},
 ]
+
 SOURCES_AGG = [
     {"name": "CareerPower", "base": "https://www.adda247.com", "url": "https://www.adda247.com/jobs/government-jobs/"},
     {"name": "SarkariExam", "base": "https://www.sarkariexam.com", "url": "https://www.sarkariexam.com"},
@@ -354,3 +355,4 @@ def main():
 
 if __name__=="__main__":
   main()
+
