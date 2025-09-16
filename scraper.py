@@ -1,6 +1,6 @@
-# scraper.py — production-ready: stable IDs, explicit decoding, shorter timeouts,
-# retry-hardening, non-HTML skip, per-source caps, and 8-thread concurrent fetch.
-# All try blocks have matching except blocks to avoid SyntaxError.
+# scraper.py — production-ready: explicit decoding, lxml parser, shorter connect/read timeouts,
+# retry-hardening, non-HTML skip, per-source caps, and 8-thread concurrent detail fetch.
+# Includes relaxed domicile filter to avoid dropping valid listings and added summary logs.
 
 import json, re, hashlib, threading
 from pathlib import Path
@@ -9,7 +9,12 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+from urllib3.util_retry import Retry  # some runners expose as urllib3.util.retry; guard below
+try:
+    from urllib3.util import Retry as _Retry
+    Retry = _Retry
+except Exception:
+    pass
 
 from bs4 import BeautifulSoup, UnicodeDammit
 import dateparser
@@ -159,11 +164,13 @@ def other_state_only(text):
     if st=="bihar": continue
     if re.search(rf"\b{re.escape(st)}\b.*{RESTRICT_PAT}",t) or re.search(rf"{RESTRICT_PAT}.*\b{re.escape(st)}\b",t): return True
   return False
+
+# RELAXED: allow by default unless explicitly “other state only”
 def eligible_by_domicile(org, detail_text):
+  if other_state_only(detail_text): return False
   if is_all_india(detail_text): return True
   if ("bpsc" in (org or "").lower()) or is_bihar_only(detail_text): return True
-  if other_state_only(detail_text): return False
-  return False
+  return True
 
 def classify_level(text):
   t=(text or "").lower()
@@ -181,8 +188,7 @@ def extract_deadline(text):
   for patt in DATE_HINTS:
     m=re.search(patt,text,flags=re.I)
     if m:
-      cand=norm(m.group(1))
-      dt=dateparser.parse(cand, settings={"DATE_ORDER":"DMY"})
+      cand=norm(m.group(1)); dt=dateparser.parse(cand, settings={"DATE_ORDER":"DMY"})
       if dt: return dt.date().isoformat()
   dt=dateparser.parse(text, settings={"PREFER_DATES_FROM":"future","DATE_ORDER":"DMY"})
   return dt.date().isoformat() if dt and dt.date()>=UTC_NOW.date() else None
@@ -199,12 +205,9 @@ def robots_allowed(url, ua=HEADERS.get("User-Agent","*")):
     p = urlparse(url); root = f"{p.scheme}://{p.netloc}"
     rp = _ROBOTS.get(root)
     if not rp:
-      rp = robotparser.RobotFileParser()
-      rp.set_url(urljoin(root, "/robots.txt"))
-      try:
-        rp.read()
-      except Exception:
-        pass
+      rp = robotparser.RobotFileParser(); rp.set_url(urljoin(root, "/robots.txt"))
+      try: rp.read()
+      except Exception: pass
       _ROBOTS[root] = rp
     return rp.can_fetch(ua, url) if rp else True
   except Exception:
@@ -233,12 +236,12 @@ def scrape_html_list(list_url, base, org):
     anchors=[]
     for a in soup.find_all("a", href=True):
       href = absolute(base, a["href"])
-      if not href or href.startswith("mailto:") or href.startswith("tel:"):
+      if not href or href.startswith("mailto:") or href.startswith("tel:"): 
         continue
       if any(href.lower().endswith(ext) for ext in (".jpg",".png",".gif",".zip",".rar",".7z",".xlsx",".xls",".doc",".docx")):
         continue
       title = norm(a.get_text(" "))
-      if len(title) < 8:
+      if len(title) < 8: 
         continue
       anchors.append((title, href))
       if len(anchors) >= PER_SOURCE_MAX:
@@ -257,7 +260,7 @@ def scrape_html_list(list_url, base, org):
       except Exception:
         detail_text = title
 
-      combo = f"{title} — {detail_text}"
+      combo=f"{title} — {detail_text}"
       if not (passes_education(combo) and passes_skill_rule(combo) and
               passes_degree_exclusions(combo) and is_recruitment(combo) and
               eligible_by_domicile(org, detail_text)):
@@ -265,9 +268,7 @@ def scrape_html_list(list_url, base, org):
 
       slug=clean_title_for_id(title)
       domicile_label="Bihar" if (("bpsc" in org.lower()) or ("bihar" in detail_text.lower())) else "All India"
-      deadline=extract_deadline(detail_text)
-      ext=find_extension_date(detail_text)
-      deadline = ext or deadline
+      deadline=extract_deadline(detail_text); ext=find_extension_date(detail_text); deadline = ext or deadline
 
       it={
         "id": make_id(org, slug),
@@ -282,15 +283,14 @@ def scrape_html_list(list_url, base, org):
         "pdfLink": href,
         "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
       }
-      it["_link_ok"] = head_ok(it["applyLink"] or it["pdfLink"])
+      it["_link_ok"]=head_ok(it["applyLink"] or it["pdfLink"])
       return it
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
       futures = [ex.submit(fetch_detail, pair) for pair in anchors]
       for fut in as_completed(futures):
         it = fut.result()
-        if it:
-          items.append(it)
+        if it: items.append(it)
 
   except Exception as e:
     print(f"[WARN] {org} scrape error: {e}")
@@ -310,31 +310,26 @@ def scrape_aggregators_all():
     items=scrape_html_list(s["url"], s["base"], s["name"])
     for it in items:
       it["source"]="aggregator"
-      if it["domicile"]!="Bihar":
-        it["domicile"]="All India"
+      if it["domicile"]!="Bihar": it["domicile"]="All India"
     out.extend(items)
   return out
 
 def merge_with_fallback(official_items, aggregator_items):
   by_slug={}
-  for it in official_items:
-    by_slug.setdefault(it["slug"], it)
+  for it in official_items: by_slug.setdefault(it["slug"], it)
   for agg in aggregator_items:
     slug=agg["slug"]
     if slug not in by_slug:
-      by_slug[slug]=agg
-      continue
+      by_slug[slug]=agg; continue
     off=by_slug[slug]
-    if agg.get("deadline") and (not off.get("deadline")):
-      off["deadline"]=agg["deadline"]
+    if agg.get("deadline") and (not off.get("deadline")): off["deadline"]=agg["deadline"]
     if not off.get("_link_ok"):
       off["applyLink"]=agg.get("applyLink") or off.get("applyLink")
       off["pdfLink"]=agg.get("pdfLink") or off.get("pdfLink")
       off["source"]="aggregator"
   merged=[]
   for it in by_slug.values():
-    it.pop("_link_ok", None)
-    merged.append(it)
+    it.pop("_link_ok", None); merged.append(it)
   return merged
 
 def drop_expired(listings):
@@ -342,36 +337,27 @@ def drop_expired(listings):
   for j in listings:
     dl=j.get("deadline")
     if dl:
-      try:
-        d=datetime.fromisoformat(dl)
+      try: d=datetime.fromisoformat(dl)
       except Exception:
-        dt=dateparser.parse(dl)
-        d=dt if isinstance(dt, datetime) else None
-      if d and d.date()<UTC_NOW.date():
-        continue
+        dt=dateparser.parse(dl); d=dt if isinstance(dt, datetime) else None
+      if d and d.date()<UTC_NOW.date(): continue
     if j.get("extractedAt"):
       try:
         ext=datetime.fromisoformat(j["extractedAt"].replace("Z",""))
-        if ext < UTC_NOW - timedelta(days=120):
-          continue
-      except Exception:
-        pass
+        if ext < UTC_NOW - timedelta(days=120): continue
+      except Exception: pass
     out.append(j)
   return out
 
 def load_data():
   base={"jobListings": [], "transparencyInfo": {}}
   if DATA_PATH.exists():
-    try:
-      base=json.loads(DATA_PATH.read_text(encoding="utf-8"))
-    except Exception:
-      pass
-  base.setdefault("jobListings",[])
-  base.setdefault("transparencyInfo",{})
+    try: base=json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    except Exception: pass
+  base.setdefault("jobListings",[]); base.setdefault("transparencyInfo",{})
   return base
 
-def save_data(data):
-  DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+def save_data(data): DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 def main():
   official=scrape_official_all()
@@ -384,7 +370,7 @@ def main():
   data["transparencyInfo"]["lastUpdated"]=UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
   data["transparencyInfo"]["totalListings"]=len(cleaned)
   save_data(data)
-  print(f"Saved {len(cleaned)} listings")
+  print(f"[INFO] merged={len(merged)} cleaned={len(cleaned)} at {UTC_NOW.isoformat()}")
 
 if __name__=="__main__":
   main()
