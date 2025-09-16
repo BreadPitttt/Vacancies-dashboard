@@ -1,8 +1,26 @@
 {
-  "jobListings": [],
+  "jobListings": [
+    {
+      "id": "ce6a2b4a48e0",
+      "slug": "ce6a2b4a48e0",
+      "title": "Bihar SHS NHM CHO Recruitment 2025",
+      "organization": "SarkariExamCM",
+      "qualificationLevel": "Graduate",
+      "domicile": "Bihar",
+      "source": "aggregator",
+      "verifiedBy": "single-aggregator",
+      "type": "VACANCY",
+      "updateSummary": null,
+      "relatedTo": null,
+      "deadline": null,
+      "applyLink": "https://sarkariexam.com.cm/bihar-shs-nhm-cho-recruitment-2025/",
+      "pdfLink": "https://sarkariexam.com.cm/bihar-shs-nhm-cho-recruitment-2025/",
+      "extractedAt": "2025-09-16T10:41:13Z"
+    }
+  ],
   "transparencyInfo": {
-    "lastUpdated": "2025-09-16T07:54:10Z",
-    "totalListings": 0,
+    "lastUpdated": "2025-09-16T10:41:13Z",
+    "totalListings": 1,
     "sourceCounts": {
       "official": {
         "SSC": 0,
@@ -23,12 +41,12 @@
       }
     },
     "aggCounts": {
-      "Adda247": 66,
+      "Adda247": 0,
       "SarkariExam": 0,
-      "RojgarResult": 200,
+      "RojgarResult": 0,
       "SarkariExamCM": 2
     },
-    "notes": "Aggregators publish; Telegram only hints; require official-domain or >=2 aggregators to publish.",
+    "notes": "Schema-compliant source; verifiedBy in {official,multi-aggregator,single-aggregator}; Telegram is hint-only with RSSHub fallbacks.",
     "telegramCounts": {
       "ezgovtjob": 0,
       "sarkariresulinfo": 0
