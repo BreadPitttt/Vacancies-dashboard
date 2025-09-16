@@ -1,7 +1,7 @@
 # Vacancies-dashboard
 General Vacancy
 
-[![Nightly and Monday Recheck](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/update.yml/badge.svg?branch=main)](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/update.yml)
+[![Monday Hard Recheck](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/monday-recheck.yml/badge.svg)](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/monday-recheck.yml)
 [![pages-build-deployment](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/pages/pages-build-deployment/badge.svg?branch=main)](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/pages/pages-build-deployment)
 [![Nightly Recheck](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/update.yml/badge.svg)](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/update.yml)
 
