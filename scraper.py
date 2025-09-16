@@ -1,12 +1,11 @@
-# scraper.py — Aggregator-first vacancies + corrigendum/update publishing with verification
-# - Aggregators: Adda247, SarkariExam, RojgarResult, SarkariExam (com.cm mirror)
-# - Publish rules:
-#     Vacancies: appear if on >=2 aggregators OR resolves to official domain (SSC, BSSC, DSSSB, IBPS, BPSC, RBI, CCRAS, RRB)
-#     Updates (corrigendum/addendum/date-extended/postponed/edit window): same verification rule
-# - Updates are linked to their base listing via parentSlug; cards include type="UPDATE" and updateSummary
-# - Strict filters exclude non-job noise; explicit decoding + lxml; short connect/read timeouts; retries; 8-thread concurrency
+# scraper.py — Aggregators + Telegram(RSS) hints with strict verification
+# - Aggregators: Adda247, SarkariExam, RojgarResult, SarkariExam.com.cm
+# - Telegram hints: ezgovtjob, sarkariresulinfo via RSSHub (no login)
+# - Publish when: official-domain link OR >=2 aggregators confirm (Telegram does NOT count)
+# - Telegram-only items saved as pending and auto-published once a confirming aggregator appears
+# - Updates flagged with type="UPDATE"; robust networking (Retry), tuple timeouts, 8-thread concurrency
 
-import json, re, hashlib, threading
+import json, re, hashlib, threading, os, xml.etree.ElementTree as ET
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin, urlparse
@@ -19,7 +18,7 @@ except Exception:
     try:
         from urllib3.util import Retry
     except Exception:
-        Retry = None  # proceed without retries
+        Retry = None
 
 from bs4 import BeautifulSoup, UnicodeDammit
 import dateparser
@@ -29,11 +28,9 @@ DATA_PATH = Path("data.json")
 UTC_NOW = datetime.now(timezone.utc)
 
 # Networking
-CONNECT_TO = 6
-READ_TO    = 12
-LIST_TO    = (CONNECT_TO, READ_TO)
-DETAIL_TO  = (CONNECT_TO, READ_TO)
-HEAD_TO    = 8
+CONNECT_TO, READ_TO = 6, 12
+LIST_TO, DETAIL_TO = (CONNECT_TO, READ_TO), (CONNECT_TO, READ_TO)
+HEAD_TO = 8
 MAX_WORKERS = 8
 PER_SOURCE_MAX = 160
 
@@ -61,13 +58,11 @@ def norm(s): return re.sub(r"\s+"," ",(s or "")).strip()
 def absolute(base, href): return href if (href and href.startswith("http")) else (urljoin(base, href) if href else None)
 
 def fetch(url, timeout):
-  r = HTTP.get(url, timeout=timeout)
-  r.raise_for_status()
-  return r
+  r = HTTP.get(url, timeout=timeout); r.raise_for_status(); return r
 
 def decode_html_bytes(resp):
   enc = resp.encoding or getattr(resp, "apparent_encoding", None) or "utf-8"
-  dammit = UnicodeDammit(resp.content, is_html=True, known_definite_encodings=[enc, "utf-8", "windows-1252", "iso-8859-1"])
+  dammit = UnicodeDammit(resp.content, is_html=True, known_definite_encodings=[enc,"utf-8","windows-1252","iso-8859-1"])
   return dammit.unicode_markup
 
 def soup_from_resp(resp):
@@ -80,8 +75,7 @@ def soup_from_resp(resp):
 def head_ok(url):
   try:
     r = HTTP.head(url, timeout=HEAD_TO, allow_redirects=True)
-    if r.status_code in (405, 501):
-      r = HTTP.get(url, timeout=HEAD_TO, stream=True)
+    if r.status_code in (405,501): r = HTTP.get(url, timeout=HEAD_TO, stream=True)
     return 200 <= r.status_code < 300
   except Exception:
     return False
@@ -94,31 +88,35 @@ AGG_SOURCES = [
   {"name":"SarkariExamCM", "base":"https://sarkariexam.com.cm",   "url":"https://sarkariexam.com.cm"},
 ]
 
-# Official domains (verification only) — now includes SSC’s new portal
-OFFICIAL_DOMAINS = {
-  "ssc.gov.in","www.ssc.gov.in",                                 # SSC official portal (new)
-  "bssc.bihar.gov.in","onlinebssc.com",                           # BSSC
-  "dsssb.delhi.gov.in","dsssbonline.nic.in",                      # DSSSB
-  "www.ibps.in",                                                  # IBPS
-  "bpsc.bihar.gov.in","bpsconline.bihar.gov.in",                  # BPSC
-  "www.rbi.org.in","opportunities.rbi.org.in",                    # RBI
-  "ccras.nic.in",                                                 # CCRAS
-  "www.rrbcdg.gov.in","www.rrbpatna.gov.in"                       # RRB examples
-}
-
-# Strict filters (vacancy signals + non-job exclusions)
-RECRUITMENT_TERMS = [r"\brecruitment\b", r"\bvacanc(?:y|ies)\b", r"\badvertisement\b", r"\bnotification\b", r"\bonline\s*form\b", r"\bapply\s*online\b"]
-EDU_HINTS = [r"\b10\s*(?:th|matric)\b", r"\b12\s*(?:th|inter(?:mediate)?)\b", r"\bgraduate\b", r"\bany\s+graduate\b"]
-EXCLUDE_DEGREE = [r"\b(b\.?tech|be\b|m\.?tech|engineering)\b", r"\bmba|pgdm|management\b", r"\bmbbs|bds|ayush|gnm|anm|nursing\b", r"\bca\b|\bcs\b|\bcma\b|\bicwa\b", r"\blaw\b|\bllb\b|\ballm\b"]
-EXCLUDE_NON_RECRUITMENT = [r"\bcharter\b", r"\bcalendar\b", r"\bcommittee\b", r"\bwebinar\b", r"\bwellness\b", r"\bcancellation\b", r"\bcancelled\b", r"\bdebarred\b", r"\bwalk\s*through\b", r"\btraining\b", r"\bvideo\b"]
-
-# Update (corrigendum) detection
-UPDATE_TERMS = [
-  r"\bcorrigendum\b", r"\baddendum\b", r"\bamendment\b", r"\brevised\b", r"\bcorrection\b",
-  r"\bdate\s*(?:extended|extension)\b", r"\bextension\s*notice\b", r"\bpostponed\b", r"\brescheduled\b", r"\bedit\s*window\b"
+# Telegram via RSSHub (secondary hints; do not publish alone)
+TELEGRAM_CHANNELS = ["ezgovtjob", "sarkariresulinfo"]
+TELEGRAM_RSS_BASES = [
+  os.getenv("TELEGRAM_RSS_BASE") or "https://rsshub.app",
+  "https://rsshub.netlify.app",
 ]
 
-# Domicile
+# Official verification domains (includes SSC portal)
+OFFICIAL_DOMAINS = {
+  "ssc.gov.in","www.ssc.gov.in",
+  "bssc.bihar.gov.in","onlinebssc.com",
+  "dsssb.delhi.gov.in","dsssbonline.nic.in",
+  "www.ibps.in",
+  "bpsc.bihar.gov.in","bpsconline.bihar.gov.in",
+  "www.rbi.org.in","opportunities.rbi.org.in",
+  "ccras.nic.in",
+  "www.rrbcdg.gov.in","www.rrbpatna.gov.in",
+}
+
+# Filters
+RECRUITMENT_TERMS = [r"\brecruitment\b", r"\bvacanc(?:y|ies)\b", r"\badvertisement\b", r"\bnotification\b", r"\bonline\s*form\b", r"\bapply\s*online\b"]
+EDU_HINTS = [r"\b10\s*(?:th|matric)\b", r"\b12\s*(?:th|inter(?:mediate)?)\b", r"\bgraduate\b", r"\bany\s+graduate\b"]
+EXCLUDE_DEGREE = [r"\b(b\.?tech|be\b|m\.?tech|engineering)\b", r"\bmba|pgdm|management\b",
+                  r"\bmbbs|bds|ayush|gnm|anm|nursing\b", r"\bca\b|\bcs\b|\bcma\b|\bicwa\b", r"\blaw\b|\bllb\b|\ballm\b"]
+EXCLUDE_NON_RECRUITMENT = [r"\bcharter\b", r"\bcalendar\b", r"\bcommittee\b", r"\bwebinar\b", r"\bwellness\b",
+                           r"\bcancellation\b", r"\bcancelled\b", r"\bdebarred\b", r"\bwalk\s*through\b", r"\btraining\b", r"\bvideo\b"]
+UPDATE_TERMS = [r"\bcorrigendum\b", r"\baddendum\b", r"\bamendment\b", r"\brevised\b", r"\bcorrection\b",
+                r"\bdate\s*(?:extended|extension)\b", r"\bextension\s*notice\b", r"\bpostponed\b", r"\brescheduled\b", r"\bedit\s*window\b"]
+
 INDIAN_STATES = ["andhra pradesh","arunachal pradesh","assam","bihar","chhattisgarh","goa","gujarat","haryana","himachal pradesh",
  "jharkhand","karnataka","kerala","madhya pradesh","maharashtra","manipur","meghalaya","mizoram","nagaland","odisha",
  "punjab","rajasthan","sikkim","tamil nadu","telangana","tripura","uttar pradesh","uttarakhand","west bengal"]
@@ -128,20 +126,15 @@ def contains_any(patterns, text):
   t=(text or "").lower()
   return any(re.search(p, t) for p in patterns)
 
-def is_update(text):
-  return contains_any(UPDATE_TERMS, text or "")
+def is_update(text): return contains_any(UPDATE_TERMS, text or "")
 
 def excluded_notice(text):
   t=(text or "").lower()
-  if contains_any(EXCLUDE_NON_RECRUITMENT, t): return True
-  if contains_any(EXCLUDE_DEGREE, t): return True
-  return False
+  return contains_any(EXCLUDE_NON_RECRUITMENT, t) or contains_any(EXCLUDE_DEGREE, t)
 
 def has_minimum_signals(text):
   t=(text or "").lower()
-  if not contains_any(RECRUITMENT_TERMS, t): return False
-  if not contains_any(EDU_HINTS, t): return False
-  return True
+  return contains_any(RECRUITMENT_TERMS, t) and contains_any(EDU_HINTS, t)
 
 def other_state_only(text):
   t=(text or "").lower()
@@ -151,9 +144,7 @@ def other_state_only(text):
       return True
   return False
 
-def eligible_by_domicile(detail_text):
-  if other_state_only(detail_text): return False
-  return True
+def eligible_by_domicile(detail_text): return not other_state_only(detail_text or "")
 
 def classify_level(text):
   t=(text or "").lower()
@@ -172,9 +163,7 @@ def base_slug_without_update(text):
   t = re.sub("|".join(UPDATE_TERMS), " ", t)
   return re.sub(r"[^a-z0-9\s]","",t).strip()
 
-def make_id(org, slug):
-  h = hashlib.sha1(f"{org.lower()}|{slug}".encode("utf-8")).hexdigest()[:12]
-  return f"{org}:{h}"
+def make_id(org, slug): return hashlib.sha1(f"{org.lower()}|{slug}".encode("utf-8")).hexdigest()[:12]
 
 def extract_deadline(text):
   m = re.search(r"(last\s*date|closing\s*date)[^\n]{0,20}(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{2,4})", (text or ""), flags=re.I)
@@ -190,20 +179,21 @@ def get_domain(u):
 
 def looks_official(url): return get_domain(url) in OFFICIAL_DOMAINS
 
+# Aggregator scraper
 def scrape_aggregator_page(src):
   items=[]
   try:
     resp = fetch(src["url"], LIST_TO)
     soup = soup_from_resp(resp)
     if soup is None: return items
+
     anchors=[]
     for a in soup.find_all("a", href=True):
       href = absolute(src["base"], a["href"])
       if not href: continue
       title = norm(a.get_text(" "))
       if len(title) < 8: continue
-      if re.search(r"\b(admit\s*card|answer\s*key|result|syllabus)\b", title, flags=re.I):
-        continue
+      if re.search(r"\b(admit\s*card|answer\s*key|result|syllabus)\b", title, flags=re.I): continue
       anchors.append((title, href))
       if len(anchors) >= PER_SOURCE_MAX: break
 
@@ -212,16 +202,12 @@ def scrape_aggregator_page(src):
       s = thread_session()
       detail_text = title
       try:
-        r = s.get(href, timeout=DETAIL_TO)
-        r.raise_for_status()
+        r = s.get(href, timeout=DETAIL_TO); r.raise_for_status()
         ds = soup_from_resp(r)
-        if ds is not None:
-          detail_text = norm(ds.get_text(" "))
-      except Exception:
-        pass
+        if ds is not None: detail_text = norm(ds.get_text(" "))
+      except Exception: pass
       combo = f"{title} — {detail_text}"
       if excluded_notice(combo): return None
-      # For updates, relax education signal but still require recruitment intent
       if is_update(combo):
         if not contains_any(RECRUITMENT_TERMS, combo): return None
       else:
@@ -231,18 +217,14 @@ def scrape_aggregator_page(src):
       base = base_slug_without_update(title)
       slug = clean_title_for_id(title) if not is_update(title) else clean_title_for_id(f"{base}-update")
       return {
-        "slug": slug,
-        "parentSlug": clean_title_for_id(base) if base else None,
-        "title": title,
-        "organization": src["name"],
-        "applyLink": href,
-        "pdfLink": href,
+        "slug": slug, "parentSlug": clean_title_for_id(base) if base else None,
+        "title": title, "organization": src["name"],
+        "applyLink": href, "pdfLink": href,
         "deadline": extract_deadline(combo),
         "qualificationLevel": classify_level(combo),
         "domicile": "Bihar" if "bihar" in combo.lower() else "All India",
-        "source": "aggregator",
-        "isUpdate": is_update(combo),
-        "updateSummary": title if is_update(combo) else None,
+        "sourceType": "aggregator", "source": src["name"],
+        "isUpdate": is_update(combo), "updateSummary": title if is_update(combo) else None,
         "detailText": combo
       }
 
@@ -255,34 +237,87 @@ def scrape_aggregator_page(src):
     print(f"[WARN] aggregator {src['name']} error: {e}")
   return items
 
-def cross_agg_verify(all_items):
-  # Group by base key: parent for updates else own slug
+# Telegram via RSSHub (secondary hints; not counted toward duplication)
+def telegram_feed_url(username):
+  for base in TELEGRAM_RSS_BASES:
+    if base:
+      return f"{base.rstrip('/')}/telegram/channel/{username}"
+  return None
+
+def scrape_telegram_channel(username):
+  items=[]
+  try:
+    url = telegram_feed_url(username)
+    if not url: return items
+    resp = fetch(url, LIST_TO)
+    root = ET.fromstring(resp.content)
+    def tx(node, tag): 
+      el = node.find(tag); return norm(el.text) if (el is not None and el.text) else ""
+    for it in root.findall(".//item"):
+      title = tx(it,"title"); link = tx(it,"link"); desc = tx(it,"description")
+      combo = norm(f"{title} — {desc}")
+      if len(title) < 8: continue
+      if excluded_notice(combo): continue
+      if is_update(combo):
+        if not contains_any(RECRUITMENT_TERMS, combo): continue
+      else:
+        if not has_minimum_signals(combo): continue
+      if not eligible_by_domicile(combo): continue
+      base = base_slug_without_update(title)
+      slug = clean_title_for_id(title) if not is_update(title) else clean_title_for_id(f"{base}-update")
+      items.append({
+        "slug": slug, "parentSlug": clean_title_for_id(base) if base else None,
+        "title": title, "organization": f"Telegram:{username}",
+        "applyLink": link or None, "pdfLink": link or None,
+        "deadline": extract_deadline(combo),
+        "qualificationLevel": classify_level(combo),
+        "domicile": "Bihar" if "bihar" in combo.lower() else "All India",
+        "sourceType": "telegram", "source": f"Telegram:{username}",
+        "isUpdate": is_update(combo), "updateSummary": title if is_update(combo) else None,
+        "detailText": combo
+      })
+    print(f"[TG ] {username}: kept={len(items)} via RSS")
+  except Exception as e:
+    print(f"[WARN] telegram {username} error: {e}")
+  return items
+
+def cross_verify_and_pending(collected, pending_prev):
+  # group by base key (parentSlug or slug)
   buckets={}
-  for it in all_items:
+  for it in collected:
     key = it["parentSlug"] or it["slug"]
-    b = buckets.setdefault(key, {"aggs": set(), "official": False, "items": []})
-    b["aggs"].add(it["organization"])
-    if looks_official(it.get("applyLink") or "") or looks_official(it.get("pdfLink") or ""):
-      b["official"] = True
+    b = buckets.setdefault(key, {"aggs": set(), "hasOfficial": False, "teleSeen": False, "items": []})
+    if it["sourceType"] == "aggregator": b["aggs"].add(it["source"])
+    if it["sourceType"] == "telegram": b["teleSeen"] = True
+    if looks_official(it.get("applyLink") or "") or looks_official(it.get("pdfLink") or ""): b["hasOfficial"] = True
     b["items"].append(it)
 
-  published=[]
+  published=[]; pending=set()
   for key, b in buckets.items():
-    if len(b["aggs"]) >= 2 or b["official"]:
+    aggregator_count = len(b["aggs"])
+    can_publish = b["hasOfficial"] or aggregator_count >= 2
+    if can_publish:
       base = None; updates=[]
       for it in b["items"]:
-        (updates if it["isUpdate"] else [None])[0:0]  # no-op, keeps style consistent
-      for it in b["items"]:
+        if it["sourceType"] == "aggregator" and not it["isUpdate"] and base is None:
+          base = it
         if it["isUpdate"]: updates.append(it)
-        else: base = base or it
       chosen=[]
       if base: chosen.append(base)
       chosen.extend(updates)
       for it in chosen:
-        it["organization"] = "/".join(sorted(list(b["aggs"])))
-        it["source"] = "aggregator-verified"
+        sources = sorted({x["source"] for x in b["items"] if x["sourceType"]=="aggregator"})
+        it["organization"] = "/".join(sources) if sources else it["organization"]
+        it["source"] = "verified"
         published.append(it)
-  return published
+    else:
+      if b["teleSeen"]: pending.add(key)
+
+  pending_now = (pending_prev or set()) | pending
+  for it in published:
+    key = it["parentSlug"] or it["slug"]
+    if key in pending_now: pending_now.remove(key)
+  return published, pending_now
 
 def drop_expired(listings):
   out=[]
@@ -307,18 +342,26 @@ def load_data():
 def save_data(data): DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 def main():
-  # 1) Discover
-  collected=[]; per_counts={}
+  # 1) Aggregator discovery
+  collected=[]; agg_counts={}
   for src in AGG_SOURCES:
-    items = scrape_aggregator_page(src)
-    collected.extend(items); per_counts[src["name"]] = len(items)
+    its = scrape_aggregator_page(src)
+    collected.extend(its); agg_counts[src["name"]] = len(its)
 
-  # 2) Verify (cross-aggregator or official link — includes ssc.gov.in)
-  verified = cross_agg_verify(collected)
+  # 2) Telegram hints (RSSHub)
+  tg_counts={}
+  for ch in TELEGRAM_CHANNELS:
+    its = scrape_telegram_channel(ch)
+    collected.extend(its); tg_counts[ch] = len(its)
 
-  # 3) Finalize and persist
+  # 3) Verify and carry pending hints between runs
+  data_prev = load_data()
+  prev_pending = set(data_prev.get("transparencyInfo",{}).get("pendingFromTelegram",[]))
+  verified, pending = cross_verify_and_pending(collected, prev_pending)
+
+  # 4) Finalize and persist
   cleaned = drop_expired(verified)
-  data = load_data()
+  data = data_prev
   data["jobListings"] = []
   for it in cleaned:
     rec = {
@@ -339,13 +382,16 @@ def main():
     }
     data["jobListings"].append(rec)
 
-  ti = data["transparencyInfo"]
+  ti = data.setdefault("transparencyInfo",{})
   ti["lastUpdated"] = UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
   ti["totalListings"] = len(data["jobListings"])
-  ti["aggCounts"] = per_counts
-  ti["notes"] = "Aggregator-first with cross-agg/official verification; updates published with type=UPDATE"
+  ti["aggCounts"] = agg_counts
+  ti["telegramCounts"] = tg_counts
+  ti["pendingFromTelegram"] = sorted(pending)
+  ti["notes"] = "Telegram used as secondary hints; publish only after official-domain or >=2 aggregators; pending hints auto-publish once confirmed."
+
   save_data(data)
-  print(f"[INFO] collected={sum(per_counts.values())} verified={len(verified)} published={len(data['jobListings'])}")
+  print(f"[INFO] agg={sum(agg_counts.values())} tg={sum(tg_counts.values())} verified={len(cleaned)} pending={len(pending)}")
 
 if __name__=="__main__":
   main()
