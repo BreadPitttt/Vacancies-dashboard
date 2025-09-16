@@ -3,9 +3,8 @@ name: Nightly and Monday Recheck
 on:
   workflow_dispatch: {}
   schedule:
-    # 18:15 UTC daily and Mondays; GitHub Actions cron uses UTC
-    - cron: '15 18 * * *'
-    - cron: '15 18 * * 1'
+    - cron: '15 18 * * *'   # daily, UTC
+    - cron: '15 18 * * 1'   # Mondays, UTC
 
 permissions:
   contents: write
@@ -34,7 +33,6 @@ jobs:
       - name: Run scraper
         env:
           PYTHONUNBUFFERED: "1"
-          # Optional: point to a self-hosted RSSHub if desired
           TELEGRAM_RSS_BASE: ${{ vars.TELEGRAM_RSS_BASE }}
         run: python scraper.py
 
@@ -67,8 +65,7 @@ jobs:
           python - << 'PY'
           import json, pathlib
           p = pathlib.Path("data.json")
-          data = json.loads(p.read_text(encoding="utf-8"))
-          p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+          p.write_text(json.dumps(json.loads(p.read_text(encoding="utf-8")), ensure_ascii=False, indent=2), encoding="utf-8")
           PY
 
       - name: Commit updated data.json and health.json if changed
@@ -90,7 +87,6 @@ jobs:
     if: ${{ vars.PAGES_URL != '' }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Audit homepage with Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
@@ -98,17 +94,12 @@ jobs:
             ${{ vars.PAGES_URL }}
           budgetPath: ./.github/lighthouse/budget.json
           uploadArtifacts: true
-
       - name: Check health.json exists (HTTP 200)
         run: |
-          set -e
-          base="${{ vars.PAGES_URL }}"
-          base="${base%/}"
+          base="${{ vars.PAGES_URL }}"; base="${base%/}"
           url="$base/health.json"
-          echo "Checking $url"
           code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
           if [ "$code" != "200" ]; then
-            echo "health.json check failed with HTTP $code"
-            exit 1
+            echo "health.json check failed with HTTP $code"; exit 1
           fi
           echo "health.json OK (HTTP $code)"
