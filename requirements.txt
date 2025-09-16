@@ -1,6 +1,6 @@
- requests
- beautifulsoup4
- feedparser
- dateparser
- jsonschema
-+ lxml
+requests
+beautifulsoup4
+feedparser
+dateparser
+jsonschema
+lxml
