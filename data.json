@@ -1,7 +1,7 @@
 {
   "jobListings": [],
   "transparencyInfo": {
-    "lastUpdated": "2025-09-16T17:46:56Z",
+    "lastUpdated": "2025-09-16T18:35:31Z",
     "totalListings": 0,
     "sourceCounts": {
       "official": {
@@ -25,7 +25,7 @@
     "aggCounts": {
       "ResultBharat": 0,
       "Adda247": 0,
-      "RojgarResult": 19,
+      "RojgarResult": 0,
       "SarkariExam": 0
     },
     "notes": "Hardened: backoff+jitter, per-host rate limit, circuit breakers, caching, metrics, inline+final validation.",
@@ -38,21 +38,23 @@
       "DSSSB_Notice": 0,
       "BPSC": 0
     },
-    "runStartedAt": "2025-09-16T17:46:56Z",
-    "runEndedAt": "2025-09-16T18:32:07Z",
-    "runDurationSec": 2710.45,
+    "runStartedAt": "2025-09-16T18:35:31Z",
+    "runEndedAt": "2025-09-16T19:21:45Z",
+    "runDurationSec": 2774.47,
     "perSourceMetrics": {
       "Adda247": {
-        "ok": 1,
-        "fail": 0,
+        "ok": 0,
+        "fail": 1,
         "skipped_due_cb": 0,
         "not_modified": 0,
-        "raw": 315,
-        "hinted": 67,
+        "raw": 0,
+        "hinted": 0,
         "kept": 0,
-        "error_samples": [],
+        "error_samples": [
+          "HTTPSConnectionPool(host='www.adda247.com', port=443): Max retries exceeded with url: /jobs/government-jobs/ (Caused by ResponseError('too many 403 error responses'))"
+        ],
         "durations": [
-          104.774409532547
+          222.66842341423035
         ]
       },
       "SarkariExam": {
@@ -67,20 +69,22 @@
           "HTTPSConnectionPool(host='www.sarkariexam.com', port=443): Max retries exceeded with url: / (Caused by ResponseError('too many 403 error responses'))"
         ],
         "durations": [
-          223.85718655586243
+          228.30369591712952
         ]
       },
       "RojgarResult": {
-        "ok": 1,
-        "fail": 0,
+        "ok": 0,
+        "fail": 1,
         "skipped_due_cb": 0,
         "not_modified": 0,
-        "raw": 183,
-        "hinted": 160,
-        "kept": 19,
-        "error_samples": [],
+        "raw": 0,
+        "hinted": 0,
+        "kept": 0,
+        "error_samples": [
+          "HTTPSConnectionPool(host='www.rojgarresult.com', port=443): Max retries exceeded with url: /recruitments/ (Caused by ResponseError('too many 403 error responses'))"
+        ],
         "durations": [
-          186.90140581130981
+          223.0560519695282
         ]
       },
       "ResultBharat": {
@@ -88,12 +92,12 @@
         "fail": 0,
         "skipped_due_cb": 0,
         "not_modified": 0,
-        "raw": 257,
+        "raw": 256,
         "hinted": 70,
         "kept": 0,
         "error_samples": [],
         "durations": [
-          53.66258192062378
+          40.87113690376282
         ]
       },
       "DSSSB_Notice": {
@@ -105,10 +109,10 @@
         "hinted": 0,
         "kept": 0,
         "error_samples": [
-          "HTTPSConnectionPool(host='dsssb.delhi.gov.in', port=443): Max retries exceeded with url: /notice-of-exam (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x7f41758a4ad0>, 'Connection to dsssb.delhi.gov.in timed out. (connect timeout=12)'))"
+          "HTTPSConnectionPool(host='dsssb.delhi.gov.in', port=443): Max retries exceeded with url: /notice-of-exam (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x7fbb1433a310>, 'Connection to dsssb.delhi.gov.in timed out. (connect timeout=12)'))"
         ],
         "durations": [
-          504.56809163093567
+          504.4266347885132
         ]
       },
       "RRB_Chandigarh": {
@@ -121,7 +125,7 @@
         "kept": 1,
         "error_samples": [],
         "durations": [
-          319.1641676425934
+          300.1144344806671
         ]
       },
       "BPSC": {
@@ -134,7 +138,7 @@
         "kept": 0,
         "error_samples": [],
         "durations": [
-          2707.500630378723
+          2774.4653565883636
         ]
       },
       "TG:ezgovtjob": {
@@ -147,10 +151,10 @@
         "kept": 0,
         "error_samples": [],
         "durations": [
-          1.8503873348236084
+          2.4002859592437744
         ]
       }
     },
-    "successRatePct": 75.0
+    "successRatePct": 50.0
   }
 }
