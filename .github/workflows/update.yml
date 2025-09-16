@@ -3,7 +3,7 @@ name: Nightly Recheck
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: '15 18 * * *'
+    - cron: '15 18 * * *'  # Daily at 18:15 UTC
 
 permissions:
   contents: write
@@ -17,7 +17,11 @@ jobs:
     timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # pull full history for rebase-safe updates
+
       - uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.11'
@@ -67,15 +71,18 @@ jobs:
           p.write_text(json.dumps(json.loads(p.read_text(encoding="utf-8")), ensure_ascii=False, indent=2), encoding="utf-8")
           PY
 
-      - name: Commit updated data.json and health.json if changed
+      - name: Commit updated data.json and health.json if changed (rebase-safe)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "actions-user"
           git config user.email "actions@users.noreply.github.com"
-          CHANGED="$(git status --porcelain data.json health.json)"
-          if [[ -n "$CHANGED" ]]; then
+          if ! git diff --quiet -- data.json health.json; then
             git add data.json health.json
             git commit -m "chore(data): nightly refresh"
-            git push
+            git fetch origin main
+            git pull --rebase origin main
+            git push origin HEAD:main
           else
             echo "No changes to commit."
           fi
