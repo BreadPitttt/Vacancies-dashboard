@@ -1,7 +1,7 @@
 {
   "jobListings": [],
   "transparencyInfo": {
-    "lastUpdated": "2025-09-16T07:23:46Z",
+    "lastUpdated": "2025-09-16T07:39:01Z",
     "totalListings": 0,
     "sourceCounts": {
       "official": {
@@ -28,6 +28,13 @@
       "RojgarResult": 0,
       "SarkariExamCM": 3
     },
-    "notes": "Aggregator-first with cross-agg/official verification; updates published with type=UPDATE"
+    "notes": "Telegram used as secondary hints; publish only after official-domain or >=2 aggregators; pending hints auto-publish once confirmed.",
+    "telegramCounts": {
+      "ezgovtjob": 1,
+      "sarkariresulinfo": 0
+    },
+    "pendingFromTelegram": [
+      "cen042025sectioncontrollercen08092025pdf 25 mb"
+    ]
   }
 }
