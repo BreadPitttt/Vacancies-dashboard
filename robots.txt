@@ -1,3 +1,9 @@
+# robots.txt for a static dashboard
 User-agent: *
-Allow: /
-# Sitemap: https://<your-pages-domain>/sitemap.xml
+# Allow reading data and health files
+Allow: /data.json
+Allow: /health.json
+# Disallow crawling of CI and auxiliary paths if ever exposed
+Disallow: /_next/
+Disallow: /api/
+# No sitemap (static single-page)
