@@ -23,16 +23,21 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Run scraper
         run: python scraper.py
+
       - name: Validate JSON Schema
         run: python validate.py
+
       - name: Quality checks (links, dates, dups)
         run: python qc_checks.py
+
       - name: Generate health.json
         run: |
           python - << 'PY'
@@ -47,6 +52,7 @@ jobs:
           }
           pathlib.Path("health.json").write_text(json.dumps(health, ensure_ascii=False, indent=2), encoding="utf-8")
           PY
+
       - name: Format data.json
         run: |
           python - << 'PY'
@@ -55,6 +61,7 @@ jobs:
           data = json.loads(p.read_text(encoding="utf-8"))
           p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
           PY
+
       - name: Commit updated data.json and health.json if changed
         run: |
           git config user.name "actions-user"
@@ -74,11 +81,25 @@ jobs:
     if: ${{ vars.PAGES_URL != '' }}
     steps:
       - uses: actions/checkout@v4
-      - name: Audit URLs using Lighthouse CI
+
+      # Audit only HTML page(s) with Lighthouse
+      - name: Audit homepage with Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
           urls: |
-            ${{ vars.PAGES_URL }}/
-            ${{ vars.PAGES_URL }}/health.json
+            ${{ vars.PAGES_URL }}
           budgetPath: ./.github/lighthouse/budget.json
           uploadArtifacts: true
+
+      # Verify JSON endpoint separately (avoid Lighthouse NOT_HTML error)
+      - name: Check health.json exists (HTTP 200)
+        run: |
+          set -e
+          URL="${{ vars.PAGES_URL%/ }}/health.json"
+          echo "Checking $URL"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          if [ "$code" != "200" ]; then
+            echo "health.json check failed with HTTP $code"
+            exit 1
+          fi
+          echo "health.json OK (HTTP $code)"
