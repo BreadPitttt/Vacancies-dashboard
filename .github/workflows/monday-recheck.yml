@@ -2,8 +2,7 @@ name: Monday Hard Recheck
 
 on:
   schedule:
-    # 02:40 AM IST every Monday == 21:10 UTC every Sunday
-    - cron: '10 21 * * 0'
+    - cron: '10 21 * * 0' # 02:40 AM IST on Mondays
   workflow_dispatch: {}
 
 permissions:
@@ -21,12 +20,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history for rebase-safe updates
+          fetch-depth: 0
 
-      - uses: actions/setup-python@v5.6.0
+      - name: Set up Python and cache dependencies
+        uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.11'
-          cache: 'pip'
+          cache: 'pip' # Cache pip dependencies
 
       - name: Install dependencies
         run: |
@@ -51,16 +51,7 @@ jobs:
           import json, datetime, pathlib
           data = json.loads(pathlib.Path("data.json").read_text(encoding="utf-8"))
           ti = data.get("transparencyInfo", {})
-          health = {
-            "ok": True,
-            "checkedAt": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "lastUpdated": ti.get("lastUpdated"),
-            "totalListings": ti.get("totalListings"),
-            "aggCounts": ti.get("aggCounts"),
-            "officialCounts": ti.get("officialCounts"),
-            "telegramCounts": ti.get("telegramCounts"),
-            "pendingFromTelegram": ti.get("pendingFromTelegram"),
-          }
+          health = {"ok": True, "checkedAt": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), **ti}
           pathlib.Path("health.json").write_text(json.dumps(health, ensure_ascii=False, indent=2), encoding="utf-8")
           PY
 
