@@ -1,17 +1,19 @@
 {
   "ok": true,
-  "checkedAt": "2025-09-16T13:25:13Z",
-  "lastUpdated": "2025-09-16T12:33:45Z",
-  "totalListings": 173,
+  "checkedAt": "2025-09-16T14:33:06Z",
+  "lastUpdated": "2025-09-16T14:01:56Z",
+  "totalListings": 21,
   "aggCounts": {
-    "Adda247": 65,
+    "Adda247": 44,
     "SarkariExam": 0,
-    "RojgarResult": 140,
+    "RojgarResult": 118,
     "SarkariExamCM": 2
   },
   "telegramCounts": {
     "ezgovtjob": 0,
-    "sarkariresulinfo": 0
+    "sarkariresulinfo": 1
   },
-  "pendingFromTelegram": []
+  "pendingFromTelegram": [
+    "police correction form last date"
+  ]
 }
