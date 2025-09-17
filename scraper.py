@@ -1,7 +1,11 @@
 # scraper.py — Aggregators-first discovery with official-first verification
-# Fix: remove illegal walrus assignment on subscript; safe metrics increments.
-# Resilience: backoff+jitter, per-host rate limit, circuit breakers, caching.
-# Strict open-window: only publish with valid, non-expired deadlines.
+# - Primaries: Adda247, SarkariResult (sarkariresult.com.cm homepage)
+# - Backups: SarkariExam, RojgarResult, ResultBharat
+# - Verify: publish only if (a) official-domain link present, or (b) 2+ aggregators corroborate
+# - Strict open window: deadline must be valid and not expired
+# - Resilience: per-host rate limit, backoff with Retry-After, circuit breaker, caching
+# - Rolling corroboration cache (.agg_seen.json) to allow multi-aggregator across recent days
+# - Official resolution from aggregator detail pages + PDF/detail deadline probing
 
 import os, re, json, time, random, hashlib, threading, xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
@@ -22,8 +26,8 @@ try:
 except Exception:
     CF = None
 
-# ------------ Config ------------
-def env_int(name, default): 
+# ---------------- Config ----------------
+def env_int(name, default):
     try: return int(os.getenv(name, "").strip() or default)
     except: return default
 def env_float(name, default):
@@ -33,6 +37,9 @@ def env_float(name, default):
 IS_HARD_RECHECK = (os.getenv("IS_HARD_RECHECK","").lower() in ("1","true","yes"))
 DATA_PATH = Path("data.json")
 CACHE_PATH = Path(".cache_http.json")
+AGG_CACHE_PATH = Path(".agg_seen.json")
+AGG_WINDOW_DAYS = env_int("MULTI_AGG_DAYS", 7)
+
 UTC_NOW = datetime.now(timezone.utc)
 
 CONNECT_TO = env_int("CONNECT_TIMEOUT", 12 if not IS_HARD_RECHECK else 16)
@@ -62,9 +69,14 @@ UA_POOL = [
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36",
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
 ]
-HEADERS_BASE = { "Accept-Language": "en-IN,en;q=0.9", "Cache-Control": "no-cache", "Pragma": "no-cache", "Connection": "keep-alive" }
+HEADERS_BASE = {
+  "Accept-Language": "en-IN,en;q=0.9",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
+  "Connection": "keep-alive",
+}
 
-# ------------ Sources ------------
+# ---------------- Sources ----------------
 PRIMARY_AGG = [
   {"name":"Adda247", "base":"https://www.adda247.com", "url":"https://www.adda247.com/jobs/government-jobs/"},
   {"name":"SarkariResult", "base":"https://sarkariresult.com.cm", "url":"https://sarkariresult.com.cm/"},
@@ -80,6 +92,7 @@ OFFICIAL_SOURCES = [
   {"name":"BPSC",           "base":"https://bpsc.bihar.gov.in",  "url":"https://bpsc.bihar.gov.in"},
   {"name":"SSC",            "base":"https://ssc.gov.in",         "url":"https://ssc.gov.in"},
 ]
+
 def env_channels():
   raw=os.getenv("TELEGRAM_CHANNELS","").strip()
   return [x for x in raw.split(",") if x] or []
@@ -89,6 +102,7 @@ TELEGRAM_RSS_BASES = [
   "https://rsshub.netlify.app",
   "https://rsshub.rssforever.com",
 ]
+
 OFFICIAL_DOMAINS = {
   "dsssb.delhi.gov.in","dsssbonline.nic.in",
   "www.rrbcdg.gov.in","rrbcdg.gov.in",
@@ -96,7 +110,7 @@ OFFICIAL_DOMAINS = {
   "ssc.gov.in","www.ssc.gov.in","www.ssc.nic.in","ssc.nic.in",
 }
 
-# ------------ HTTP ------------
+# ---------------- HTTP & Resilience ----------------
 def session_with_retries(pool=96):
   s = requests.Session()
   s.headers.update({**HEADERS_BASE, "User-Agent": random.choice(UA_POOL)})
@@ -137,6 +151,7 @@ def _rate_limit_for(host):
       return max(0.0, wait)
     b["t"] -= 1.0; b["ts"] = now; _host_tokens[host] = b
   return 0.0
+
 def _sleep_with_jitter(): time.sleep(BASELINE_SLEEP + random.uniform(JITTER_MIN, JITTER_MAX))
 
 _cb = {}
@@ -158,6 +173,7 @@ def cb_fail(name):
   elif st["fail"] >= CB_FAILURE_THRESHOLD: st["state"]="open"; st["opened"]=time.time()
   _cb[name]=st
 
+# Cache headers for list pages
 try: _cache=json.loads(CACHE_PATH.read_text(encoding="utf-8"))
 except Exception: _cache={}
 def _cache_headers_for(url):
@@ -168,7 +184,7 @@ def _cache_headers_for(url):
 def _update_cache_from_response(url, resp):
   et = resp.headers.get("ETag"); lm = resp.headers.get("Last-Modified")
   if et or lm:
-    _cache[url] = {}; 
+    _cache[url] = {}
     if et: _cache[url]["etag"]=et
     if lm: _cache[url]["last_modified"]=lm
 def save_http_cache():
@@ -229,7 +245,7 @@ def fetch(url, timeout, use_cache=False):
         time.sleep(sleep_s); continue
       raise
 
-# ------------ Parsing & filters ------------
+# ---------------- Parsing & Filters ----------------
 def norm(s): return re.sub(r"\s+"," ",(s or "")).strip()
 def absolute(base, href): return href if (href and href.startswith("http")) else (urljoin(base, href) if href else None)
 
@@ -285,6 +301,7 @@ def norm_key(title):
   tokens = [w for w in t.split() if len(w) > 2]
   return " ".join(tokens[:14])
 
+# Deadlines
 DATE_WORDS = {"jan":"january","feb":"february","mar":"march","apr":"april","may":"may","jun":"june","jul":"july","aug":"august","sep":"september","sept":"september","oct":"october","nov":"november","dec":"december"}
 def _month_word_fix(s):
   t=s.lower()
@@ -392,11 +409,36 @@ def soup_text(url):
     pass
   return ""
 
+# Rolling aggregator corroboration cache
+def load_agg_seen():
+  try:
+    data = json.loads(AGG_CACHE_PATH.read_text(encoding="utf-8"))
+    if AGG_WINDOW_DAYS <= 0: return {}
+    cutoff = datetime.utcnow() - timedelta(days=AGG_WINDOW_DAYS)
+    pruned = {}
+    for k, info in data.items():
+      kept=[]
+      for src, ts in info.get("seen", []):
+        try:
+          dt = datetime.fromisoformat(ts.replace("Z",""))
+          if dt >= cutoff: kept.append((src, ts))
+        except Exception:
+          continue
+      if kept: pruned[k] = {"seen": kept}
+    return pruned
+  except Exception:
+    return {}
+def save_agg_seen(cache):
+  try:
+    AGG_CACHE_PATH.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+  except Exception:
+    pass
+
+# ---------------- Scraping ----------------
 def scrape_generic_list(src, treat_as="aggregator", metrics=None):
   name = src["name"]; url = src["url"]; base = src["base"]
   if not cb_before(name):
-    if metrics is not None:
-      metrics[name]["skipped_due_cb"] = metrics[name]["skipped_due_cb"] + 1
+    if metrics is not None: metrics[name]["skipped_due_cb"] = metrics[name]["skipped_due_cb"] + 1
     return []
   started=time.time()
   items=[]; raw=0; hinted=0; kept=0
@@ -404,15 +446,12 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
     r = fetch(url, LIST_TO, use_cache=True)
     if r.status_code == 304:
       if metrics is not None:
-        m = metrics[name]
-        m["not_modified"] = m["not_modified"] + 1
-        m["durations"].append(time.time()-started)
+        m = metrics[name]; m["not_modified"] = m["not_modified"] + 1; m["durations"].append(time.time()-started)
       cb_succ(name); return []
     soup = soup_from_resp(r)
     if soup is None:
       cb_fail(name)
-      if metrics is not None:
-        metrics[name]["fail"] = metrics[name]["fail"] + 1
+      if metrics is not None: metrics[name]["fail"] = metrics[name]["fail"] + 1
       return []
     anchors=[]
     for a in soup.find_all("a", href=True):
@@ -426,12 +465,43 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
       detail_text = title + " — " + soup_text(href)
       if is_non_vacancy(detail_text) or other_state_only(detail_text) or not education_allowed(detail_text): continue
       key_base = norm_key(title); upd = is_update(detail_text); unique_key = f"{key_base}|upd" if upd else key_base
+
+      # Try to resolve official link from aggregator detail page
+      official_link = None; tmp_deadline = None
+      try:
+        rd = thread_session().get(href, timeout=DETAIL_TO, verify=certifi.where(), headers={"User-Agent": random.choice(UA_POOL), **HEADERS_BASE})
+        if "html" in (rd.headers.get("Content-Type","")).lower():
+          sd = soup_from_resp(rd)
+          if sd:
+            for a2 in sd.find_all("a", href=True):
+              u2 = absolute(href, a2["href"])
+              if looks_official(u2):
+                official_link = u2
+                break
+            if not official_link:
+              for a2 in sd.find_all("a", href=True):
+                u2 = absolute(href, a2["href"])
+                if u2 and ("pdf" in u2.lower()):
+                  dl_probe = probe_deadline_from_link(u2)
+                  if dl_probe:
+                    tmp_deadline = dl_probe
+                    if looks_official(u2): official_link = u2
+                    break
+      except Exception:
+        pass
+
+      deadline_here = extract_deadline(detail_text, fallback_url=official_link or href)
+      if tmp_deadline and not deadline_here: deadline_here = tmp_deadline
+
       rec = {
         "key": key_base, "uniqueKey": unique_key, "title": title,
-        "organization": src["name"], "applyLink": href, "pdfLink": href,
-        "deadline": extract_deadline(detail_text, fallback_url=href),
+        "organization": src["name"],
+        "applyLink": official_link or href,
+        "pdfLink": official_link or href,
+        "deadline": deadline_here,
         "domicile": "Bihar" if "bihar" in detail_text.lower() else "All India",
-        "sourceType": treat_as, "source": src["name"],
+        "sourceType": "official" if official_link else treat_as,
+        "source": src["name"] if not official_link else "official-resolved",
         "isUpdate": upd, "updateSummary": title if upd else None,
         "detailText": detail_text
       }
@@ -439,9 +509,7 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
         items.append(rec); kept += 1
     cb_succ(name)
     if metrics is not None:
-      m = metrics[name]
-      m["ok"] = m["ok"] + 1
-      m["durations"].append(time.time()-started)
+      m = metrics[name]; m["ok"] = m["ok"] + 1; m["durations"].append(time.time()-started)
       m["raw"] += raw; m["hinted"] += hinted; m["kept"] += kept
     print(f"[{treat_as.upper()}] {name}: raw={raw} hinted={hinted} kept={kept}")
   except Exception as e:
@@ -500,7 +568,7 @@ def scrape_telegram_channel(username, metrics):
     cb_fail(key); metrics[key]["fail"] = metrics[key]["fail"] + 1; metrics[key]["durations"].append(time.time()-started)
   print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items
 
-# ------------ Aggregators-first merge & verify ------------
+# ---------------- Merge & Verify ----------------
 def merge_and_verify(primary_items, backup_items, official_items):
   buckets={}
   def add(it):
@@ -513,31 +581,31 @@ def merge_and_verify(primary_items, backup_items, official_items):
   for lst in (primary_items, backup_items, official_items):
     for it in lst: add(it)
 
+  agg_seen = load_agg_seen()
+
   published=[]; pending=set(); seen_ids=set()
   for key, b in buckets.items():
-    rep = None
+    rep = None; verifiedBy = None
     if b["hasOfficial"]:
       rep = next((x for x in b["items"] if x.get("sourceType")=="official" and not x.get("isUpdate")), None) or \
             next((x for x in b["items"] if x.get("sourceType")=="official"), None)
       verifiedBy = "official"
     else:
-      if len(b["aggs"]) >= 2:
+      historical = set([s for s,_ in agg_seen.get(key, {}).get("seen", [])])
+      combined = set(b["aggs"]) | historical
+      if len(combined) >= 2:
         rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator" and not x.get("isUpdate")), None) or \
               next((x for x in b["items"] if x.get("sourceType")=="aggregator"), None)
         verifiedBy = "multi-aggregator"
       else:
         pending.add(key); continue
-    if not rep: continue
 
-    dl = rep.get("deadline")
-    ok_deadline = False
+    if not rep: continue
+    dl = rep.get("deadline"); ok_deadline=False
     if dl:
-      try:
-        ok_deadline = dateparser.parse(dl, settings={"DATE_ORDER":"DMY"}).date() >= datetime.now().date()
-      except Exception:
-        ok_deadline = False
-    if not ok_deadline:
-      continue
+      try: ok_deadline = dateparser.parse(dl, settings={"DATE_ORDER":"DMY"}).date() >= datetime.now().date()
+      except Exception: ok_deadline=False
+    if not ok_deadline: continue
 
     sources = sorted({x["source"] for x in b["items"] if x.get("sourceType") in ("official","aggregator")})
     schema_source = "official" if verifiedBy == "official" else "aggregator"
@@ -573,7 +641,7 @@ def merge_and_verify(primary_items, backup_items, official_items):
       published.append(upd)
   return published, pending
 
-# ------------ Repo IO ------------
+# ---------------- IO ----------------
 def load_data():
   base={"jobListings": [], "transparencyInfo": {}}
   if DATA_PATH.exists():
@@ -583,7 +651,7 @@ def load_data():
   return base
 def save_data(data): DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-# ------------ Main ------------
+# ---------------- Main ----------------
 def main():
   run_started = time.time()
   per_source_metrics = {}
@@ -614,6 +682,19 @@ def main():
         elif tag=="o": off_counts[name]=0
         else: tg_counts[name]=0
 
+  # Update rolling aggregator cache with today’s sightings
+  agg_seen = load_agg_seen()
+  def note_agg(it):
+    if it.get("sourceType") == "aggregator":
+      rec = agg_seen.setdefault(it["key"], {"seen": []})
+      src = it["source"]
+      existing = [s for s,_ in rec["seen"]]
+      if src not in existing:
+        rec["seen"].append((src, UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")))
+  for it in primary_items + backup_items:
+    note_agg(it)
+  save_agg_seen(agg_seen)
+
   published, pending = merge_and_verify(primary_items, backup_items, official_items)
 
   prev = load_data()
@@ -628,7 +709,7 @@ def main():
   ti["officialCounts"] = off_counts
   ti["telegramCounts"] = tg_counts
   ti["pendingFromAggregators"] = sorted(list(pending))
-  ti["notes"] = "Aggregators-first discovery; official-first verification; strict open window; resilient networking."
+  ti["notes"] = "Aggregators-first discovery; official-first verification; strict open window; resilient networking; rolling corroboration."
   ti["runDurationSec"] = round(duration,2)
   ti["perSourceMetrics"] = per_source_metrics
 
@@ -637,4 +718,3 @@ def main():
 
 if __name__ == "__main__":
   main()
-
