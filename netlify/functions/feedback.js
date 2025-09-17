@@ -1,8 +1,7 @@
 "use strict";
-const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
 
-// Reusable CORS headers (allowing your GitHub Pages origin)
-const ALLOW_ORIGIN = "https://breadpitttt.github.io"; // exact origin of your dashboard
+// CORS: allow your Pages origin
+const ALLOW_ORIGIN = "https://breadpitttt.github.io";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": ALLOW_ORIGIN,
   "Access-Control-Allow-Methods": "OPTIONS, POST",
@@ -12,17 +11,16 @@ const CORS_HEADERS = {
 };
 
 exports.handler = async (event) => {
-  // Preflight
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: CORS_HEADERS, body: "" };
   }
-
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, headers: CORS_HEADERS, body: "Method Not Allowed" };
   }
 
   try {
-    if (!process.env.FEEDBACK_TOKEN) {
+    const token = process.env.FEEDBACK_TOKEN;
+    if (!token) {
       return { statusCode: 500, headers: CORS_HEADERS, body: "Missing FEEDBACK_TOKEN" };
     }
 
@@ -39,12 +37,12 @@ exports.handler = async (event) => {
     const gh    = "https://api.github.com";
     const headers = {
       Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${process.env.FEEDBACK_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       "User-Agent": "netlify-fn-feedback"
     };
 
-    // Read existing file (404 tolerated)
+    // Read existing file if present
     const getUrl = `${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`;
     let sha, current = "";
     const getRes = await fetch(getUrl, { headers });
@@ -59,7 +57,7 @@ exports.handler = async (event) => {
       return { statusCode: getRes.status, headers: CORS_HEADERS, body: `Read failed: ${txt}` };
     }
 
-    // Append one JSONL line
+    // Append JSONL line
     const line = JSON.stringify({ ...record, ts: new Date().toISOString() }) + "\n";
     const updated = Buffer.from(current + line).toString("base64");
 
@@ -71,7 +69,7 @@ exports.handler = async (event) => {
     const putRes = await fetch(putUrl, { method: "PUT", headers, body: JSON.stringify(body) });
     if (!putRes.ok) {
       const t = await putRes.text().catch(()=> "");
-      return { statusCode: putRes.status, headers: CORS_HEADERS, body: `Update failed: ${t}` };
+      return { statusCode: 500, headers: CORS_HEADERS, body: `Update failed: ${t}` };
     }
 
     return { statusCode: 200, headers: CORS_HEADERS, body: "OK" };
