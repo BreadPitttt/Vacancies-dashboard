@@ -67,7 +67,7 @@ HEADERS_BASE = { "Accept-Language": "en-IN,en;q=0.9", "Cache-Control": "no-cache
 # ------------ Sources ------------
 PRIMARY_AGG = [
   {"name":"Adda247", "base":"https://www.adda247.com", "url":"https://www.adda247.com/jobs/government-jobs/"},
-  {"name":"SarkariResultAlt", "base":"https://sarkariresult.com.cm", "url":"https://sarkariresult.com.cm/latestjob.php"},
+  {"name":"SarkariResult", "base":"https://sarkariresult.com.cm", "url":"https://sarkariresult.com.cm/"},
 ]
 BACKUP_AGG = [
   {"name":"SarkariExam",   "base":"https://www.sarkariexam.com",  "url":"https://www.sarkariexam.com"},
@@ -637,3 +637,4 @@ def main():
 
 if __name__ == "__main__":
   main()
+
