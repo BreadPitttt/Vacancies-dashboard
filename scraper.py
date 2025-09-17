@@ -28,8 +28,8 @@ HEADERS = {
 
 RULES_PATH = "rules.json"
 REPORTS_PATH = "reports.jsonl"
-PRUNE_DAYS = 14               # keep last N days of feedback
-MAX_RULES = 200               # avoid unbounded rule growth
+PRUNE_DAYS = 14
+MAX_RULES = 200
 
 # ---------------- Small utilities ----------------
 def now_iso():
@@ -62,7 +62,7 @@ def make_id(prefix, link):
     key = parsed.path + ("?" + parsed.query if parsed.query else "")
     return f"{prefix}_{key.strip('/') or 'root'}"
 
-# ---------------- Strict policy (general vacancy) ----------------
+# ---------------- Strict eligibility policy ----------------
 TEACHER_TERMS = {
     "teacher","tgt","pgt","prt","school teacher","faculty","lecturer",
     "assistant professor","professor","b.ed","bed ","d.el.ed","deled","ctet","tet "
@@ -114,12 +114,6 @@ def derive_org(text):
     return "N/A"
 
 # ---------------- Domicile policy (precise) ----------------
-# Keep:
-# - All India / Any State / Open to all Indian nationals
-# - Bihar-only domicile posts
-# - Other state posts ONLY if outsiders are allowed (title signals openness)
-# Drop:
-# - Other state posts that say domicile/resident/local-only
 STATE_NAMES = [
     "andhra pradesh","arunachal pradesh","assam","bihar","chhattisgarh","goa","gujarat","haryana",
     "himachal pradesh","jharkhand","karnataka","kerala","madhya pradesh","maharashtra","manipur",
@@ -128,37 +122,48 @@ STATE_NAMES = [
     "delhi","puducherry","chandigarh","andaman","nicobar","dadra","nagar haveli","daman","diu",
     "lakshadweep"
 ]
-
 OPEN_SIGNALS = ["all india","any state","open to all","pan india","indian nationals","across india","from any state"]
 CLOSE_SIGNALS = ["domicile","resident","locals only","local candidates","state quota","only"]
 
 def domicile_allow(title):
     t = (title or "").lower()
-    # Clearly open nationwide
     if any(k in t for k in OPEN_SIGNALS):
         return True
-    # Bihar-only accepted
     if "bihar" in t and any(k in t for k in CLOSE_SIGNALS):
         return True
-    # If another state is explicitly "only/local/resident/domicle": reject
     for st in STATE_NAMES:
         if st == "bihar":
             continue
         if st in t and any(k in t for k in CLOSE_SIGNALS):
             return False
-    # Otherwise, no explicit restriction in title => allow (the detail page may refine later)
     return True
 
 # ---------------- Rules + Feedback adapter ----------------
 def load_rules():
     seed = {
         "exclusions": {
-            "titleKeywords": ["engineer","developer","scientist","analyst","specialist","mba","m.tech","mca","b.tech","b.e","phd","postgraduate","research","professor","lecturer","teacher","tgt","pgt","prt","b.ed","ctet","tet"],
-            "skillKeywords": ["advanced analytics","cloud architecture","machine learning","cad"]
+            "titleKeywords": ["teacher","tgt","pgt","prt","b.ed","ctet","tet"],
+            "skillKeywords": ["advanced analytics","cloud architecture","machine learning","cad"],
+            "scoredTitle": [
+                {"token":"engineer","score":0.9,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"developer","score":0.9,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"scientist","score":0.9,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"analyst","score":0.85,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"mba","score":0.95,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"m.tech","score":0.95,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"mca","score":0.95,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"b.tech","score":0.95,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"b.e","score":0.95,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"phd","score":0.98,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"postgraduate","score":0.9,"hits":0,"falsePos":0,"lastSeen":""},
+                {"token":"research","score":0.8,"hits":0,"falsePos":0,"lastSeen":""}
+            ],
+            "domicileCloseSignals": CLOSE_SIGNALS
         },
         "inclusions": {
-            "educationKeywords": ["10th","matric","ssc","12th","intermediate","hsc","graduate","any degree"],
-            "skillKeywords": ["typing","computer","physical","field duty"]
+            "educationKeywords": ["10th","matric","ssc","12th","intermediate","hsc","graduate","any degree","bachelor"],
+            "skillKeywords": ["typing","computer","physical","field duty"],
+            "domicileOpenSignals": OPEN_SIGNALS
         },
         "siteHints": {
             "www.adda247.com": {"excludeSections": ["sarkari result","admit card","answer key"]},
@@ -166,7 +171,15 @@ def load_rules():
             "sarkarijobfind.com": {"excludeSections": ["result","admit card","answer key"]},
             "www.freejobalert.com": {"excludeSections": ["admit card","result","answer key","syllabus"]}
         },
-        "metadata": {"updatedAt": now_iso()}
+        "domicile": {
+            "states": STATE_NAMES,
+            "biharAllowed": True
+        },
+        "metadata": {
+            "updatedAt": now_iso(),
+            "changelog": [],
+            "prune": {"days": 14, "maxRules": 220, "dailyDecay": 0.98, "promoteAt": 0.70, "demoteBelow": 0.30}
+        }
     }
     if not os.path.exists(RULES_PATH):
         return seed
@@ -205,7 +218,7 @@ def feedback_adapter(rules):
                 except Exception:
                     continue
                 flag = (rec.get("flag") or rec.get("type") or "").lower()
-                if flag not in ["report","not general vacancy","wrong eligibility"]:
+                if flag not in ["report","not general vacancy","wrong eligibility","right"]:
                     continue
                 ts = rec.get("ts") or rec.get("timestamp") or ""
                 try:
@@ -217,10 +230,10 @@ def feedback_adapter(rules):
                 title = (rec.get("title") or rec.get("note") or rec.get("url") or "").lower()
                 if not title:
                     continue
-                tokens = ["engineer","developer","scientist","analyst","specialist","mba","m.tech","mca","b.tech","b.e","phd","postgraduate","research","professor","lecturer","teacher","tgt","pgt","prt","b.ed","ctet","tet"]
+                tokens = [it.get("token") for it in rules["exclusions"]["scoredTitle"] if it.get("token")]
                 for tok in tokens:
-                    if tok in title and tok not in rules["exclusions"]["titleKeywords"]:
-                        rules["exclusions"]["titleKeywords"].append(tok)
+                    if tok in title:
+                        update_scored_rules_from_feedback(tok, positive=(flag in ["report","not general vacancy","wrong eligibility"]))
                         added += 1
     except Exception:
         pass
@@ -229,6 +242,43 @@ def feedback_adapter(rules):
     return rules
 
 RULES = load_rules()
+
+def scored_match_excluded(title):
+    t = (title or "").lower()
+    scored = RULES.get("exclusions", {}).get("scoredTitle", [])
+    total_strength = 0.0
+    for it in scored:
+        tok = it.get("token","")
+        sc = float(it.get("score",0))
+        if tok and tok in t:
+            total_strength += sc
+            if sc >= 0.9:
+                return True, "high_conf_rule"
+    if total_strength >= 1.2:
+        return True, "combined_rules"
+    return False, ""
+
+def update_scored_rules_from_feedback(token, positive=True):
+    scored = RULES.get("exclusions", {}).get("scoredTitle", [])
+    for it in scored:
+        if it.get("token") == token:
+            if positive:
+                it["score"] = min(0.99, round(float(it.get("score",0)) * 1.02 + 0.02, 4))
+                it["hits"] = int(it.get("hits",0)) + 1
+            else:
+                it["score"] = max(0.01, round(float(it.get("score",0)) * 0.97 - 0.02, 4))
+                it["falsePos"] = int(it.get("falsePos",0)) + 1
+            it["lastSeen"] = now_iso()
+            break
+    decay = float(RULES.get("metadata",{}).get("prune",{}).get("dailyDecay", 0.98))
+    for it in scored:
+        it["score"] = max(0.01, round(float(it.get("score",0))*decay, 4))
+    promote = float(RULES.get("metadata",{}).get("prune",{}).get("promoteAt", 0.70))
+    RULES["exclusions"]["titleKeywords"] = list({*RULES["exclusions"]["titleKeywords"]})
+    for it in scored:
+        if it["score"] >= promote and it["token"] not in RULES["exclusions"]["titleKeywords"]:
+            RULES["exclusions"]["titleKeywords"].append(it["token"])
+
 RULES = feedback_adapter(RULES)
 
 def title_hits_excluded(title):
@@ -253,14 +303,14 @@ def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
     title = clean_text(title)
     href_abs = normalize_url(base_url, href)
 
-    # rules‑based exclusion
     hit, _ = title_hits_excluded(title)
     if hit:
         return None
-    # strict policy exclusion
+    hit_scored, _w = scored_match_excluded(title)
+    if hit_scored:
+        return None
     if violates_general_policy(title):
         return None
-    # domicile openness check
     if not domicile_allow(title):
         return None
 
@@ -274,13 +324,14 @@ def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
         "slug": derive_slug(title, href_abs),
         "qualificationLevel": education if education in ["10th pass", "12th pass", "Any graduate"] else "N/A",
         "domicile": "All India",
-        "source": source_name,
-        "type": "General",
+        "source": "aggregator",          # schema enum
+        "type": "VACANCY",               # schema enum
         "extractedAt": now_iso(),
         "meta": {
             "post": derive_post(title),
             "allowedSkills": [k for k in ["Typing","Computer operations","Physical"] if allowed_basic_skill(title)],
-            "sourceUrl": base_url
+            "sourceUrl": base_url,
+            "sourceSite": source_name     # keep original site here
         }
     }
     return job
@@ -415,8 +466,8 @@ def enforce_schema_defaults(jobs):
         j.setdefault("slug", derive_slug(j.get("title"), j.get("applyLink")))
         j.setdefault("qualificationLevel", "N/A")
         j.setdefault("domicile", "All India")
-        j.setdefault("source", "N/A")
-        j.setdefault("type", "General")
+        j.setdefault("source", "aggregator")
+        j.setdefault("type", "VACANCY")
         j.setdefault("extractedAt", now_iso())
     return jobs
 
@@ -427,9 +478,11 @@ def save_outputs(jobs, sources_used):
         "totalJobs": len(jobs),
         "jobListings": jobs,
         "transparencyInfo": {
-            "notes": "General vacancies (10th/12th/Any graduate). Excludes teacher and technical/management/PG roles. Domicile rule: All‑India and Bihar‑only allowed; other states allowed only if title signals All‑India/Any State/open to all.",
+            "notes": "General vacancies (10th/12th/Any graduate). Excludes teacher and technical/management/PG roles. Domicile: All‑India and Bihar‑only allowed; other states allowed only if title signals open to any state.",
             "sourcesTried": sources_used if isinstance(sources_used, list) else [sources_used],
-            "schemaVersion": "1.2"
+            "schemaVersion": "1.2",
+            "totalListings": len(jobs),          # required by schema
+            "lastUpdated": now_iso()             # required by schema
         }
     }
     with open("data.json", "w", encoding="utf-8") as f:
