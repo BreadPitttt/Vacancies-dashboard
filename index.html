@@ -1,45 +1,173 @@
-  <!-- Hidden form for reporting an issue -->
-  <div id="report-modal" style="display:none; border:1px solid #ccc; padding:10px; margin-top:10px; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; z-index: 1000;">
-    <h2>Report a Vacancy</h2>
-    <form id="reportForm">
-      <label>Listing ID:</label><br>
-      <input type="text" id="reportListingId" readonly><br><br>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vacancies Dashboard</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        header {
+            background-color: #333;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: relative;
+        }
+        #btn-show-missing-form {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #jobs-root {
+            padding: 20px;
+        }
+        .job-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .btn-report {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            float: right;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 5px;
+        }
+        .modal-content input, .modal-content textarea, .modal-content select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px 0;
+            display: inline-block;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .modal-content button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .modal-content button[type="submit"] {
+            background-color: #28a745;
+            color: white;
+        }
+        .modal-content button[type="button"] {
+            background-color: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
 
-      <label>Reason:</label><br>
-      <select id="reportReason">
-        <option>Not a vacancy</option>
-        <option>Wrong eligibility</option>
-        <option>Wrong dates</option>
-        <option>Wrong link/PDF</option>
-        <option>Duplicate</option>
-        <option>Other</option>
-      </select><br><br>
+    <header>
+        <h1>Vacancies Dashboard</h1>
+        <button id="btn-show-missing-form">Submit a Missing Vacancy</button>
+        <div id="status-container">
+            <span id="health-pill">Health: ...</span> |
+            <span id="last-updated">Last updated: ...</span> |
+            <span id="total-listings">Listings: ...</span>
+        </div>
+    </header>
 
-      <label>Evidence URL (optional):</label><br>
-      <input type="url" id="reportEvidenceUrl"><br><br>
+    <main>
+        <div id="jobs-root">
+            <!-- Your app.js will create job cards here.
+                 Each card should have a report button like this:
+            <div class="job-card">
+                <h3>Job Title</h3>
+                <p>Job Details...</p>
+                <button class="btn-report" data-id="UNIQUE_JOB_ID">Report</button>
+            </div>
+            -->
+        </div>
+    </main>
 
-      <label>Note (optional):</label><br>
-      <textarea id="reportNote"></textarea><br><br>
+    <!-- Hidden Report Modal -->
+    <div id="report-modal" class="modal">
+        <div class="modal-content">
+            <h2>Report a Vacancy</h2>
+            <form id="reportForm">
+                <label for="reportListingId">Listing ID:</label>
+                <input type="text" id="reportListingId" readonly>
 
-      <button type="submit">Submit Report</button>
-      <button type="button" onclick="document.getElementById('report-modal').style.display='none';">Cancel</button>
-    </form>
-  </div>
+                <label for="reportReason">Reason:</label>
+                <select id="reportReason">
+                    <option>Not a vacancy</option>
+                    <option>Wrong eligibility</option>
+                    <option>Wrong dates</option>
+                    <option>Wrong link/PDF</option>
+                    <option>Duplicate</option>
+                    <option>Other</option>
+                </select>
 
-  <!-- Hidden form for submitting a missing vacancy -->
-  <div id="missing-modal" style="display:none; border:1px solid #ccc; padding:10px; margin-top:10px; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; z-index: 1000;">
-    <h2>Submit Missing Vacancy</h2>
-    <form id="missingForm">
-      <label>Title:</label><br>
-      <input type="text" id="missingTitle"><br><br>
+                <label for="reportEvidenceUrl">Evidence URL (optional):</label>
+                <input type="url" id="reportEvidenceUrl">
 
-      <label>URL:</label><br>
-      <input type="url" id="missingUrl"><br><br>
+                <label for="reportNote">Note (optional):</label>
+                <textarea id="reportNote"></textarea>
 
-      <label>Note (optional):</label><br>
-      <textarea id="missingNote"></textarea><br><br>
+                <button type="submit">Submit Report</button>
+                <button type="button">Cancel</button>
+            </form>
+        </div>
+    </div>
 
-      <button type="submit">Submit Missing Vacancy</button>
-      <button type="button" onclick="document.getElementById('missing-modal').style.display='none';">Cancel</button>
-    </form>
-  </div>
+    <!-- Hidden Missing Vacancy Modal -->
+    <div id="missing-modal" class="modal">
+        <div class="modal-content">
+            <h2>Submit Missing Vacancy</h2>
+            <form id="missingForm">
+                <label for="missingTitle">Title:</label>
+                <input type="text" id="missingTitle">
+
+                <label for="missingUrl">URL:</label>
+                <input type="url" id="missingUrl">
+
+                <label for="missingNote">Note (optional):</label>
+                <textarea id="missingNote"></textarea>
+
+                <button type="submit">Submit Missing Vacancy</button>
+                <button type="button">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
