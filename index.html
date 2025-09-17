@@ -1,39 +1,45 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Vacancies Dashboard</title>
-  <meta name="description" content="General-competition government vacancies for Any Graduate, 12th, and 10th." />
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <header class="site-header">
-    <h1>Vacancies Dashboard</h1>
-    <p class="subtitle">General Vacancy — Any Graduate, 12th, 10th</p>
-  </header>
+  <!-- Hidden form for reporting an issue -->
+  <div id="report-modal" style="display:none; border:1px solid #ccc; padding:10px; margin-top:10px; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; z-index: 1000;">
+    <h2>Report a Vacancy</h2>
+    <form id="reportForm">
+      <label>Listing ID:</label><br>
+      <input type="text" id="reportListingId" readonly><br><br>
 
-  <!-- Health/status banner -->
-  <div id="status-banner" class="status-banner">
-    <div class="status-line">
-      <span class="pill" id="health-pill">Loading…</span>
-      <span id="last-updated">Last updated: —</span>
-      <span id="total-listings">Listings: —</span>
-    </div>
+      <label>Reason:</label><br>
+      <select id="reportReason">
+        <option>Not a vacancy</option>
+        <option>Wrong eligibility</option>
+        <option>Wrong dates</option>
+        <option>Wrong link/PDF</option>
+        <option>Duplicate</option>
+        <option>Other</option>
+      </select><br><br>
+
+      <label>Evidence URL (optional):</label><br>
+      <input type="url" id="reportEvidenceUrl"><br><br>
+
+      <label>Note (optional):</label><br>
+      <textarea id="reportNote"></textarea><br><br>
+
+      <button type="submit">Submit Report</button>
+      <button type="button" onclick="document.getElementById('report-modal').style.display='none';">Cancel</button>
+    </form>
   </div>
 
-  <main class="container">
-    <!-- Your existing page content goes here.
-         Example placeholder for where you render job listings -->
-    <div id="jobs-root"></div>
-  </main>
+  <!-- Hidden form for submitting a missing vacancy -->
+  <div id="missing-modal" style="display:none; border:1px solid #ccc; padding:10px; margin-top:10px; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; z-index: 1000;">
+    <h2>Submit Missing Vacancy</h2>
+    <form id="missingForm">
+      <label>Title:</label><br>
+      <input type="text" id="missingTitle"><br><br>
 
-  <footer class="site-footer">
-    <p>
-      Data refreshed automatically by GitHub Actions. See transparency in <code>health.json</code>.
-    </p>
-  </footer>
+      <label>URL:</label><br>
+      <input type="url" id="missingUrl"><br><br>
 
-  <script src="app.js"></script>
-</body>
-</html>
+      <label>Note (optional):</label><br>
+      <textarea id="missingNote"></textarea><br><br>
+
+      <button type="submit">Submit Missing Vacancy</button>
+      <button type="button" onclick="document.getElementById('missing-modal').style.display='none';">Cancel</button>
+    </form>
+  </div>
