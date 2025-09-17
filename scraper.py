@@ -1,6 +1,7 @@
 # scraper.py — Aggregators-first discovery with official-first verification
-# Preserves resilience: backoff+jitter, per-host rate limit, circuit breakers, caching.
-# Strict open-window: only publish with valid non-expired deadline.
+# Fix: remove illegal walrus assignment on subscript; safe metrics increments.
+# Resilience: backoff+jitter, per-host rate limit, circuit breakers, caching.
+# Strict open-window: only publish with valid, non-expired deadlines.
 
 import os, re, json, time, random, hashlib, threading, xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
@@ -64,26 +65,21 @@ UA_POOL = [
 HEADERS_BASE = { "Accept-Language": "en-IN,en;q=0.9", "Cache-Control": "no-cache", "Pragma": "no-cache", "Connection": "keep-alive" }
 
 # ------------ Sources ------------
-# Primaries
 PRIMARY_AGG = [
   {"name":"Adda247", "base":"https://www.adda247.com", "url":"https://www.adda247.com/jobs/government-jobs/"},
   {"name":"SarkariResultAlt", "base":"https://sarkariresult.com.cm", "url":"https://sarkariresult.com.cm/latestjob.php"},
 ]
-# Backups/corroboration
 BACKUP_AGG = [
   {"name":"SarkariExam",   "base":"https://www.sarkariexam.com",  "url":"https://www.sarkariexam.com"},
   {"name":"RojgarResult",  "base":"https://www.rojgarresult.com", "url":"https://www.rojgarresult.com/recruitments/"},
   {"name":"ResultBharat",  "base":"https://www.resultbharat.com", "url":"https://www.resultbharat.com"},
 ]
-
 OFFICIAL_SOURCES = [
   {"name":"DSSSB_Notice",   "base":"https://dsssb.delhi.gov.in", "url":"https://dsssb.delhi.gov.in/notice-of-exam"},
   {"name":"RRB_Chandigarh", "base":"https://www.rrbcdg.gov.in",  "url":"https://www.rrbcdg.gov.in"},
   {"name":"BPSC",           "base":"https://bpsc.bihar.gov.in",  "url":"https://bpsc.bihar.gov.in"},
   {"name":"SSC",            "base":"https://ssc.gov.in",         "url":"https://ssc.gov.in"},
 ]
-
-# Telegram hints only (optional)
 def env_channels():
   raw=os.getenv("TELEGRAM_CHANNELS","").strip()
   return [x for x in raw.split(",") if x] or []
@@ -93,7 +89,6 @@ TELEGRAM_RSS_BASES = [
   "https://rsshub.netlify.app",
   "https://rsshub.rssforever.com",
 ]
-
 OFFICIAL_DOMAINS = {
   "dsssb.delhi.gov.in","dsssbonline.nic.in",
   "www.rrbcdg.gov.in","rrbcdg.gov.in",
@@ -127,7 +122,6 @@ def thread_session():
     _thread_local.s = session_with_retries()
   return _thread_local.s
 
-# Rate limit + jitter
 _host_tokens = {}; _host_lock = threading.Lock()
 def _rate_limit_for(host):
   capacity = PER_HOST_RPM
@@ -145,7 +139,6 @@ def _rate_limit_for(host):
   return 0.0
 def _sleep_with_jitter(): time.sleep(BASELINE_SLEEP + random.uniform(JITTER_MIN, JITTER_MAX))
 
-# Circuit breaker
 _cb = {}
 def cb_before(name):
   st = _cb.get(name, {"fail":0,"state":"closed","opened":0.0,"probe":0})
@@ -165,7 +158,6 @@ def cb_fail(name):
   elif st["fail"] >= CB_FAILURE_THRESHOLD: st["state"]="open"; st["opened"]=time.time()
   _cb[name]=st
 
-# Lightweight caching of list pages
 try: _cache=json.loads(CACHE_PATH.read_text(encoding="utf-8"))
 except Exception: _cache={}
 def _cache_headers_for(url):
@@ -293,7 +285,6 @@ def norm_key(title):
   tokens = [w for w in t.split() if len(w) > 2]
   return " ".join(tokens[:14])
 
-# Deadline parsing (richer)
 DATE_WORDS = {"jan":"january","feb":"february","mar":"march","apr":"april","may":"may","jun":"june","jul":"july","aug":"august","sep":"september","sept":"september","oct":"october","nov":"november","dec":"december"}
 def _month_word_fix(s):
   t=s.lower()
@@ -371,7 +362,6 @@ def extract_deadline(text, fallback_url=None):
   dt = dateparser.parse(text or "", settings={"PREFER_DATES_FROM":"future","DATE_ORDER":"DMY"})
   return dt.date().isoformat() if (dt and dt.date() >= datetime.now().date()) else None
 
-# Education + domicile remain as in earlier hardened script
 def infer_qualification(text):
   t=(text or "").lower()
   if any(re.search(p, t) for p in [r"\b10\s*th\b", r"\bmatric\b"]): return "10th Pass"
@@ -393,7 +383,6 @@ def validate_inline(rec):
   if not (is_valid_url(al) or is_valid_url(pl)): return False
   return True
 
-# ------------ Scraping helpers ------------
 def soup_text(url):
   try:
     r = thread_session().get(url, timeout=DETAIL_TO, verify=certifi.where(), headers={"User-Agent": random.choice(UA_POOL), **HEADERS_BASE})
@@ -406,18 +395,24 @@ def soup_text(url):
 def scrape_generic_list(src, treat_as="aggregator", metrics=None):
   name = src["name"]; url = src["url"]; base = src["base"]
   if not cb_before(name):
-    if metrics is not None: metrics[name]["skipped_due_cb"] += 1
+    if metrics is not None:
+      metrics[name]["skipped_due_cb"] = metrics[name]["skipped_due_cb"] + 1
     return []
   started=time.time()
   items=[]; raw=0; hinted=0; kept=0
   try:
     r = fetch(url, LIST_TO, use_cache=True)
     if r.status_code == 304:
-      if metrics is not None: m=metrics[name]; m["not_modified"] += 1; m["durations"].append(time.time()-started)
+      if metrics is not None:
+        m = metrics[name]
+        m["not_modified"] = m["not_modified"] + 1
+        m["durations"].append(time.time()-started)
       cb_succ(name); return []
     soup = soup_from_resp(r)
     if soup is None:
-      cb_fail(name); metrics and (metrics[name].__setitem__("fail", metrics[name]["fail"]+1))
+      cb_fail(name)
+      if metrics is not None:
+        metrics[name]["fail"] = metrics[name]["fail"] + 1
       return []
     anchors=[]
     for a in soup.find_all("a", href=True):
@@ -444,10 +439,16 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
         items.append(rec); kept += 1
     cb_succ(name)
     if metrics is not None:
-      m = metrics[name]; m["ok"] += 1; m["durations"].append(time.time()-started); m["raw"]+=raw; m["hinted"]+=hinted; m["kept"]+=kept
+      m = metrics[name]
+      m["ok"] = m["ok"] + 1
+      m["durations"].append(time.time()-started)
+      m["raw"] += raw; m["hinted"] += hinted; m["kept"] += kept
     print(f"[{treat_as.upper()}] {name}: raw={raw} hinted={hinted} kept={kept}")
   except Exception as e:
-    cb_fail(name); metrics and (metrics[name]["fail"] := metrics[name]["fail"]+1)  # python 3.11 walrus safe in Actions
+    cb_fail(name)
+    if metrics is not None:
+      metrics[name]["fail"] = metrics[name]["fail"] + 1
+      metrics[name]["error_samples"].append(str(e))
     print(f"[WARN] {treat_as} {name} error: {e}")
   return items
 
@@ -459,8 +460,9 @@ def telegram_feed_urls(username):
     if base: yield f"{base.rstrip('/')}/telegram/channel/{username}"
 
 def scrape_telegram_channel(username, metrics):
-  if not cb_before(f"TG:{username}"):
-    metrics[f"TG:{username}"]["skipped_due_cb"] += 1
+  key = f"TG:{username}"
+  if not cb_before(key):
+    metrics[key]["skipped_due_cb"] = metrics[key]["skipped_due_cb"] + 1
     return []
   started=time.time()
   items=[]; kept=0
@@ -487,19 +489,19 @@ def scrape_telegram_channel(username, metrics):
           }
           if validate_inline(rec): items.append(rec); kept += 1
         print(f"[TG ] {username}: kept={kept}")
-        cb_succ(f"TG:{username}"); metrics[f"TG:{username}"]["ok"] += 1; metrics[f"TG:{username}"]["durations"].append(time.time()-started); metrics[f"TG:{username}"]["kept"]+=kept
+        cb_succ(key); metrics[key]["ok"] = metrics[key]["ok"] + 1
+        metrics[key]["durations"].append(time.time()-started); metrics[key]["kept"]+=kept
         return items
       except Exception as e:
         print(f"[WARN] telegram {username}@{url}: {e}; trying next")
-        metrics[f"TG:{username}"]["error_samples"].append(str(e))
+        metrics[key]["error_samples"].append(str(e))
         continue
   except Exception:
-    cb_fail(f"TG:{username}"); metrics[f"TG:{username}"]["fail"] += 1; metrics[f"TG:{username}"]["durations"].append(time.time()-started)
+    cb_fail(key); metrics[key]["fail"] = metrics[key]["fail"] + 1; metrics[key]["durations"].append(time.time()-started)
   print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items
 
 # ------------ Aggregators-first merge & verify ------------
 def merge_and_verify(primary_items, backup_items, official_items):
-  # Bucket by normalized key
   buckets={}
   def add(it):
     b = buckets.setdefault(it["key"], {"aggs": set(), "items": [], "hasOfficial": False, "offNames": set()})
@@ -513,14 +515,12 @@ def merge_and_verify(primary_items, backup_items, official_items):
 
   published=[]; pending=set(); seen_ids=set()
   for key, b in buckets.items():
-    # Choose representative: prefer official first
     rep = None
     if b["hasOfficial"]:
       rep = next((x for x in b["items"] if x.get("sourceType")=="official" and not x.get("isUpdate")), None) or \
             next((x for x in b["items"] if x.get("sourceType")=="official"), None)
       verifiedBy = "official"
     else:
-      # No official: need at least two aggregator sources
       if len(b["aggs"]) >= 2:
         rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator" and not x.get("isUpdate")), None) or \
               next((x for x in b["items"] if x.get("sourceType")=="aggregator"), None)
@@ -529,7 +529,6 @@ def merge_and_verify(primary_items, backup_items, official_items):
         pending.add(key); continue
     if not rep: continue
 
-    # Strict open-window: must have a valid, unexpired deadline
     dl = rep.get("deadline")
     ok_deadline = False
     if dl:
@@ -571,7 +570,6 @@ def merge_and_verify(primary_items, backup_items, official_items):
         "applyLink": u.get("applyLink") or rep_rec["applyLink"], "pdfLink": u.get("pdfLink") or rep_rec["pdfLink"],
         "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
       }
-      # For updates, deadline can be None (will inherit display from base on frontend if needed)
       published.append(upd)
   return published, pending
 
@@ -585,10 +583,9 @@ def load_data():
   return base
 def save_data(data): DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-# ------------ Orchestration ------------
+# ------------ Main ------------
 def main():
   run_started = time.time()
-  # Metrics
   per_source_metrics = {}
   for s in PRIMARY_AGG+BACKUP_AGG: per_source_metrics[s["name"]]={"ok":0,"fail":0,"skipped_due_cb":0,"not_modified":0,"raw":0,"hinted":0,"kept":0,"error_samples":[],"durations":[]}
   for s in OFFICIAL_SOURCES: per_source_metrics[s["name"]]={"ok":0,"fail":0,"skipped_due_cb":0,"not_modified":0,"raw":0,"hinted":0,"kept":0,"error_samples":[],"durations":[]}
@@ -617,15 +614,12 @@ def main():
         elif tag=="o": off_counts[name]=0
         else: tg_counts[name]=0
 
-  # Merge and verify according to the stated policy
   published, pending = merge_and_verify(primary_items, backup_items, official_items)
 
-  # Strict open-window already applied; no extra drop
   prev = load_data()
   data = prev
   data["jobListings"] = published
 
-  # Transparency
   duration = time.time() - run_started
   ti = data.setdefault("transparencyInfo",{})
   ti["lastUpdated"] = UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
