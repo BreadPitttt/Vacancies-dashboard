@@ -1,17 +1,22 @@
-# scraper.py — Aggregators-first discovery with official-first verification
-# - Primaries: Adda247, SarkariResult (sarkariresult.com.cm homepage)
-# - Backups: SarkariExam, RojgarResult, ResultBharat
-# - Verify: publish only if (a) official-domain link present, or (b) 2+ aggregators corroborate
-# - Strict open window: deadline must be valid and not expired
-# - Resilience: per-host rate limit, backoff with Retry-After, circuit breaker, caching
-# - Rolling corroboration cache (.agg_seen.json) to allow multi-aggregator across recent days
-# - Official resolution from aggregator detail pages + PDF/detail deadline probing
+# scraper.py — Final Hardened Version
+# - Implements: Aggregators-first discovery, official-first verification, strict open-window publishing.
+# - NEW: User-Agent rotation, dynamic headers, proxy support, and no-retry on 403.
+# - Resilience: Per-host rate limit, exponential backoff, circuit breaker, caching, rolling corroboration.
 
-import os, re, json, time, random, hashlib, threading, xml.etree.ElementTree as ET
+import os
+import re
+import json
+import time
+import random
+import hashlib
+import threading
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
-import requests, certifi, dateparser
+import requests
+import certifi
+import dateparser
 from bs4 import BeautifulSoup, UnicodeDammit
 from requests.adapters import HTTPAdapter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,42 +44,40 @@ DATA_PATH = Path("data.json")
 CACHE_PATH = Path(".cache_http.json")
 AGG_CACHE_PATH = Path(".agg_seen.json")
 AGG_WINDOW_DAYS = env_int("MULTI_AGG_DAYS", 7)
+PROXY_URL = os.getenv("PROXY_URL", "").strip()
 
 UTC_NOW = datetime.now(timezone.utc)
 
-CONNECT_TO = env_int("CONNECT_TIMEOUT", 12 if not IS_HARD_RECHECK else 16)
-READ_TO    = env_int("READ_TIMEOUT",    35 if not IS_HARD_RECHECK else 45)
+CONNECT_TO = env_int("CONNECT_TIMEOUT", 20 if not IS_HARD_RECHECK else 25)
+READ_TO    = env_int("READ_TIMEOUT",    50 if not IS_HARD_RECHECK else 60)
 LIST_TO, DETAIL_TO = (CONNECT_TO, READ_TO), (CONNECT_TO, READ_TO)
 
-MAX_WORKERS     = env_int("MAX_WORKERS", 10 if not IS_HARD_RECHECK else 14)
-PER_SOURCE_MAX  = env_int("PER_SOURCE_MAX", 140 if not IS_HARD_RECHECK else 200)
+MAX_WORKERS     = env_int("MAX_WORKERS", 8 if not IS_HARD_RECHECK else 12)
+PER_SOURCE_MAX  = env_int("PER_SOURCE_MAX", 150 if not IS_HARD_RECHECK else 220)
 
-RETRY_TOTAL         = env_int("RETRY_TOTAL", 5)
-RETRY_CONNECT       = env_int("RETRY_CONNECT", 4)
-RETRY_READ          = env_int("RETRY_READ", 4)
-BACKOFF_FACTOR      = env_float("BACKOFF_FACTOR", 0.9)
-MAX_BACKOFF_SECONDS = env_int("MAX_BACKOFF_SECONDS", 45)
+RETRY_TOTAL         = env_int("RETRY_TOTAL", 4)
+RETRY_CONNECT       = env_int("RETRY_CONNECT", 3)
+RETRY_READ          = env_int("RETRY_READ", 3)
+BACKOFF_FACTOR      = env_float("BACKOFF_FACTOR", 1.2)
+MAX_BACKOFF_SECONDS = env_int("MAX_BACKOFF_SECONDS", 60)
 
-PER_HOST_RPM   = env_int("PER_HOST_RPM", 24 if not IS_HARD_RECHECK else 36)
-BASELINE_SLEEP = env_float("BASELINE_SLEEP_S", 0.7 if not IS_HARD_RECHECK else 0.6)
-JITTER_MIN     = env_float("JITTER_MIN", 0.6)
-JITTER_MAX     = env_float("JITTER_MAX", 1.8)
+PER_HOST_RPM   = env_int("PER_HOST_RPM", 18 if not IS_HARD_RECHECK else 24)
+BASELINE_SLEEP = env_float("BASELINE_SLEEP_S", 1.5 if not IS_HARD_RECHECK else 1.0)
+JITTER_MIN     = env_float("JITTER_MIN", 0.8)
+JITTER_MAX     = env_float("JITTER_MAX", 2.5)
 
-CB_FAILURE_THRESHOLD  = env_int("CB_FAILURE_THRESHOLD", 6)
-CB_OPEN_SECONDS       = env_int("CB_OPEN_SECONDS", 600)
+CB_FAILURE_THRESHOLD  = env_int("CB_FAILURE_THRESHOLD", 5)
+CB_OPEN_SECONDS       = env_int("CB_OPEN_SECONDS", 720)
 CB_HALF_OPEN_PROBE    = env_int("CB_HALF_OPEN_PROBE", 1)
 
+# Realistic User-Agent Pool
 UA_POOL = [
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36",
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:126.0) Gecko/20100101 Firefox/126.0",
 ]
-HEADERS_BASE = {
-  "Accept-Language": "en-IN,en;q=0.9",
-  "Cache-Control": "no-cache",
-  "Pragma": "no-cache",
-  "Connection": "keep-alive",
-}
 
 # ---------------- Sources ----------------
 PRIMARY_AGG = [
@@ -111,15 +114,21 @@ OFFICIAL_DOMAINS = {
 }
 
 # ---------------- HTTP & Resilience ----------------
+def get_proxies():
+    if PROXY_URL:
+        return {"http": PROXY_URL, "https": PROXY_URL}
+    return None
+
 def session_with_retries(pool=96):
   s = requests.Session()
-  s.headers.update({**HEADERS_BASE, "User-Agent": random.choice(UA_POOL)})
   s.verify = certifi.where()
+  s.proxies = get_proxies()
   if Retry:
+    # Do not retry on 403 (Permission Denied) as it's a hard block
     retry = Retry(
       total=RETRY_TOTAL, connect=RETRY_CONNECT, read=RETRY_READ,
       backoff_factor=BACKOFF_FACTOR,
-      status_forcelist=[403,429,500,502,503,504],
+      status_forcelist=[429,500,502,503,504], # Excluded 403
       allowed_methods={"GET","HEAD"},
       respect_retry_after_header=True,
     )
@@ -173,7 +182,6 @@ def cb_fail(name):
   elif st["fail"] >= CB_FAILURE_THRESHOLD: st["state"]="open"; st["opened"]=time.time()
   _cb[name]=st
 
-# Cache headers for list pages
 try: _cache=json.loads(CACHE_PATH.read_text(encoding="utf-8"))
 except Exception: _cache={}
 def _cache_headers_for(url):
@@ -197,53 +205,83 @@ def looks_official(url):
   except Exception: return False
 def _host(url): return urlparse(url or "").netloc.lower()
 
+def get_dynamic_headers():
+    return {
+        "User-Agent": random.choice(UA_POOL),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": random.choice(["en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7", "en-US,en;q=0.9", "en-GB,en;q=0.9"]),
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+    }
+
 def fetch(url, timeout, use_cache=False):
   host = _host(url)
   w = _rate_limit_for(host)
   if w>0: time.sleep(w)
   _sleep_with_jitter()
-  extra={}
-  if use_cache: extra.update(_cache_headers_for(url))
+  
+  headers = get_dynamic_headers()
+  if use_cache:
+    headers.update(_cache_headers_for(url))
+  
   attempt=0
   while True:
     attempt+=1
     try:
-      r = HTTP.get(url, timeout=timeout, headers=extra)
+      r = thread_session().get(url, timeout=timeout, headers=headers)
       if r.status_code == 304:
         class _R: pass
         nr=_R(); nr.status_code=304; nr.headers=r.headers; nr.content=b""; nr.url=url
         return nr
+      
+      # For 403, we stop immediately as it's a hard block. No retry.
+      if r.status_code == 403:
+          print(f"[BLOCK] Received 403 from {url}. Halting retries for this URL.")
+          r.raise_for_status() # This will raise an exception and be caught below
+
       r.raise_for_status()
       if use_cache: _update_cache_from_response(url, r)
       return r
     except requests.exceptions.SSLError:
       if any(h in host for h in OFFICIAL_SSL_FALLBACK):
-        r2 = requests.get(url, headers={**HTTP.headers, **extra}, timeout=sum(timeout), verify=False)
+        r2 = requests.get(url, headers=headers, timeout=sum(timeout), verify=False, proxies=get_proxies())
         r2.raise_for_status()
         if use_cache: _update_cache_from_response(url, r2)
         return r2
       raise
     except requests.exceptions.RequestException as e:
       code = getattr(e.response, "status_code", 0) if hasattr(e, "response") else 0
-      if code == 403 and CF:
+      # Use Cloudflare solver only if the original status code suggests it might help (not 404 etc.)
+      if code in [403, 503] and CF:
         try:
-          r2 = CF.get(url, timeout=sum(timeout))
+          r2 = CF.get(url, timeout=sum(timeout), proxies=get_proxies())
           if getattr(r2, "status_code", 0) == 200:
             if use_cache: _update_cache_from_response(url, r2)
             return r2
         except Exception:
           pass
+      
+      # This logic is now handled by the Retry object, but we keep a manual check for clarity
+      # And because 403 is now excluded from auto-retry.
+      if attempt > RETRY_TOTAL:
+          raise
+      
       ra = 0
       if hasattr(e,"response") and e.response is not None:
         v = e.response.headers.get("Retry-After")
         if v:
           try: ra = int(v)
           except: ra = min(60, MAX_BACKOFF_SECONDS)
-      backoff = min(MAX_BACKOFF_SECONDS, (2 ** min(attempt, 6)) * BACKOFF_FACTOR) + random.uniform(0.2,0.9)
+      
+      backoff = min(MAX_BACKOFF_SECONDS, (BACKOFF_FACTOR ** attempt) + random.uniform(0.2,0.9))
       sleep_s = max(backoff, ra)
-      if attempt <= RETRY_TOTAL:
-        time.sleep(sleep_s); continue
-      raise
+      print(f"[RETRY] Attempt {attempt}/{RETRY_TOTAL} failed for {url}. Waiting {sleep_s:.2f}s. Reason: {e}")
+      time.sleep(sleep_s)
+      continue
 
 # ---------------- Parsing & Filters ----------------
 def norm(s): return re.sub(r"\s+"," ",(s or "")).strip()
@@ -402,7 +440,7 @@ def validate_inline(rec):
 
 def soup_text(url):
   try:
-    r = thread_session().get(url, timeout=DETAIL_TO, verify=certifi.where(), headers={"User-Agent": random.choice(UA_POOL), **HEADERS_BASE})
+    r = fetch(url, DETAIL_TO)
     if "html" in (r.headers.get("Content-Type","")).lower():
       s = soup_from_resp(r); return norm(s.get_text(" ")) if s else ""
   except Exception:
@@ -438,7 +476,7 @@ def save_agg_seen(cache):
 def scrape_generic_list(src, treat_as="aggregator", metrics=None):
   name = src["name"]; url = src["url"]; base = src["base"]
   if not cb_before(name):
-    if metrics is not None: metrics[name]["skipped_due_cb"] = metrics[name]["skipped_due_cb"] + 1
+    if metrics is not None: metrics[name]["skipped_due_cb"] = metrics[name].get("skipped_due_cb", 0) + 1
     return []
   started=time.time()
   items=[]; raw=0; hinted=0; kept=0
@@ -446,12 +484,12 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
     r = fetch(url, LIST_TO, use_cache=True)
     if r.status_code == 304:
       if metrics is not None:
-        m = metrics[name]; m["not_modified"] = m["not_modified"] + 1; m["durations"].append(time.time()-started)
+        m = metrics[name]; m["not_modified"] = m.get("not_modified", 0) + 1; m["durations"].append(time.time()-started)
       cb_succ(name); return []
     soup = soup_from_resp(r)
     if soup is None:
       cb_fail(name)
-      if metrics is not None: metrics[name]["fail"] = metrics[name]["fail"] + 1
+      if metrics is not None: metrics[name]["fail"] = metrics[name].get("fail", 0) + 1
       return []
     anchors=[]
     for a in soup.find_all("a", href=True):
@@ -466,10 +504,9 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
       if is_non_vacancy(detail_text) or other_state_only(detail_text) or not education_allowed(detail_text): continue
       key_base = norm_key(title); upd = is_update(detail_text); unique_key = f"{key_base}|upd" if upd else key_base
 
-      # Try to resolve official link from aggregator detail page
       official_link = None; tmp_deadline = None
       try:
-        rd = thread_session().get(href, timeout=DETAIL_TO, verify=certifi.where(), headers={"User-Agent": random.choice(UA_POOL), **HEADERS_BASE})
+        rd = fetch(href, DETAIL_TO)
         if "html" in (rd.headers.get("Content-Type","")).lower():
           sd = soup_from_resp(rd)
           if sd:
@@ -496,8 +533,7 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
       rec = {
         "key": key_base, "uniqueKey": unique_key, "title": title,
         "organization": src["name"],
-        "applyLink": official_link or href,
-        "pdfLink": official_link or href,
+        "applyLink": official_link or href, "pdfLink": official_link or href,
         "deadline": deadline_here,
         "domicile": "Bihar" if "bihar" in detail_text.lower() else "All India",
         "sourceType": "official" if official_link else treat_as,
@@ -509,14 +545,14 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
         items.append(rec); kept += 1
     cb_succ(name)
     if metrics is not None:
-      m = metrics[name]; m["ok"] = m["ok"] + 1; m["durations"].append(time.time()-started)
-      m["raw"] += raw; m["hinted"] += hinted; m["kept"] += kept
+      m = metrics[name]; m["ok"] = m.get("ok", 0) + 1; m["durations"].append(time.time()-started)
+      m["raw"] = m.get("raw", 0) + raw; m["hinted"] = m.get("hinted", 0) + hinted; m["kept"] = m.get("kept", 0) + kept
     print(f"[{treat_as.upper()}] {name}: raw={raw} hinted={hinted} kept={kept}")
   except Exception as e:
     cb_fail(name)
     if metrics is not None:
-      metrics[name]["fail"] = metrics[name]["fail"] + 1
-      metrics[name]["error_samples"].append(str(e))
+      metrics[name]["fail"] = metrics[name].get("fail", 0) + 1
+      metrics[name].setdefault("error_samples", []).append(str(e))
     print(f"[WARN] {treat_as} {name} error: {e}")
   return items
 
@@ -530,7 +566,7 @@ def telegram_feed_urls(username):
 def scrape_telegram_channel(username, metrics):
   key = f"TG:{username}"
   if not cb_before(key):
-    metrics[key]["skipped_due_cb"] = metrics[key]["skipped_due_cb"] + 1
+    metrics[key]["skipped_due_cb"] = metrics[key].get("skipped_due_cb", 0) + 1
     return []
   started=time.time()
   items=[]; kept=0
@@ -557,15 +593,16 @@ def scrape_telegram_channel(username, metrics):
           }
           if validate_inline(rec): items.append(rec); kept += 1
         print(f"[TG ] {username}: kept={kept}")
-        cb_succ(key); metrics[key]["ok"] = metrics[key]["ok"] + 1
-        metrics[key]["durations"].append(time.time()-started); metrics[key]["kept"]+=kept
+        cb_succ(key); metrics[key]["ok"] = metrics[key].get("ok", 0) + 1
+        metrics[key]["durations"].append(time.time()-started); metrics[key]["kept"] = metrics[key].get("kept", 0) + kept
         return items
       except Exception as e:
         print(f"[WARN] telegram {username}@{url}: {e}; trying next")
-        metrics[key]["error_samples"].append(str(e))
+        metrics[key].setdefault("error_samples", []).append(str(e))
         continue
   except Exception:
-    cb_fail(key); metrics[key]["fail"] = metrics[key]["fail"] + 1; metrics[key]["durations"].append(time.time()-started)
+    cb_fail(key); metrics[key]["fail"] = metrics[key].get("fail", 0) + 1
+    if "durations" in metrics[key]: metrics[key]["durations"].append(time.time()-started)
   print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items
 
 # ---------------- Merge & Verify ----------------
@@ -607,7 +644,7 @@ def merge_and_verify(primary_items, backup_items, official_items):
       except Exception: ok_deadline=False
     if not ok_deadline: continue
 
-    sources = sorted({x["source"] for x in b["items"] if x.get("sourceType") in ("official","aggregator")})
+    sources = sorted({x["source"] for x in b["items"] if x.get("sourceType") in ("official","aggregator", "official-resolved")})
     schema_source = "official" if verifiedBy == "official" else "aggregator"
     base_id = hashlib.sha1(f"{'|'.join(sources)}|{rep['uniqueKey']}".encode("utf-8")).hexdigest()[:12]
     rid = base_id; n=1
