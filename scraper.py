@@ -1,12 +1,13 @@
-# scraper.py — v9 (Primary: Adda247 + FreeJobAlert; backup: SarkariExam; SSL-safe; anti-bot aware; full file)
-# - Strict SSL with certifi; suppresses InsecureRequestWarning (no verify=False used)
-# - Larger UA pool; dynamic headers with Referer
-# - Refined 403/429 handling with per-host RPM and cooldowns; Google “sorry” redirect detection
-# - Per-domain timeout overrides (SSC/DSSSB/BPSC/RRB); robust decoding; PDF first 3 pages
-# - Rolling corroboration across runs; multi-source verification; detailed metrics; syntax fixes
+# scraper.py — v10.2 (Critical fixes + low-risk improvements; single file)
+# - Publisher-first (FreeJobAlert) publishing
+# - Verifiers: Adda247, SarkariExam, SarkariResult.com.cm
+# - Official portals disabled
+# - Fixes: remove walrus in validate_inline, add looks_official, strict SSL for Cloudscraper
+# - Improvements: evidenceHTML snapshot (first 2KB), deadlineMismatch flag
+# - 4-day corroboration, reports/submissions queues, daysLeft, userState, auto-archive
 
 import os, re, json, time, random, hashlib, threading, warnings, xml.etree.ElementTree as ET, io
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -24,6 +25,10 @@ except Exception:
 try:
     import cloudscraper
     CF = cloudscraper.create_scraper()
+    try:
+        CF.verify = certifi.where()
+    except Exception:
+        pass
 except Exception:
     CF = None
 try:
@@ -31,7 +36,14 @@ try:
 except Exception:
     pdfplumber = None
 
-# ---------------- Config ----------------
+# ---------------- Paths & Config ----------------
+DATA_PATH = Path("data.json")
+CACHE_PATH = Path(".cache_http.json")
+AGG_CACHE_PATH = Path(".agg_seen.json")
+REPORTS_PATH = Path("reports.jsonl")
+SUBMISSIONS_PATH = Path("submissions.jsonl")
+USER_STATE_PATH = Path("user_state.json")
+
 def env_int(name, default):
     try: return int(os.getenv(name, "").strip() or default)
     except: return default
@@ -40,27 +52,16 @@ def env_float(name, default):
     except: return default
 
 IS_HARD_RECHECK = (os.getenv("IS_HARD_RECHECK","").lower() in ("1","true","yes"))
-DATA_PATH = Path("data.json")
-CACHE_PATH = Path(".cache_http.json")
-AGG_CACHE_PATH = Path(".agg_seen.json")
-AGG_WINDOW_DAYS = env_int("MULTI_AGG_DAYS", 7)
-
 UTC_NOW = datetime.now(timezone.utc)
 
 CONNECT_TO = env_int("CONNECT_TIMEOUT", 22 if not IS_HARD_RECHECK else 28)
 READ_TO    = env_int("READ_TIMEOUT",    65 if not IS_HARD_RECHECK else 80)
 LIST_TO, DETAIL_TO = (CONNECT_TO, READ_TO), (CONNECT_TO, READ_TO)
 
-DOMAIN_TIMEOUTS = {
-    "ssc.gov.in":          (CONNECT_TO, READ_TO + 30),
-    "www.rrbcdg.gov.in":   (CONNECT_TO, READ_TO + 20),
-    "rrbcdg.gov.in":       (CONNECT_TO, READ_TO + 20),
-    "dsssb.delhi.gov.in":  (CONNECT_TO, READ_TO + 25),
-    "bpsc.bihar.gov.in":   (CONNECT_TO, READ_TO + 20),
-}
+AGG_WINDOW_DAYS = env_int("CORROBORATION_DAYS", 4)
 
 MAX_WORKERS     = env_int("MAX_WORKERS", 8 if not IS_HARD_RECHECK else 12)
-PER_SOURCE_MAX  = env_int("PER_SOURCE_MAX", 150 if not IS_HARD_RECHECK else 220)
+PER_SOURCE_MAX  = env_int("PER_SOURCE_MAX", 160 if not IS_HARD_RECHECK else 220)
 
 RETRY_TOTAL         = env_int("RETRY_TOTAL", 4)
 RETRY_CONNECT       = env_int("RETRY_CONNECT", 3)
@@ -69,13 +70,9 @@ BACKOFF_FACTOR      = env_float("BACKOFF_FACTOR", 1.3)
 MAX_BACKOFF_SECONDS = env_int("MAX_BACKOFF_SECONDS", 75)
 
 PER_HOST_RPM   = env_int("PER_HOST_RPM", 18 if not IS_HARD_RECHECK else 24)
-BASELINE_SLEEP = env_float("BASELINE_SLEEP_S", 1.4 if not IS_HARD_RECHECK else 1.0)
+BASELINE_SLEEP = env_float("BASELINE_SLEEP_S", 1.3 if not IS_HARD_RECHECK else 1.0)
 JITTER_MIN     = env_float("JITTER_MIN", 0.7)
 JITTER_MAX     = env_float("JITTER_MAX", 2.4)
-
-CB_FAILURE_THRESHOLD  = env_int("CB_FAILURE_THRESHOLD", 5)
-CB_OPEN_SECONDS       = env_int("CB_OPEN_SECONDS", 720)
-CB_HALF_OPEN_PROBE    = env_int("CB_HALF_OPEN_PROBE", 1)
 
 UA_POOL = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -85,38 +82,24 @@ UA_POOL = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 ]
-
 if InsecureRequestWarning:
     warnings.simplefilter("ignore", InsecureRequestWarning)
 
-# ---------------- Tiered Aggregators ----------------
-PRIMARY_AGG = [
+PUBLISHER = {"name":"FreeJobAlert", "base":"https://www.freejobalert.com", "url":"https://www.freejobalert.com/latest-notifications/"}
+VERIFIERS = [
   {"name":"Adda247", "base":"https://www.adda247.com", "url":"https://www.adda247.com/jobs/"},
-  {"name":"FreeJobAlert", "base":"https://www.freejobalert.com", "url":"https://www.freejobalert.com/latest-notifications/"},
-]
-BACKUP_AGG = [
   {"name":"SarkariExam", "base":"https://www.sarkariexam.com", "url":"https://www.sarkariexam.com"},
+  {"name":"SarkariResult", "base":"https://sarkariresult.com.cm", "url":"https://sarkariresult.com.cm/"},
 ]
 
-OFFICIAL_SOURCES = [
-  {"name":"DSSSB_Notice",   "base":"https://dsssb.delhi.gov.in", "url":"https://dsssb.delhi.gov.in/notice-of-exam"},
-  {"name":"RRB_Chandigarh", "base":"https://www.rrbcdg.gov.in",  "url":"https://www.rrbcdg.gov.in"},
-  {"name":"BPSC",           "base":"https://bpsc.bihar.gov.in",  "url":"https://bpsc.bihar.gov.in"},
-  {"name":"SSC",            "base":"https://ssc.gov.in",         "url":"https://ssc.gov.in"},
-]
-
-def env_channels():
-  raw=os.getenv("TELEGRAM_CHANNELS","").strip()
-  return [x for x in raw.split(",") if x] or []
-TELEGRAM_CHANNELS = env_channels()
-TELEGRAM_RSS_BASES = [os.getenv("TELEGRAM_RSS_BASE") or "https://rsshub.app"]
-
-OFFICIAL_DOMAINS = {
-  "dsssb.delhi.gov.in","dsssbonline.nic.in","rrbcdg.gov.in",
-  "bpsc.bihar.gov.in","ssc.gov.in","ssc.nic.in",
+HOST_RPM = {
+  "www.freejobalert.com": 18, "freejobalert.com": 18,
+  "www.adda247.com": 10, "adda247.com": 10,
+  "www.sarkariexam.com": 10, "sarkariexam.com": 10,
+  "sarkariresult.com.cm": 12, "www.sarkariresult.com.cm": 12,
 }
 
-# ---------------- HTTP & Resilience ----------------
+# ---------------- HTTP layer ----------------
 def session_with_retries(pool=96):
   s = requests.Session()
   s.verify = certifi.where()
@@ -140,37 +123,12 @@ def thread_session():
   if not hasattr(_thread_local, "s"): _thread_local.s = session_with_retries()
   return _thread_local.s
 
-_cb = {}
-def get_cb_state(name): return _cb.get(name, {"state":"closed"})["state"]
-def cb_before(name):
-  st = _cb.get(name, {"fail":0,"state":"closed","opened":0.0,"probe":0})
-  if st["state"] == "open":
-    if (time.time() - st["opened"]) >= CB_OPEN_SECONDS:
-      st["state"]="half-open"; st["probe"]=0; _cb[name]=st
-    else: return False
-  if st["state"] == "half-open":
-    if st["probe"] >= CB_HALF_OPEN_PROBE: return False
-    st["probe"] += 1; _cb[name]=st
-  return True
-def cb_succ(name): _cb[name] = {"fail":0,"state":"closed","opened":0.0,"probe":0}
-def cb_fail(name):
-  st = _cb.get(name, {"fail":0,"state":"closed","opened":0.0,"probe":0})
-  st["fail"] += 1
-  if st["state"] == "half-open": st["state"]="open"; st["opened"]=time.time(); st["probe"]=0
-  elif st["fail"] >= CB_FAILURE_THRESHOLD: st["state"]="open"; st["opened"]=time.time()
-  _cb[name]=st
-
-# token bucket + cooldowns
 _host_tokens = {}; _host_lock = threading.Lock()
 _host_cooldown = {}  # host -> resume_time
-HOST_RPM = {
-  "www.adda247.com": 10, "adda247.com": 10,
-  "www.freejobalert.com": 18, "freejobalert.com": 18,
-  "www.sarkariexam.com": 10, "sarkariexam.com": 10,
-}
+
+def _host(url): return urlparse(url or "").netloc.lower()
 def _cooldown_host(host, seconds):
-  with _host_lock:
-    _host_cooldown[host] = time.monotonic() + max(0.0, seconds)
+  with _host_lock: _host_cooldown[host] = time.monotonic() + max(0.0, seconds)
 
 def _rate_limit_for(host):
   capacity = HOST_RPM.get(host, PER_HOST_RPM)
@@ -178,8 +136,7 @@ def _rate_limit_for(host):
   with _host_lock:
     now = time.monotonic()
     cd = _host_cooldown.get(host, 0.0)
-    if now < cd:
-      return cd - now
+    if now < cd: return cd - now
     b = _host_tokens.get(host, {"t": capacity, "ts": now})
     elapsed = now - b["ts"]
     b["t"] = min(capacity, b["t"] + elapsed * refill)
@@ -192,7 +149,7 @@ def _rate_limit_for(host):
 
 def _sleep_with_jitter(): time.sleep(BASELINE_SLEEP + random.uniform(JITTER_MIN, JITTER_MAX))
 
-try: _cache=json.loads(Path(CACHE_PATH).read_text(encoding="utf-8"))
+try: _cache=json.loads(CACHE_PATH.read_text(encoding="utf-8"))
 except Exception: _cache={}
 def _cache_headers_for(url):
   meta=_cache.get(url,{}); h={}
@@ -206,15 +163,8 @@ def _update_cache_from_response(url, resp):
     if et: _cache[url]["etag"]=et
     if lm: _cache[url]["last_modified"]=lm
 def save_http_cache():
-  try: Path(CACHE_PATH).write_text(json.dumps(_cache, indent=2, ensure_ascii=False), encoding="utf-8")
+  try: CACHE_PATH.write_text(json.dumps(_cache, indent=2, ensure_ascii=False), encoding="utf-8")
   except Exception: pass
-
-def _host(url): return urlparse(url or "").netloc.lower()
-def looks_official(url):
-  try: return urlparse(url or "").netloc.lower() in {
-    "dsssb.delhi.gov.in","dsssbonline.nic.in","rrbcdg.gov.in","bpsc.bihar.gov.in","ssc.gov.in","ssc.nic.in"
-  }
-  except Exception: return False
 
 def get_dynamic_headers(referer=None):
   langs = [
@@ -233,9 +183,6 @@ def get_dynamic_headers(referer=None):
   if referer: h["Referer"] = referer
   return h
 
-def _timeouts_for(url):
-  return DOMAIN_TIMEOUTS.get(_host(url), DETAIL_TO)
-
 def fetch(url, timeout, use_cache=False, referer=None):
   host = _host(url)
   wait = _rate_limit_for(host)
@@ -243,51 +190,37 @@ def fetch(url, timeout, use_cache=False, referer=None):
   _sleep_with_jitter()
   headers = get_dynamic_headers(referer=referer)
   if use_cache: headers.update(_cache_headers_for(url))
+  to = timeout
   try:
-    to = _timeouts_for(url) if timeout == DETAIL_TO else timeout
     r = thread_session().get(url, timeout=to, headers=headers, allow_redirects=True)
-    # Detect Google bot-check redirect
     if "sorry/index" in (getattr(r, "url", "") or "") and "google.com" in (r.url or ""):
-      _cooldown_host(host, 30)
-      raise requests.exceptions.RetryError("Hit Google bot-check redirect")
-
+      _cooldown_host(host, 30); raise requests.exceptions.RetryError("Google bot-check redirect")
     if r.status_code == 304:
       class _R: pass
       nr=_R(); nr.status_code=304; nr.headers=r.headers; nr.content=b""; nr.url=url
       return nr
-
     if r.status_code == 429:
-      _cooldown_host(host, 45)
-      time.sleep(2.0)
-      alt_headers = get_dynamic_headers(referer=referer)
-      r_alt = thread_session().get(url, timeout=to, headers=alt_headers, allow_redirects=True)
-      if r_alt.status_code == 200:
-        if use_cache: _update_cache_from_response(url, r_alt)
-        return r_alt
-      _cooldown_host(host, 90)
-      r_alt.raise_for_status()
-
+      _cooldown_host(host, 45); time.sleep(2.0)
+      alt = thread_session().get(url, timeout=to, headers=get_dynamic_headers(referer=referer), allow_redirects=True)
+      if alt.status_code == 200:
+        if use_cache: _update_cache_from_response(url, alt); return alt
+      _cooldown_host(host, 90); alt.raise_for_status()
     if r.status_code == 403:
-      attempts = 2 if host in ("www.adda247.com","adda247.com","www.sarkariexam.com","sarkariexam.com") else 1
+      attempts = 2 if host in ("www.adda247.com","adda247.com","www.sarkariexam.com","sarkariexam.com","sarkariresult.com.cm","www.sarkariresult.com.cm") else 1
       last = r
       for _ in range(attempts):
         time.sleep(2.5)
-        alt_headers = get_dynamic_headers(referer=referer)
-        last = thread_session().get(url, timeout=to, headers=alt_headers, allow_redirects=True)
+        last = thread_session().get(url, timeout=to, headers=get_dynamic_headers(referer=referer), allow_redirects=True)
         if last.status_code == 200:
-          if use_cache: _update_cache_from_response(url, last)
-          return last
-      print(f"[BLOCK] 403 from {url}. Attempts={attempts+1}.")
-      last.raise_for_status()
-
+          if use_cache: _update_cache_from_response(url, last); return last
+      print(f"[BLOCK] 403 from {url}. Attempts={attempts+1}."); last.raise_for_status()
     r.raise_for_status()
     if use_cache: _update_cache_from_response(url, r)
     return r
   except requests.exceptions.SSLError:
-    # Two verified retries; some gov chains are flaky
     for _ in range(2):
-      alt = session_with_retries()
-      r2 = alt.get(url, timeout=_timeouts_for(url), headers=headers, allow_redirects=True)
+      sess = session_with_retries()
+      r2 = sess.get(url, timeout=to, headers=headers, allow_redirects=True)
       try:
         r2.raise_for_status()
         if use_cache: _update_cache_from_response(url, r2)
@@ -295,33 +228,23 @@ def fetch(url, timeout, use_cache=False, referer=None):
       except Exception:
         continue
     raise
-  except requests.exceptions.RequestException as e:
-    code = getattr(e.response, "status_code", 0) if hasattr(e, "response") else 0
-    if code in [403, 503] and CF:
-      try:
-        sess = cloudscraper.create_scraper()
-        sess.verify = certifi.where()
-        r2 = sess.get(url, timeout=sum(_timeouts_for(url)), headers=headers, allow_redirects=True)
-        if getattr(r2, "status_code", 0) == 200:
-          if use_cache: _update_cache_from_response(url, r2)
-          return r2
-      except Exception:
-        pass
-    raise
 
-# ---------------- Parsing & Filters ----------------
+# ---------------- Helpers & parsing ----------------
 def norm(s): return re.sub(r"\s+"," ",(s or "")).strip()
 def absolute(base, href): return href if (href and href.startswith("http")) else (urljoin(base, href) if href else None)
+
+def looks_official(url):
+  try:
+    dom = urlparse(url).netloc.lower()
+    return dom in {"dsssb.delhi.gov.in","dsssbonline.nic.in","rrbcdg.gov.in","bpsc.bihar.gov.in","ssc.gov.in","ssc.nic.in"}
+  except Exception:
+    return False
 
 def _decode_html_bytes(resp):
   try:
     content = resp.content
     if not content: return ""
-    dammit = UnicodeDammit(
-      content,
-      is_html=True,
-      known_definite_encodings=[resp.encoding or "", "utf-8", "utf-16", "cp1252", "windows-1252", "iso-8859-1"]
-    )
+    dammit = UnicodeDammit(content, is_html=True, known_definite_encodings=[resp.encoding or "", "utf-8", "utf-16", "cp1252", "windows-1252", "iso-8859-1"])
     txt = dammit.unicode_markup
     if txt is None:
       try: return content.decode("utf-8", errors="ignore")
@@ -339,21 +262,12 @@ def soup_from_resp(resp):
   except Exception: return BeautifulSoup(html, "html.parser")
 
 RECRUITMENT_TERMS = [r"\brecruitment\b", r"\bvacanc(?:y|ies)\b", r"\badvertisement\b", r"\bnotification\b", r"\bonline\s*form\b", r"\bapply\s*online\b"]
-EXCLUDE_NOISE = [r"\badmit\s*card\b", r"\banswer\s*key\b", r"\bresult\b", r"\bsyllabus\b"]
+EXCLUDE_NOISE = [r"\badmit\s*card\b", r"\banswer\s*key\b", r"\bresult\b", r"\bsyllabus\b", r"\blogin\b"]
 UPDATE_TERMS = [r"\bcorrigendum\b", r"\baddendum\b", r"\bamendment\b", r"\brevised\b", r"\bdate\s*(?:extended|extension)\b"]
 def contains_any(patterns, text): return any(re.search(p, (text or "").lower()) for p in patterns)
 def is_update(text): return contains_any(UPDATE_TERMS, text)
 def is_joblike(text): return contains_any(RECRUITMENT_TERMS, text) and not contains_any(EXCLUDE_NOISE, text)
 def is_non_vacancy(text): return bool(re.search(r"\b(otr|one\s*time\s*registration)\b", (text or "").lower()))
-
-INDIAN_STATES = ["andhra pradesh","arunachal pradesh","assam","bihar","chhattisgarh","goa","gujarat","haryana","himachal pradesh","jharkhand","karnataka","kerala","madhya pradesh","maharashtra","manipur","meghalaya","mizoram","nagaland","odisha","punjab","rajasthan","sikkim","tamil nadu","telangana","tripura","uttar pradesh","uttarakhand","west bengal"]
-def other_state_only(text):
-  t=(text or "").lower()
-  if not re.search(r"\b(domici(?:le|liary)|resident)\b", t): return False
-  for st in INDIAN_STATES:
-    if st=="bihar": continue
-    if re.search(rf"\b{re.escape(st)}\b.*\bonly\b", t) or re.search(rf"\bonly\b.*\b{re.escape(st)}\b", t): return True
-  return False
 
 ALLOWED_EDU = [r"\b10\s*th\b", r"\bmatric\b", r"\b12\s*th\b", r"\binter(?:mediate)?\b", r"\bany\s+graduate\b", r"\bgraduate\b", r"\bbachelor(?:'s)?\s+degree\b"]
 EXCLUDE_EDU = [
@@ -366,13 +280,12 @@ def education_allowed(text):
   t=(text or "").lower()
   if any(re.search(p, t) for p in EXCLUDE_EDU): return False
   return any(re.search(p, t) for p in ALLOWED_EDU)
-
-def norm_key(title):
-  t = norm(title).lower()
-  t = re.sub(r"(recruitment|notification|advertisement|apply\s*online|online\s*form|\b20\d{2})"," ",t)
-  t = re.sub(r"[^a-z0-9\s]", " ", t)
-  tokens = [w for w in t.split() if len(w) > 2]
-  return " ".join(tokens[:14])
+def infer_qualification(text):
+  t=(text or "").lower()
+  if any(re.search(p, t) for p in [r"\b10\s*th\b", r"\bmatric\b"]): return "10th Pass"
+  if any(re.search(p, t) for p in [r"\b12\s*th\b", r"\binter\b"]): return "12th Pass"
+  if any(re.search(p, t) for p in [r"\bany\s+graduate\b", r"\bgraduate\b"]): return "Graduate"
+  return "Graduate"
 
 DATE_WORDS = {"jan":"january","feb":"february","mar":"march","apr":"april","jun":"june","jul":"july","aug":"august","sep":"september","oct":"october","nov":"november","dec":"december"}
 def _month_word_fix(s):
@@ -380,9 +293,6 @@ def _month_word_fix(s):
   for k,v in DATE_WORDS.items(): t=re.sub(rf"\b{k}\b",v,t)
   return re.sub(r"[–—−]", "-", t)
 PAT_TILL = re.compile(r"(till|closes\s*on|last\s*date)\s*[:\-]?\s*(\d{1,2}\s+[a-z]+(?:\s+\d{4})?|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})", re.I)
-def _parse_dmy_token(s):
-  try: return dateparser.parse(s, settings={"DATE_ORDER":"DMY"}).date()
-  except: return None
 def parse_application_window(text):
   t=_month_word_fix(norm(text or ""))
   m = PAT_TILL.search(t)
@@ -391,24 +301,22 @@ def parse_application_window(text):
     return (None, dt.date().isoformat() if dt else None)
   return (None,None)
 
-def probe_deadline_from_link(primary_url):
+def probe_deadline_from_link(url):
   try:
-    if not primary_url: return None
-    r = fetch(primary_url, DETAIL_TO, referer=None)
+    r = fetch(url, DETAIL_TO)
     ct = (r.headers.get("Content-Type","").lower())
     if "html" in ct:
       s = soup_from_resp(r)
       if s:
         _, e = parse_application_window(norm(s.get_text(" ")[:4000]))
         return e
-    elif pdfplumber and ("pdf" in ct or "pdf" in primary_url.lower()):
+    elif pdfplumber and ("pdf" in ct or "pdf" in url.lower()):
       with pdfplumber.open(io.BytesIO(r.content)) as pdf:
         for i in range(min(3, len(pdf.pages))):
-          text = (pdf.pages[i].extract_text() or "")
+          text = pdf.pages[i].extract_text() or ""
           _, e = parse_application_window(text)
           if e: return e
-  except Exception as e:
-    print(f"[DEBUG] PDF/Detail probe failed for {primary_url}: {e}")
+  except Exception:
     return None
   return None
 
@@ -421,39 +329,24 @@ def extract_deadline(text, fallback_url=None):
   dt = dateparser.parse(text or "", settings={"PREFER_DATES_FROM":"future","DATE_ORDER":"DMY"})
   return dt.date().isoformat() if (dt and dt.date() >= datetime.now().date()) else None
 
-def infer_qualification(text):
-  t=(text or "").lower()
-  if any(re.search(p, t) for p in [r"\b10\s*th\b", r"\bmatric\b"]): return "10th Pass"
-  if any(re.search(p, t) for p in [r"\b12\s*th\b", r"\binter\b"]): return "12th Pass"
-  if any(re.search(p, t) for p in [r"\bany\s+graduate\b", r"\bgraduate\b"]): return "Graduate"
-  return "Graduate"
-
-def is_valid_url(u):
+def days_left(deadline_iso):
   try:
-    if not u: return False
-    pr = urlparse(u); return pr.scheme in ("http","https") and pr.netloc
-  except: return False
+    d = datetime.fromisoformat(deadline_iso).date()
+    return (d - date.today()).days
+  except Exception:
+    return None
 
-def validate_inline(rec):
-  if not (rec.get("title") and len(rec["title"]) > 6): return False
-  if not (rec.get("detailText") and len(rec.get("detailText","")) > 40): return False
-  if not (is_valid_url(rec.get("applyLink")) or is_valid_url(rec.get("pdfLink"))): return False
-  return True
+def norm_key(title):
+  t = norm(title).lower()
+  t = re.sub(r"(recruitment|notification|advertisement|apply\s*online|online\s*form|\b20\d{2})"," ",t)
+  t = re.sub(r"[^a-z0-9\s]", " ", t)
+  tokens = [w for w in t.split() if len(w) > 2]
+  return " ".join(tokens[:14])
 
-def soup_text(url, referer=None):
-  try:
-    r = fetch(url, DETAIL_TO, referer=referer)
-    if "html" in (r.headers.get("Content-Type","") or "").lower():
-      s = soup_from_resp(r)
-      return norm(s.get_text(" ")) if s else ""
-  except Exception as e:
-    print(f"[DEBUG] soup_text failed for {url}: {e}")
-  return ""
-
-# ---------------- Rolling corroboration cache ----------------
+# ---------------- Corroboration cache ----------------
 def load_agg_seen():
   try:
-    data = json.loads(Path(AGG_CACHE_PATH).read_text(encoding="utf-8"))
+    data = json.loads(AGG_CACHE_PATH.read_text(encoding="utf-8"))
     if AGG_WINDOW_DAYS <= 0: return {}
     cutoff = datetime.utcnow() - timedelta(days=AGG_WINDOW_DAYS)
     pruned = {}
@@ -468,171 +361,126 @@ def load_agg_seen():
     return pruned
   except: return {}
 def save_agg_seen(cache):
-  try: Path(AGG_CACHE_PATH).write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+  try: AGG_CACHE_PATH.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
   except: pass
 
+# ---------------- Queues & user state ----------------
+def read_jsonl(path):
+  items=[]
+  if Path(path).exists():
+    with open(path, "r", encoding="utf-8") as f:
+      for line in f:
+        line=line.strip()
+        if not line: continue
+        try: items.append(json.loads(line))
+        except: continue
+  return items
+
+def read_user_state():
+  try: return json.loads(USER_STATE_PATH.read_text(encoding="utf-8"))
+  except: return {}
+
 # ---------------- Scraping ----------------
-def scrape_generic_list(src, treat_as="aggregator", metrics=None):
+def try_get_text(url, referer=None):
+  try:
+    r = fetch(url, DETAIL_TO, referer=referer)
+    # Evidence snapshot: first 2KB raw HTML/text
+    ev = r.content[:2048].decode("utf-8", errors="ignore") if getattr(r, "content", None) else ""
+    text = ""
+    if "html" in (r.headers.get("Content-Type","") or "").lower():
+      s=soup_from_resp(r); text = norm(s.get_text(" ")) if s else ""
+    return text, ev
+  except Exception:
+    return "", ""
+
+def validate_inline(rec):
+  if not (rec.get("title") and len(rec["title"])>6): return False
+  if not (rec.get("detailText") and len(rec["detailText"])>40): return False
+  if not (is_valid_url(rec.get("applyLink")) or is_valid_url(rec.get("pdfLink"))): return False
+  return True
+
+def is_valid_url(u):
+  try:
+    if not u: return False
+    pr = urlparse(u); return pr.scheme in ("http","https") and pr.netloc
+  except: return False
+
+def scrape_list(src, treat_as, metrics):
   name = src["name"]; url = src["url"]; base = src["base"]
-  if not cb_before(name):
-    if metrics is not None: metrics[name]["skipped_due_cb"] = metrics[name].get("skipped_due_cb", 0) + 1
-    return []
-  started=time.time(); items=[]; raw=0; hinted=0; kept=0
+  started=time.time(); raw=0; hinted=0; kept=0; items=[]
   try:
     r = fetch(url, LIST_TO, use_cache=True)
     if r.status_code == 304:
-      if metrics is not None:
-        m = metrics[name]; m["not_modified"] = m.get("not_modified", 0) + 1; m["durations"].append(time.time()-started)
-      cb_succ(name); return []
+      m=metrics[name]; m["not_modified"]=m.get("not_modified",0)+1; m["durations"].append(time.time()-started)
+      return []
     soup = soup_from_resp(r)
     if soup is None:
-      cb_fail(name); 
-      if metrics is not None: metrics[name]["fail"] = metrics[name].get("fail", 0) + 1
-      return []
+      metrics[name]["fail"]=metrics[name].get("fail",0)+1; return []
     anchors=[]
     for a in soup.find_all("a", href=True):
       href = absolute(base, a["href"]); title = norm(a.get_text(" "))
-      if not href or len(title) < 6: continue
+      if not href or len(title)<6: continue
       raw += 1
-      if (treat_as=="official") or is_joblike(f"{title} {href}"):
+      if (treat_as!="publisher" and treat_as!="verifier") or is_joblike(f"{title} {href}"):
         anchors.append((title, href)); hinted += 1
-      if len(anchors) >= PER_SOURCE_MAX: break
+      if len(anchors)>=PER_SOURCE_MAX: break
     for title, href in anchors:
-      detail_text = title + " — " + soup_text(href, referer=url)
-      if is_non_vacancy(detail_text) or other_state_only(detail_text) or not education_allowed(detail_text): continue
-      key_base = norm_key(title); upd = is_update(detail_text); unique_key = f"{key_base}|upd" if upd else key_base
+      detail_text, evidence = try_get_text(href, referer=url)
+      if not detail_text: detail_text = title  # minimal fallback
+      if is_non_vacancy(detail_text) or not education_allowed(detail_text): continue
+      key_base = norm_key(title); upd=is_update(detail_text)
 
-      official_link = None; tmp_deadline = None
-      try:
-        rd = fetch(href, DETAIL_TO, referer=url)
-        if "html" in (rd.headers.get("Content-Type","") or "").lower():
-          sd = soup_from_resp(rd)
-          if sd:
-            for a2 in sd.find_all("a", href=True):
-              u2 = absolute(href, a2["href"])
-              if looks_official(u2): official_link = u2; break
-            if not official_link:
-              for a2 in sd.find_all("a", href=True):
-                u2 = absolute(href, a2["href"])
-                if u2 and ("pdf" in u2.lower()):
-                  dl_probe = probe_deadline_from_link(u2)
-                  if dl_probe:
-                    tmp_deadline = dl_probe
-                    if looks_official(u2): official_link = u2
-                    break
-      except Exception as e:
-        if metrics is not None:
-          metrics[name].setdefault("error_samples", []).append(f"detail_fetch:{type(e).__name__}:{str(e)[:180]}")
-
-      deadline_here = extract_deadline(detail_text, fallback_url=official_link or href)
-      if tmp_deadline and not deadline_here: deadline_here = tmp_deadline
+      deadline_pub = extract_deadline(detail_text, fallback_url=href)
 
       rec = {
-        "key": key_base, "uniqueKey": unique_key, "title": title,
-        "organization": src["name"],
-        "applyLink": official_link or href, "pdfLink": official_link or href,
-        "deadline": deadline_here,
+        "key": key_base, "uniqueKey": f"{key_base}|upd" if upd else key_base,
+        "title": title, "organization": name,
+        "applyLink": href, "pdfLink": href,
+        "deadline": deadline_pub,
         "domicile": "Bihar" if "bihar" in detail_text.lower() else "All India",
-        "sourceType": "official" if official_link else treat_as,
-        "source": src["name"] if not official_link else "official-resolved",
+        "sourceType": treat_as, "source": name,
         "isUpdate": upd, "updateSummary": title if upd else None,
-        "detailText": detail_text
+        "detailText": detail_text,
+        "evidenceHTML": evidence
       }
       if validate_inline(rec):
-        items.append(rec); kept += 1
-    cb_succ(name)
-    if metrics is not None:
-      m = metrics[name]; m["ok"] = m.get("ok", 0) + 1; m["durations"].append(time.time()-started)
-      m["raw"] = m.get("raw", 0) + raw; m["hinted"] = m.get("hinted", 0) + hinted; m["kept"] = m.get("kept", 0) + kept
-    print(f"[{treat_as.upper()}] {name}: raw={raw} hinted={hinted} kept={kept}")
+        items.append(rec); kept+=1
+    metrics[name]["ok"]=metrics[name].get("ok",0)+1; metrics[name]["durations"].append(time.time()-started)
+    metrics[name]["raw"]=metrics[name].get("raw",0)+raw; metrics[name]["hinted"]=metrics[name].get("hinted",0)+hinted; metrics[name]["kept"]=metrics[name].get("kept",0)+kept
   except Exception as e:
-    cb_fail(name)
-    if metrics is not None:
-      metrics[name]["fail"] = metrics[name].get("fail", 0) + 1
-      metrics[name].setdefault("error_samples", []).append(f"list_fetch:{type(e).__name__}:{str(e)[:200]}")
-    print(f"[WARN] {treat_as} {name} error: {e}")
+    metrics[name]["fail"]=metrics[name].get("fail",0)+1
+    metrics[name].setdefault("error_samples",[]).append(f"{type(e).__name__}:{str(e)[:160]}")
   return items
 
-def scrape_aggregator_page(src, metrics): return scrape_generic_list(src, "aggregator", metrics)
-def scrape_official_page(src, metrics):   return scrape_generic_list(src, "official", metrics)
+# ---------------- Merge & Publish (publisher-first) ----------------
+def publish_from_publisher(pub_items, ver_items):
+  agg_seen = load_agg_seen()
+  published=[]; seen_ids=set()
 
-def telegram_feed_urls(username):
-  for base in TELEGRAM_RSS_BASES:
-    if base: yield f"{base.rstrip('/')}/telegram/channel/{username}"
+  for it in pub_items + ver_items:
+    if it.get("sourceType") in ("publisher","verifier"):
+      rec = agg_seen.setdefault(it["key"], {"seen": []})
+      if it["source"] not in [s for s,_ in rec["seen"]]:
+        rec["seen"].append((it["source"], UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")))
+  save_agg_seen(agg_seen)
 
-def scrape_telegram_channel(username, metrics):
-  key = f"TG:{username}"
-  if not cb_before(key):
-    metrics[key]["skipped_due_cb"] = metrics[key].get("skipped_due_cb", 0) + 1
-    return []
-  started=time.time(); items=[]; kept=0
-  try:
-    for url in telegram_feed_urls(username):
-      try:
-        root = ET.fromstring(fetch(url, LIST_TO, use_cache=True).content)
-        def tx(node, tag):
-          el = node.find(tag); return norm(el.text) if (el is not None and el.text) else ""
-        for it in root.findall(".//item"):
-          title = tx(it,"title"); link = tx(it,"link"); desc = tx(it,"description")
-          combo = norm(f"{title} {desc}")
-          if len(title) < 6 or not is_joblike(combo): continue
-          if is_non_vacancy(combo) or other_state_only(combo) or not education_allowed(combo): continue
-          key_base = norm_key(title); upd = is_update(combo); unique_key = f"{key_base}|upd" if upd else key_base
-          rec = {
-            "key": key_base, "uniqueKey": unique_key, "title": title,
-            "organization": f"Telegram:{username}", "applyLink": link or None, "pdfLink": link or None,
-            "deadline": extract_deadline(combo, fallback_url=link or None),
-            "domicile": "Bihar" if "bihar" in combo.lower() else "All India",
-            "sourceType": "telegram", "source": f"Telegram:{username}",
-            "isUpdate": upd, "updateSummary": title if upd else None,
-            "detailText": combo
-          }
-          if validate_inline(rec): items.append(rec); kept += 1
-        print(f"[TG ] {username}: kept={kept}")
-        cb_succ(key); metrics[key]["ok"] = metrics[key].get("ok", 0) + 1
-        metrics[key]["durations"].append(time.time()-started); metrics[key]["kept"]=metrics[key].get("kept",0)+kept
-        return items
-      except Exception as e:
-        metrics[key].setdefault("error_samples", []).append(f"rss_fetch:{type(e).__name__}:{str(e)[:180]}")
-        continue
-  except Exception as e:
-    cb_fail(key); metrics[key]["fail"] = metrics[key].get("fail", 0) + 1
-    metrics[key].setdefault("error_samples", []).append(f"tg_loop:{type(e).__name__}:{str(e)[:180]}")
-    if "durations" in metrics[key]: metrics[key]["durations"].append(time.time()-started)
-  print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items
+  # Build quick lookup of verifier deadlines per key to flag mismatches
+  ver_deadline_by_key = {}
+  for v in ver_items:
+    if v.get("deadline"):
+      ver_deadline_by_key.setdefault(v["key"], set()).add(v["deadline"])
 
-# ---------------- Merge & Verify ----------------
-def merge_and_verify(primary_items, backup_items, official_items):
   buckets={}
   def add(it):
-    b = buckets.setdefault(it["key"], {"aggs": set(), "items": [], "hasOfficial": False, "offNames": set()})
-    if it["sourceType"] == "aggregator": b["aggs"].add(it["source"])
-    if it["sourceType"] == "official":
-      b["hasOfficial"] = True; b["offNames"].add(it["source"])
+    b=buckets.setdefault(it["key"], {"pub":[], "ver":set(), "items":[]})
+    if it["sourceType"]=="publisher": b["pub"].append(it)
+    elif it["sourceType"]=="verifier": b["ver"].add(it["source"])
     b["items"].append(it)
+  for it in pub_items: add(it)
+  for it in ver_items: add(it)
 
-  for lst in (primary_items, backup_items, official_items):
-    for it in lst: add(it)
-
-  agg_seen = load_agg_seen()
-
-  published=[]; pending=set(); seen_ids=set()
   for key, b in buckets.items():
-    rep = None; verifiedBy = None
-    if b["hasOfficial"]:
-      rep = next((x for x in b["items"] if x.get("sourceType")=="official" and not x.get("isUpdate")), None) or \
-            next((x for x in b["items"] if x.get("sourceType")=="official"), None)
-      verifiedBy = "official"
-    else:
-      historical = set([s for s,_ in agg_seen.get(key, {}).get("seen", [])])
-      combined = set(b["aggs"]) | historical
-      if len(combined) >= 2:
-        rep = next((x for x in b["items"] if x.get("sourceType")=="aggregator" and not x.get("isUpdate")), None) or \
-              next((x for x in b["items"] if x.get("sourceType")=="aggregator"), None)
-        verifiedBy = "multi-aggregator"
-      else:
-        pending.add(key); continue
-
+    rep = next((x for x in b["pub"] if not x.get("isUpdate")), None) or (b["pub"][0] if b["pub"] else None)
     if not rep: continue
     dl = rep.get("deadline"); ok_deadline=False
     if dl:
@@ -640,120 +488,160 @@ def merge_and_verify(primary_items, backup_items, official_items):
       except Exception: ok_deadline=False
     if not ok_deadline: continue
 
-    sources = sorted({x["source"] for x in b["items"] if x.get("sourceType") in ("official","aggregator","official-resolved")})
-    schema_source = "official" if verifiedBy == "official" else "aggregator"
-    base_id = hashlib.sha1(f"{'|'.join(sources)}|{rep['uniqueKey']}".encode("utf-8")).hexdigest()[:12]
-    rid = base_id; n=1
+    verifiedBy = "publisher"
+    if len(b["ver"]) >= 1: verifiedBy = "multi-aggregator"
+
+    rid_base = hashlib.sha1(f"{rep['uniqueKey']}|{verifiedBy}".encode("utf-8")).hexdigest()[:12]
+    rid = rid_base; n=1
     while rid in seen_ids:
-      rid = hashlib.sha1(f"{base_id}|{n}".encode("utf-8")).hexdigest()[:12]; n+=1
+      rid = hashlib.sha1(f"{rid_base}|{n}".encode("utf-8")).hexdigest()[:12]; n+=1
     seen_ids.add(rid)
+
+    dleft = days_left(rep["deadline"])
+    mismatch = False
+    if key in ver_deadline_by_key:
+      mismatch = (rep["deadline"] not in ver_deadline_by_key[key])
+
     rep_rec = {
-      "id": rid, "slug": rid, "title": rep["title"], "organization": "/".join(sources) if sources else rep["organization"],
+      "id": rid, "slug": rid, "title": rep["title"],
+      "organization": rep["organization"],
       "qualificationLevel": infer_qualification(rep["detailText"]),
-      "domicile": rep["domicile"], "source": schema_source, "verifiedBy": verifiedBy,
-      "type": "VACANCY", "updateSummary": None, "relatedTo": None, "deadline": rep.get("deadline"),
-      "applyLink": rep.get("applyLink"), "pdfLink": rep.get("pdfLink"), "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+      "domicile": rep["domicile"], "source": "aggregator",
+      "verifiedBy": verifiedBy, "type": "VACANCY",
+      "updateSummary": None, "relatedTo": None,
+      "deadline": rep["deadline"], "daysLeft": dleft,
+      "applyLink": rep.get("applyLink"), "pdfLink": rep.get("pdfLink"),
+      "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+      "flags": {"hidden": False, "reported": False, "reportReason": None, "evidenceUrl": None, "deadlineMismatch": mismatch},
+      "userState": None,
+      "evidenceHTML": rep.get("evidenceHTML","")
     }
     published.append(rep_rec)
+
     for u in (x for x in b["items"] if x.get("isUpdate")):
-      up_base = hashlib.sha1(f"{'|'.join(sources)}|{u['uniqueKey']}".encode("utf-8")).hexdigest()[:12]
-      uid = up_base; m=1
+      uid_base = hashlib.sha1(f"{u['uniqueKey']}|upd".encode("utf-8")).hexdigest()[:12]
+      uid=uid_base; m=1
       while uid in seen_ids:
-        uid = hashlib.sha1(f"{up_base}|{m}".encode("utf-8")).hexdigest()[:12]; m+=1
+        uid = hashlib.sha1(f"{uid_base}|{m}".encode("utf-8")).hexdigest()[:12]; m+=1
       seen_ids.add(uid)
       upd = {
-        "id": uid, "slug": uid, "title": "[UPDATE] " + u["title"], "organization": rep_rec["organization"],
+        "id": uid, "slug": uid, "title": "[UPDATE] " + u["title"],
+        "organization": rep_rec["organization"],
         "qualificationLevel": infer_qualification(u["detailText"]),
-        "domicile": rep["domicile"], "source": schema_source, "verifiedBy": verifiedBy,
-        "type": "UPDATE", "updateSummary": u.get("updateSummary"), "relatedTo": rep_rec["slug"],
+        "domicile": rep["domicile"], "source": "aggregator",
+        "verifiedBy": verifiedBy, "type": "UPDATE",
+        "updateSummary": u.get("updateSummary"), "relatedTo": rep_rec["slug"],
         "deadline": u.get("deadline") or rep_rec["deadline"],
+        "daysLeft": days_left(u.get("deadline") or rep_rec["deadline"]),
         "applyLink": u.get("applyLink") or rep_rec["applyLink"], "pdfLink": u.get("pdfLink") or rep_rec["pdfLink"],
         "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "flags": {"hidden": False, "reported": False, "reportReason": None, "evidenceUrl": None, "deadlineMismatch": False},
+        "userState": None,
+        "evidenceHTML": u.get("evidenceHTML","")
       }
       published.append(upd)
-  return published, pending
+  return published
 
-# ---------------- IO ----------------
+# ---------------- Feedback & Learning ----------------
+def apply_reports_and_learning(items, reports):
+  reasons_count = {}
+  for r in reports:
+    lid = r.get("listingId"); reason = (r.get("reason") or "Other").strip()
+    for it in items:
+      if it["id"] == lid:
+        it["flags"]["hidden"] = True; it["flags"]["reported"] = True
+        it["flags"]["reportReason"] = reason
+        it["flags"]["evidenceUrl"] = r.get("evidenceUrl") or None
+        break
+    reasons_count[reason] = reasons_count.get(reason, 0) + 1
+  return reasons_count
+
+def self_learn_adjustments(reasons_count, metrics):
+  if reasons_count.get("Not a vacancy", 0) >= 3:
+    if r"\bnotification\s*pdf\b" not in EXCLUDE_NOISE: EXCLUDE_NOISE.append(r"\bnotification\s*pdf\b")
+  if reasons_count.get("Wrong eligibility", 0) >= 3:
+    if r"\bpost\b" not in RECRUITMENT_TERMS: RECRUITMENT_TERMS.append(r"\bpost\b")
+  metrics.setdefault("learning", {})["reportReasons"] = reasons_count
+
+def attach_user_state(items, user_state_map):
+  for it in items:
+    if it["id"] in user_state_map:
+      it["userState"] = user_state_map[it["id"]]
+
+def archive_past_deadline(items):
+  today = date.today()
+  active=[]; archived=[]
+  for it in items:
+    try:
+      if it.get("deadline"):
+        d = datetime.fromisoformat(it["deadline"]).date()
+        if d < today:
+          archived.append(it); continue
+        it["daysLeft"] = (d - today).days
+    except Exception:
+      pass
+    active.append(it)
+  return active, archived
+
+# ---------------- Data IO ----------------
 def load_data():
-  base={"jobListings": [], "transparencyInfo": {}}
-  if Path(DATA_PATH).exists():
-    try: base=json.loads(Path(DATA_PATH).read_text(encoding="utf-8"))
+  base={"jobListings": [], "archivedListings": [], "transparencyInfo": {}}
+  if DATA_PATH.exists():
+    try: base=json.loads(DATA_PATH.read_text(encoding="utf-8"))
     except Exception: pass
-  base.setdefault("jobListings",[]); base.setdefault("transparencyInfo",{})
+  base.setdefault("jobListings",[]); base.setdefault("archivedListings",[]); base.setdefault("transparencyInfo",{})
   return base
-def save_data(data): Path(DATA_PATH).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+def save_data(data): DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 # ---------------- Main ----------------
 def main():
   run_started = time.time()
-  per_source_metrics = {}
-  for s in PRIMARY_AGG+BACKUP_AGG+OFFICIAL_SOURCES:
-    per_source_metrics[s["name"]]={"ok":0,"fail":0,"skipped_due_cb":0,"not_modified":0,"raw":0,"hinted":0,"kept":0,"error_samples":[],"durations":[],"cb_state":"closed"}
-  for ch in TELEGRAM_CHANNELS:
-    per_source_metrics[f"TG:{ch}"]={"ok":0,"fail":0,"skipped_due_cb":0,"not_modified":0,"raw":0,"hinted":0,"kept":0,"error_samples":[],"durations":[],"cb_state":"closed"}
+  metrics = {PUBLISHER["name"]: {"ok":0,"fail":0,"skipped_due_cb":0,"not_modified":0,"raw":0,"hinted":0,"kept":0,"error_samples":[],"durations":[]}}
+  for v in VERIFIERS:
+    metrics[v["name"]]={"ok":0,"fail":0,"skipped_due_cb":0,"not_modified":0,"raw":0,"hinted":0,"kept":0,"error_samples":[],"durations":[]}
 
-  # Gentle initial backoff for strict hosts
-  _cooldown_host("www.adda247.com", 5.0)
-  _cooldown_host("www.sarkariexam.com", 5.0)
+  publisher_items = scrape_list(PUBLISHER, "publisher", metrics)
 
-  primary_items=[]; backup_items=[]; official_items=[]; tg_hints=[]
-  agg_counts={}; off_counts={}; tg_counts={}
-
-  with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-    futs = {}
-    for src in PRIMARY_AGG: futs[ex.submit(scrape_aggregator_page, src, per_source_metrics)] = ("p", src["name"])
-    for src in BACKUP_AGG:  futs[ex.submit(scrape_aggregator_page, src, per_source_metrics)] = ("b", src["name"])
-    for src in OFFICIAL_SOURCES: futs[ex.submit(scrape_official_page, src, per_source_metrics)] = ("o", src["name"])
-    for ch in TELEGRAM_CHANNELS: futs[ex.submit(scrape_telegram_channel, ch, per_source_metrics)] = ("t", ch)
+  verifier_items=[]
+  with ThreadPoolExecutor(max_workers=min(len(VERIFIERS), 4)) as ex:
+    futs={ex.submit(scrape_list, v, "verifier", metrics): v["name"] for v in VERIFIERS}
     for f in as_completed(futs):
-      tag, name = futs[f]
-      try:
-        its = f.result()
-        if tag=="p": primary_items.extend(its); agg_counts[name]=len(its)
-        elif tag=="b": backup_items.extend(its); agg_counts[name]=len(its)
-        elif tag=="o": official_items.extend(its); off_counts[name]=len(its)
-        else: tg_hints.extend(its); tg_counts[name]=len(its)
+      try: verifier_items.extend(f.result())
       except Exception as e:
-        print(f"[ERROR] {tag}:{name} failed: {e}")
-        if tag in ("p","b"): agg_counts[name]=0
-        elif tag=="o": off_counts[name]=0
-        else: tg_counts[name]=0
+        nm=futs[f]; metrics[nm]["fail"]=metrics[nm].get("fail",0)+1; metrics[nm].setdefault("error_samples",[]).append(str(e)[:160])
 
-  agg_seen = load_agg_seen()
-  def note_agg(it):
-    if it.get("sourceType") == "aggregator":
-      rec = agg_seen.setdefault(it["key"], {"seen": []})
-      seen_sources = [s for s,_ in rec["seen"]]
-      if it["source"] not in seen_sources:
-        rec["seen"].append((it["source"], UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")))
-  for it in primary_items + backup_items:
-    note_agg(it)
-  save_agg_seen(agg_seen)
+  published = publish_from_publisher(publisher_items, verifier_items)
 
-  published, pending = merge_and_verify(primary_items, backup_items, official_items)
+  reports = read_jsonl(REPORTS_PATH)
+  submissions = read_jsonl(SUBMISSIONS_PATH)
+  user_state = read_user_state()
+
+  reasons_count = apply_reports_and_learning(published, reports)
+  self_learn_adjustments(reasons_count, metrics)
+  attach_user_state(published, user_state)
+  active, archived_new = archive_past_deadline(published)
 
   data = load_data()
-  data["jobListings"] = published
+  prev_ids = {it["id"] for it in data["jobListings"]}
+  active_ids = {it["id"] for it in active}
+  moved_to_archive = [it for it in data["jobListings"] if it["id"] not in active_ids and it["id"] in prev_ids]
+  data["archivedListings"].extend(archived_new + moved_to_archive)
+  data["jobListings"] = active
 
   duration = time.time() - run_started
+  ti = data.setdefault("transparencyInfo",{})
+  ti["lastUpdated"] = UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
+  ti["totalActive"] = len(active)
+  ti["totalArchived"] = len(data["archivedListings"])
+  ti["publisherCounts"] = {PUBLISHER["name"]: len(publisher_items)}
+  ti["verifierCounts"] = {v["name"]: sum(1 for x in verifier_items if x["organization"]==v["name"]) for v in VERIFIERS}
+  ti["reportReasons"] = reasons_count
+  ti["notes"] = "v10.2: FJA publisher-first; verifiers Adda247,SarkariExam,SarkariResult; strict SSL; evidenceHTML; deadlineMismatch; 4-day corroboration; daysLeft; userState."
+  ti["runDurationSec"] = round(duration,2)
+  ti["submissionsQueued"] = len(submissions)
 
-  data_ti = data.setdefault("transparencyInfo", {})
-  data_ti["lastUpdated"] = UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
-  data_ti["totalListings"] = len(published)
-  data_ti["aggCounts"] = {**{s["name"]: 0 for s in PRIMARY_AGG + BACKUP_AGG}, **agg_counts}
-  data_ti["officialCounts"] = off_counts
-  data_ti["telegramCounts"] = tg_counts
-  data_ti["pendingFromAggregators"] = sorted(list(pending))
-  data_ti["notes"] = "v9: Primary Adda247 + FreeJobAlert; SSL-verified fetch; anti-bot aware; PDF first 3 pages; metrics."
-  data_ti["runDurationSec"] = round(duration, 2)
-
-  for name in per_source_metrics:
-    per_source_metrics[name]["cb_state"] = get_cb_state(name)
-  data_ti["perSourceMetrics"] = per_source_metrics
-
-  save_data(data)
-  save_http_cache()
-  print(f"[INFO] published={len(published)} pending={len(pending)} duration={round(duration,2)}s")
+  save_data(data); save_http_cache()
+  print(f"[INFO] active={len(active)} archived+={len(archived_new)} duration={round(duration,2)}s")
 
 if __name__ == "__main__":
   main()
