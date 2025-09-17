@@ -1,8 +1,8 @@
 {
   "ok": true,
   "reason": null,
-  "checkedAt": "2025-09-16T20:19:07.841530Z",
-  "lastUpdated": "2025-09-16T19:32:10Z",
+  "checkedAt": "2025-09-17T18:53:32.288530Z",
+  "lastUpdated": "2025-09-17T18:50:05Z",
   "totalListings": 0,
   "sourceCounts": {
     "official": {
@@ -29,7 +29,7 @@
     "RojgarResult": 0,
     "SarkariExam": 0
   },
-  "notes": "Hardened: backoff+jitter, per-host rate limit, circuit breakers, caching, metrics, inline+final validation.",
+  "notes": "v10.2: FJA publisher-first; verifiers Adda247,SarkariExam,SarkariResult; strict SSL; evidenceHTML; deadlineMismatch; 4-day corroboration; daysLeft; userState.",
   "telegramCounts": {
     "ezgovtjob": 0
   },
@@ -41,7 +41,7 @@
   },
   "runStartedAt": "2025-09-16T19:32:10Z",
   "runEndedAt": "2025-09-16T20:19:07Z",
-  "runDurationSec": 2817.06,
+  "runDurationSec": 206.58,
   "perSourceMetrics": {
     "Adda247": {
       "ok": 0,
@@ -156,5 +156,17 @@
       ]
     }
   },
-  "successRatePct": 50.0
+  "successRatePct": 50.0,
+  "totalActive": 0,
+  "totalArchived": 0,
+  "publisherCounts": {
+    "FreeJobAlert": 0
+  },
+  "verifierCounts": {
+    "Adda247": 0,
+    "SarkariExam": 0,
+    "SarkariResult": 0
+  },
+  "reportReasons": {},
+  "submissionsQueued": 0
 }
