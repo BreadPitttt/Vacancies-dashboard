@@ -21,7 +21,7 @@ exports.handler = async (event) => {
     const record = normalizeRecord(type, payload);
 
     // Configure your repo
-    const owner = "<BreadPitttt>"; // keep as in your working setup
+    const owner = "BreadPitttt"; // keep as in your working setup
     const repo = "Vacancies-dashboard";
     const gh = "https://api.github.com";
     const headers = {
