@@ -78,7 +78,6 @@ CB_FAILURE_THRESHOLD  = env_int("CB_FAILURE_THRESHOLD", 5)
 CB_OPEN_SECONDS       = env_int("CB_OPEN_SECONDS", 720)
 CB_HALF_OPEN_PROBE    = env_int("CB_HALF_OPEN_PROBE", 1)
 
-# Larger UA pool (Chrome/Edge/Firefox/Safari variants)
 UA_POOL = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
@@ -88,7 +87,6 @@ UA_POOL = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 ]
 
-# Suppress InsecureRequestWarning in production (no verify=False is used)
 if InsecureRequestWarning:
     warnings.simplefilter("ignore", InsecureRequestWarning)
 
@@ -243,7 +241,6 @@ def fetch(url, timeout, use_cache=False, referer=None):
       nr=_R(); nr.status_code=304; nr.headers=r.headers; nr.content=b""; nr.url=url
       return nr
     if r.status_code == 403:
-      # Limit retries on strict domains (single alternate UA)
       time.sleep(1.2)
       alt_headers = get_dynamic_headers(referer=referer)
       r_alt = thread_session().get(url, timeout=to, headers=alt_headers)
@@ -257,7 +254,6 @@ def fetch(url, timeout, use_cache=False, referer=None):
     return r
   except requests.exceptions.SSLError:
     try:
-      # Verified retry with fresh session (no verify=False)
       alt = session_with_retries()
       r2 = alt.get(url, timeout=_timeouts_for(url), headers=headers)
       r2.raise_for_status()
@@ -267,7 +263,6 @@ def fetch(url, timeout, use_cache=False, referer=None):
       raise
   except requests.exceptions.RequestException as e:
     code = getattr(e.response, "status_code", 0) if hasattr(e, "response") else 0
-    # Exponential backoff is via urllib3.Retry; try CF once for 403/503 (verified)
     if code in [403, 503] and CF:
       try:
         sess = cloudscraper.create_scraper()
@@ -346,7 +341,6 @@ def norm_key(title):
   tokens = [w for w in t.split() if len(w) > 2]
   return " ".join(tokens[:14])
 
-# Deadline parsing
 DATE_WORDS = {"jan":"january","feb":"february","mar":"march","apr":"april","jun":"june","jul":"july","aug":"august","sep":"september","oct":"october","nov":"november","dec":"december"}
 def _month_word_fix(s):
   t=s.lower()
@@ -399,7 +393,7 @@ def infer_qualification(text):
   t=(text or "").lower()
   if any(re.search(p, t) for p in [r"\b10\s*th\b", r"\bmatric\b"]): return "10th Pass"
   if any(re.search(p, t) for p in [r"\b12\s*th\b", r"\binter\b"]): return "12th Pass"
-  if any(re.search(p, t) for p in [r"\bany\s+graduate\b", r"\bgraduate\b"]): return "Graduate"
+  if any(research := re.search(r"\bany\s+graduate\b|\bgraduate\b", t)): return "Graduate"
   return "Graduate"
 
 def is_valid_url(u):
@@ -689,7 +683,6 @@ def main():
         elif tag=="o": off_counts[name]=0
         else: tg_counts[name]=0
 
-  # Update corroboration cache
   agg_seen = load_agg_seen()
   def note_agg(it):
     if it.get("sourceType") == "aggregator":
@@ -706,9 +699,8 @@ def main():
   data = load_data()
   data["jobListings"] = published
 
-   duration = time.time() - run_started
+  duration = time.time() - run_started
 
-  # Build transparency info
   data_ti = data.setdefault("transparencyInfo", {})
   data_ti["lastUpdated"] = UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
   data_ti["totalListings"] = len(published)
@@ -719,15 +711,12 @@ def main():
   data_ti["notes"] = "v8: Tiered aggregators; SSL-verified fetch; softer 403; stronger decoding; PDF first 3 pages; metrics & CB states."
   data_ti["runDurationSec"] = round(duration, 2)
 
-  # Finalize CB states and simple HTTP status histograms if any recorded
   for name in per_source_metrics:
     per_source_metrics[name]["cb_state"] = get_cb_state(name)
   data_ti["perSourceMetrics"] = per_source_metrics
 
-  # Persist artifacts
   save_data(data)
   save_http_cache()
-
   print(f"[INFO] published={len(published)} pending={len(pending)} duration={round(duration,2)}s")
 
 if __name__ == "__main__":
