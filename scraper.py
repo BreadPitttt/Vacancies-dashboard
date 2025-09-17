@@ -1,8 +1,9 @@
-# scraper.py — v8 (Production-hardening + Tiered aggregators + Observability)
-# - Adds: looks_official, strict SSL verification, suppressed InsecureRequestWarning (trusted),
-#   larger UA pool, dynamic headers with Referer, refined retry/backoff (soft 403 handling),
-#   per-domain timeout overrides, stronger decoding, PDF first 3 pages, detailed metrics/logs,
-#   syntax fixes, rolling corroboration, and multi-tier verification (Telegram = hints).
+# scraper.py — v9 (Primary: Adda247 + FreeJobAlert; backup: SarkariExam; SSL-safe; anti-bot aware; full file)
+# - Strict SSL with certifi; suppresses InsecureRequestWarning (no verify=False used)
+# - Larger UA pool; dynamic headers with Referer
+# - Refined 403/429 handling with per-host RPM and cooldowns; Google “sorry” redirect detection
+# - Per-domain timeout overrides (SSC/DSSSB/BPSC/RRB); robust decoding; PDF first 3 pages
+# - Rolling corroboration across runs; multi-source verification; detailed metrics; syntax fixes
 
 import os, re, json, time, random, hashlib, threading, warnings, xml.etree.ElementTree as ET, io
 from datetime import datetime, timezone, timedelta
@@ -46,12 +47,10 @@ AGG_WINDOW_DAYS = env_int("MULTI_AGG_DAYS", 7)
 
 UTC_NOW = datetime.now(timezone.utc)
 
-# Global timeouts
 CONNECT_TO = env_int("CONNECT_TIMEOUT", 22 if not IS_HARD_RECHECK else 28)
 READ_TO    = env_int("READ_TIMEOUT",    65 if not IS_HARD_RECHECK else 80)
 LIST_TO, DETAIL_TO = (CONNECT_TO, READ_TO), (CONNECT_TO, READ_TO)
 
-# Per-domain timeout overrides (host -> (connect, read))
 DOMAIN_TIMEOUTS = {
     "ssc.gov.in":          (CONNECT_TO, READ_TO + 30),
     "www.rrbcdg.gov.in":   (CONNECT_TO, READ_TO + 20),
@@ -92,13 +91,10 @@ if InsecureRequestWarning:
 
 # ---------------- Tiered Aggregators ----------------
 PRIMARY_AGG = [
+  {"name":"Adda247", "base":"https://www.adda247.com", "url":"https://www.adda247.com/jobs/"},
   {"name":"FreeJobAlert", "base":"https://www.freejobalert.com", "url":"https://www.freejobalert.com/latest-notifications/"},
-  {"name":"Adda247", "base":"https://www.adda247.com", "url":"https://www.adda247.com/jobs/government-jobs/"},
 ]
 BACKUP_AGG = [
-  {"name":"SarkariNaukriBlog", "base":"https://www.sarkarinaukriblog.com", "url":"https://www.sarkarinaukriblog.com/"},
-  {"name":"SarkariResult", "base":"https://sarkariresult.com.cm", "url":"https://sarkariresult.com.cm/"},
-  {"name":"JagranJosh", "base":"https://www.jagranjosh.com", "url":"https://www.jagranjosh.com/notifications"},
   {"name":"SarkariExam", "base":"https://www.sarkariexam.com", "url":"https://www.sarkariexam.com"},
 ]
 
@@ -144,21 +140,6 @@ def thread_session():
   if not hasattr(_thread_local, "s"): _thread_local.s = session_with_retries()
   return _thread_local.s
 
-_host_tokens = {}; _host_lock = threading.Lock()
-def _rate_limit_for(host):
-  capacity = PER_HOST_RPM; refill = PER_HOST_RPM / 60.0
-  with _host_lock:
-    b = _host_tokens.get(host, {"t": capacity, "ts": time.monotonic()})
-    now = time.monotonic(); elapsed = now - b["ts"]
-    b["t"] = min(capacity, b["t"] + elapsed * refill)
-    if b["t"] < 1.0:
-      wait = (1.0 - b["t"]) / refill
-      _host_tokens[host] = {"t": b["t"], "ts": now}; return max(0.0, wait)
-    b["t"] -= 1.0; b["ts"] = now; _host_tokens[host] = b
-  return 0.0
-
-def _sleep_with_jitter(): time.sleep(BASELINE_SLEEP + random.uniform(JITTER_MIN, JITTER_MAX))
-
 _cb = {}
 def get_cb_state(name): return _cb.get(name, {"state":"closed"})["state"]
 def cb_before(name):
@@ -179,7 +160,39 @@ def cb_fail(name):
   elif st["fail"] >= CB_FAILURE_THRESHOLD: st["state"]="open"; st["opened"]=time.time()
   _cb[name]=st
 
-try: _cache=json.loads(CACHE_PATH.read_text(encoding="utf-8"))
+# token bucket + cooldowns
+_host_tokens = {}; _host_lock = threading.Lock()
+_host_cooldown = {}  # host -> resume_time
+HOST_RPM = {
+  "www.adda247.com": 10, "adda247.com": 10,
+  "www.freejobalert.com": 18, "freejobalert.com": 18,
+  "www.sarkariexam.com": 10, "sarkariexam.com": 10,
+}
+def _cooldown_host(host, seconds):
+  with _host_lock:
+    _host_cooldown[host] = time.monotonic() + max(0.0, seconds)
+
+def _rate_limit_for(host):
+  capacity = HOST_RPM.get(host, PER_HOST_RPM)
+  refill = capacity / 60.0
+  with _host_lock:
+    now = time.monotonic()
+    cd = _host_cooldown.get(host, 0.0)
+    if now < cd:
+      return cd - now
+    b = _host_tokens.get(host, {"t": capacity, "ts": now})
+    elapsed = now - b["ts"]
+    b["t"] = min(capacity, b["t"] + elapsed * refill)
+    if b["t"] < 1.0:
+      wait = (1.0 - b["t"]) / refill
+      _host_tokens[host] = {"t": b["t"], "ts": now}
+      return max(0.0, wait)
+    b["t"] -= 1.0; b["ts"] = now; _host_tokens[host] = b
+  return 0.0
+
+def _sleep_with_jitter(): time.sleep(BASELINE_SLEEP + random.uniform(JITTER_MIN, JITTER_MAX))
+
+try: _cache=json.loads(Path(CACHE_PATH).read_text(encoding="utf-8"))
 except Exception: _cache={}
 def _cache_headers_for(url):
   meta=_cache.get(url,{}); h={}
@@ -193,81 +206,102 @@ def _update_cache_from_response(url, resp):
     if et: _cache[url]["etag"]=et
     if lm: _cache[url]["last_modified"]=lm
 def save_http_cache():
-  try: CACHE_PATH.write_text(json.dumps(_cache, indent=2, ensure_ascii=False), encoding="utf-8")
+  try: Path(CACHE_PATH).write_text(json.dumps(_cache, indent=2, ensure_ascii=False), encoding="utf-8")
   except Exception: pass
 
 def _host(url): return urlparse(url or "").netloc.lower()
-
 def looks_official(url):
-  try:
-    return urlparse(url or "").netloc.lower() in OFFICIAL_DOMAINS
-  except Exception:
-    return False
+  try: return urlparse(url or "").netloc.lower() in {
+    "dsssb.delhi.gov.in","dsssbonline.nic.in","rrbcdg.gov.in","bpsc.bihar.gov.in","ssc.gov.in","ssc.nic.in"
+  }
+  except Exception: return False
 
 def get_dynamic_headers(referer=None):
-    langs = [
-      "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-      "en-GB,en;q=0.9",
-      "en-US,en;q=0.9",
-    ]
-    h = {
-        "User-Agent": random.choice(UA_POOL),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Accept-Language": random.choice(langs),
-        "Upgrade-Insecure-Requests": "1",
-        "Connection": "keep-alive",
-    }
-    if referer:
-        h["Referer"] = referer
-    return h
+  langs = [
+    "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+    "en-GB,en;q=0.9",
+    "en-US,en;q=0.9",
+  ]
+  h = {
+    "User-Agent": random.choice(UA_POOL),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Accept-Language": random.choice(langs),
+    "Upgrade-Insecure-Requests": "1",
+    "Connection": "keep-alive",
+  }
+  if referer: h["Referer"] = referer
+  return h
 
 def _timeouts_for(url):
-  h = _host(url)
-  return DOMAIN_TIMEOUTS.get(h, DETAIL_TO)
+  return DOMAIN_TIMEOUTS.get(_host(url), DETAIL_TO)
 
 def fetch(url, timeout, use_cache=False, referer=None):
   host = _host(url)
-  w = _rate_limit_for(host)
-  if w>0: time.sleep(w)
+  wait = _rate_limit_for(host)
+  if wait>0: time.sleep(wait)
   _sleep_with_jitter()
   headers = get_dynamic_headers(referer=referer)
   if use_cache: headers.update(_cache_headers_for(url))
   try:
     to = _timeouts_for(url) if timeout == DETAIL_TO else timeout
-    r = thread_session().get(url, timeout=to, headers=headers)
+    r = thread_session().get(url, timeout=to, headers=headers, allow_redirects=True)
+    # Detect Google bot-check redirect
+    if "sorry/index" in (getattr(r, "url", "") or "") and "google.com" in (r.url or ""):
+      _cooldown_host(host, 30)
+      raise requests.exceptions.RetryError("Hit Google bot-check redirect")
+
     if r.status_code == 304:
       class _R: pass
       nr=_R(); nr.status_code=304; nr.headers=r.headers; nr.content=b""; nr.url=url
       return nr
-    if r.status_code == 403:
-      time.sleep(1.2)
+
+    if r.status_code == 429:
+      _cooldown_host(host, 45)
+      time.sleep(2.0)
       alt_headers = get_dynamic_headers(referer=referer)
-      r_alt = thread_session().get(url, timeout=to, headers=alt_headers)
+      r_alt = thread_session().get(url, timeout=to, headers=alt_headers, allow_redirects=True)
       if r_alt.status_code == 200:
         if use_cache: _update_cache_from_response(url, r_alt)
         return r_alt
-      print(f"[BLOCK] 403 from {url}. Giving up after one alternate UA.")
+      _cooldown_host(host, 90)
       r_alt.raise_for_status()
+
+    if r.status_code == 403:
+      attempts = 2 if host in ("www.adda247.com","adda247.com","www.sarkariexam.com","sarkariexam.com") else 1
+      last = r
+      for _ in range(attempts):
+        time.sleep(2.5)
+        alt_headers = get_dynamic_headers(referer=referer)
+        last = thread_session().get(url, timeout=to, headers=alt_headers, allow_redirects=True)
+        if last.status_code == 200:
+          if use_cache: _update_cache_from_response(url, last)
+          return last
+      print(f"[BLOCK] 403 from {url}. Attempts={attempts+1}.")
+      last.raise_for_status()
+
     r.raise_for_status()
     if use_cache: _update_cache_from_response(url, r)
     return r
   except requests.exceptions.SSLError:
-    try:
+    # Two verified retries; some gov chains are flaky
+    for _ in range(2):
       alt = session_with_retries()
-      r2 = alt.get(url, timeout=_timeouts_for(url), headers=headers)
-      r2.raise_for_status()
-      if use_cache: _update_cache_from_response(url, r2)
-      return r2
-    except Exception:
-      raise
+      r2 = alt.get(url, timeout=_timeouts_for(url), headers=headers, allow_redirects=True)
+      try:
+        r2.raise_for_status()
+        if use_cache: _update_cache_from_response(url, r2)
+        return r2
+      except Exception:
+        continue
+    raise
   except requests.exceptions.RequestException as e:
     code = getattr(e.response, "status_code", 0) if hasattr(e, "response") else 0
     if code in [403, 503] and CF:
       try:
         sess = cloudscraper.create_scraper()
         sess.verify = certifi.where()
-        r2 = sess.get(url, timeout=sum(_timeouts_for(url)), headers=headers)
+        r2 = sess.get(url, timeout=sum(_timeouts_for(url)), headers=headers, allow_redirects=True)
         if getattr(r2, "status_code", 0) == 200:
           if use_cache: _update_cache_from_response(url, r2)
           return r2
@@ -307,7 +341,6 @@ def soup_from_resp(resp):
 RECRUITMENT_TERMS = [r"\brecruitment\b", r"\bvacanc(?:y|ies)\b", r"\badvertisement\b", r"\bnotification\b", r"\bonline\s*form\b", r"\bapply\s*online\b"]
 EXCLUDE_NOISE = [r"\badmit\s*card\b", r"\banswer\s*key\b", r"\bresult\b", r"\bsyllabus\b"]
 UPDATE_TERMS = [r"\bcorrigendum\b", r"\baddendum\b", r"\bamendment\b", r"\brevised\b", r"\bdate\s*(?:extended|extension)\b"]
-
 def contains_any(patterns, text): return any(re.search(p, (text or "").lower()) for p in patterns)
 def is_update(text): return contains_any(UPDATE_TERMS, text)
 def is_joblike(text): return contains_any(RECRUITMENT_TERMS, text) and not contains_any(EXCLUDE_NOISE, text)
@@ -370,9 +403,8 @@ def probe_deadline_from_link(primary_url):
         return e
     elif pdfplumber and ("pdf" in ct or "pdf" in primary_url.lower()):
       with pdfplumber.open(io.BytesIO(r.content)) as pdf:
-        for i in range(min(3, len(pdf.pages))):  # first 3 pages
-          page = pdf.pages[i]
-          text = page.extract_text() or ""
+        for i in range(min(3, len(pdf.pages))):
+          text = (pdf.pages[i].extract_text() or "")
           _, e = parse_application_window(text)
           if e: return e
   except Exception as e:
@@ -393,7 +425,7 @@ def infer_qualification(text):
   t=(text or "").lower()
   if any(re.search(p, t) for p in [r"\b10\s*th\b", r"\bmatric\b"]): return "10th Pass"
   if any(re.search(p, t) for p in [r"\b12\s*th\b", r"\binter\b"]): return "12th Pass"
-  if any(research := re.search(r"\bany\s+graduate\b|\bgraduate\b", t)): return "Graduate"
+  if any(re.search(p, t) for p in [r"\bany\s+graduate\b", r"\bgraduate\b"]): return "Graduate"
   return "Graduate"
 
 def is_valid_url(u):
@@ -421,7 +453,7 @@ def soup_text(url, referer=None):
 # ---------------- Rolling corroboration cache ----------------
 def load_agg_seen():
   try:
-    data = json.loads(AGG_CACHE_PATH.read_text(encoding="utf-8"))
+    data = json.loads(Path(AGG_CACHE_PATH).read_text(encoding="utf-8"))
     if AGG_WINDOW_DAYS <= 0: return {}
     cutoff = datetime.utcnow() - timedelta(days=AGG_WINDOW_DAYS)
     pruned = {}
@@ -436,7 +468,7 @@ def load_agg_seen():
     return pruned
   except: return {}
 def save_agg_seen(cache):
-  try: AGG_CACHE_PATH.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+  try: Path(AGG_CACHE_PATH).write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
   except: pass
 
 # ---------------- Scraping ----------------
@@ -644,12 +676,12 @@ def merge_and_verify(primary_items, backup_items, official_items):
 # ---------------- IO ----------------
 def load_data():
   base={"jobListings": [], "transparencyInfo": {}}
-  if DATA_PATH.exists():
-    try: base=json.loads(DATA_PATH.read_text(encoding="utf-8"))
+  if Path(DATA_PATH).exists():
+    try: base=json.loads(Path(DATA_PATH).read_text(encoding="utf-8"))
     except Exception: pass
   base.setdefault("jobListings",[]); base.setdefault("transparencyInfo",{})
   return base
-def save_data(data): DATA_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+def save_data(data): Path(DATA_PATH).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 # ---------------- Main ----------------
 def main():
@@ -659,6 +691,10 @@ def main():
     per_source_metrics[s["name"]]={"ok":0,"fail":0,"skipped_due_cb":0,"not_modified":0,"raw":0,"hinted":0,"kept":0,"error_samples":[],"durations":[],"cb_state":"closed"}
   for ch in TELEGRAM_CHANNELS:
     per_source_metrics[f"TG:{ch}"]={"ok":0,"fail":0,"skipped_due_cb":0,"not_modified":0,"raw":0,"hinted":0,"kept":0,"error_samples":[],"durations":[],"cb_state":"closed"}
+
+  # Gentle initial backoff for strict hosts
+  _cooldown_host("www.adda247.com", 5.0)
+  _cooldown_host("www.sarkariexam.com", 5.0)
 
   primary_items=[]; backup_items=[]; official_items=[]; tg_hints=[]
   agg_counts={}; off_counts={}; tg_counts={}
@@ -708,7 +744,7 @@ def main():
   data_ti["officialCounts"] = off_counts
   data_ti["telegramCounts"] = tg_counts
   data_ti["pendingFromAggregators"] = sorted(list(pending))
-  data_ti["notes"] = "v8: Tiered aggregators; SSL-verified fetch; softer 403; stronger decoding; PDF first 3 pages; metrics & CB states."
+  data_ti["notes"] = "v9: Primary Adda247 + FreeJobAlert; SSL-verified fetch; anti-bot aware; PDF first 3 pages; metrics."
   data_ti["runDurationSec"] = round(duration, 2)
 
   for name in per_source_metrics:
