@@ -4,226 +4,319 @@ import json
 import logging
 from datetime import datetime
 import re
+import time
+from urllib.parse import urljoin, urlparse
 
-# --- Configuration ---
-# Configure logging to see the scraper's activity
+# ---------------- Configuration ----------------
+
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 
-# List of sources, with primary first and backups after.
-# The scraper will try them in this order.
+REQUEST_TIMEOUT = 20
+REQUEST_SLEEP_SECONDS = 1.2
+FIRST_SUCCESS_MODE = True  # stop at first source that returns jobs
+
 SOURCES = [
-    {
-        "name": "freejobalert",
-        "url": "https://www.freejobalert.com",
-        "parser": "parse_freejobalert"
-    },
-    {
-        "name": "sarkarijobfind",
-        "url": "https://sarkarijobfind.com",
-        "parser": "parse_sarkarijobfind"
-    },
-    {
-        "name": "resultbharat",
-        "url": "https://www.resultbharat.com",
-        "parser": "parse_resultbharat"
-    },
-    {
-        "name": "add247",
-        "url": "https://www.adda247.com/jobs/", # Corrected URL
-        "parser": "parse_add247"
-    }
+    {"name": "freejobalert",   "url": "https://www.freejobalert.com/", "parser": "parse_freejobalert"},
+    {"name": "sarkarijobfind", "url": "https://sarkarijobfind.com/",   "parser": "parse_sarkarijobfind"},
+    {"name": "resultbharat",   "url": "https://www.resultbharat.com/", "parser": "parse_resultbharat"},
+    {"name": "adda247",        "url": "https://www.adda247.com/jobs/", "parser": "parse_adda247"},
 ]
 
-# HTTP headers to mimic a real browser
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
 }
 
-# --- Parser Functions ---
+# ------------- Helpers: policy and schema fields -------------
 
-def parse_freejobalert(content):
-    """
-    Parses the HTML content from freejobalert.com.
-    (This is a placeholder based on a typical structure; selectors may need adjustment).
-    """
+def now_iso():
+    return datetime.now().isoformat()
+
+def clean_text(x):
+    return re.sub(r'\s+', ' ', x or '').strip()
+
+def normalize_url(base, href):
+    if not href:
+        return None
+    return urljoin(base, href)
+
+def slugify(text):
+    t = (text or "").lower()
+    t = re.sub(r'[^a-z0-9]+', '-', t).strip('-')
+    return t[:80] or 'job'
+
+def derive_slug(title, link):
+    s = slugify(title)
+    if s == 'job' and link:
+        path = urlparse(link).path
+        s = slugify(path.split('/')[-1])
+    return s or 'job'
+
+def make_id(prefix, link):
+    if not link:
+        return f"{prefix}_no_link"
+    parsed = urlparse(link)
+    key = parsed.path + ("?" + parsed.query if parsed.query else "")
+    return f"{prefix}_{key.strip('/') or 'root'}"
+
+# -------- General-vacancy policy (strict) --------
+# Allowed education bands only: 10th pass, 12th pass, Any graduate
+# No technical/management/postgraduate. Allowed skills only: Typing, Computer operations, Physical.
+# Teacher roles and variants must be excluded entirely.
+
+TEACHER_TERMS = {
+    "teacher","tgt","pgt","prt","school teacher","faculty","lecturer",
+    "assistant professor","professor","b.ed","bed ","d.el.ed","deled","ctet","tet "
+}
+
+def education_band_from_text(text):
+    t = (text or "").lower()
+    if any(k in t for k in ["10th", "matric", "ssc "]): return "10th pass"
+    if any(k in t for k in ["12th", "intermediate", "hsc"]): return "12th pass"
+    if "graduate" in t or "bachelor" in t: return "Any graduate"
+    return "N/A"
+
+def violates_general_policy(text):
+    t = (text or "").lower()
+
+    # Hard exclusion for teacher roles and related qualifications/tests
+    if any(k in t for k in TEACHER_TERMS):
+        return True
+
+    # Explicit higher/technical/management keywords
+    disallow = [
+        "b.tech", "btech", "b.e", "be ", "m.tech", "mtech", "m.e", "mca", "bca",
+        "mba", "cma", "cfa", "ca ", "pg ", "post graduate", "postgraduate",
+        "phd", "m.sc", "msc", "m.a", "ma ", "m.com", "mcom", "mphil",
+        "engineer", "developer", "scientist", "research associate", "architect",
+        "data scientist", "ml engineer", "cloud engineer", "sde", "devops"
+    ]
+    return any(k in t for k in disallow)
+
+def allowed_basic_skill(text):
+    t = (text or "").lower()
+    return any(k in t for k in ["typing", "computer", "physical", "field duty"])
+
+def derive_post(text):
+    t = (text or "").lower()
+    # Intentionally exclude teacher variants from post detection
+    for key in [
+        "constable", "clerk", "apprentice", "technician", "je", "ae",
+        "officer", "assistant", "mts", "multi tasking",
+        "data entry", "operator", "guard", "peon", "si", "jlo", "nursing officer"
+    ]:
+        if key in t:
+            return key.title()
+    return "N/A"
+
+def derive_org(text):
+    t = (text or "").upper()
+    for key in ["SSC","UPSC","RRB","RPF","IBPS","SBI","PNB","RPSC","UPPSC","BPSC","HPSC",
+                "DSSSB","NVS","AAI","IOCL","NTPC","DRDO","ISRO","NHAI","NHPC","PGCIL","NCL"]:
+        if key in t:
+            return key
+    return "N/A"
+
+def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
+    title = clean_text(title)
+    href_abs = normalize_url(base_url, href)
+
+    # Apply strict general-vacancy filter and teacher exclusion
+    if violates_general_policy(title):
+        return None
+
+    education = education_band_from_text(title)
+
+    job = {
+        "id": make_id(prefix, href_abs),
+        "title": title or "N/A",
+        "organization": derive_org(title),
+        "deadline": deadline or "N/A",
+        "applyLink": href_abs or base_url,
+
+        # Required by schema
+        "slug": derive_slug(title, href_abs),
+        "qualificationLevel": education if education in ["10th pass", "12th pass", "Any graduate"] else "N/A",
+        "domicile": "All India",
+        "source": source_name,
+        "type": "General",
+        "extractedAt": now_iso(),
+
+        # Optional meta
+        "meta": {
+            "post": derive_post(title),
+            "allowedSkills": [k for k in ["Typing","Computer operations","Physical"] if allowed_basic_skill(title)],
+            "sourceUrl": base_url
+        }
+    }
+    return job
+
+# ---------------- Parsers ----------------
+
+def parse_freejobalert(content, source_name, base_url):
     soup = BeautifulSoup(content, 'html.parser')
     jobs = []
-    job_table = soup.find('table') 
-    if not job_table:
-        return []
-        
-    for row in job_table.find_all('tr'):
-        cells = row.find_all('td')
-        if len(cells) > 2:
-            try:
-                job_title = cells[0].text.strip()
-                apply_link = cells[0].find('a')['href']
-                deadline = cells[2].text.strip()
-                
-                if not job_title or not apply_link: continue
-
-                jobs.append({
-                    "id": f"fja_{apply_link}",
-                    "title": job_title,
-                    "organization": "N/A",
-                    "deadline": deadline,
-                    "applyLink": requests.compat.urljoin("https://www.freejobalert.com", apply_link)
-                })
-            except (AttributeError, KeyError, IndexError):
+    # Generic anchors inside tables
+    for tbl in soup.select('table'):
+        for a in tbl.select('a[href]'):
+            title = clean_text(a.get_text())
+            href = a.get('href')
+            if not title or not href:
                 continue
-    return jobs
-
-def parse_sarkarijobfind(content):
-    """
-    Parses the HTML content from sarkarijobfind.com.
-    """
-    soup = BeautifulSoup(content, 'html.parser')
-    jobs = []
-    new_updates_heading = soup.find('h3', string=re.compile(r'New Update', re.IGNORECASE))
-    if new_updates_heading and new_updates_heading.find_next_sibling('ul'):
-        job_list = new_updates_heading.find_next_sibling('ul')
-        for item in job_list.find_all('li'):
-            try:
-                link = item.find('a')
-                if not link: continue
-                
-                job_title = link.text.strip()
-                apply_link = link['href']
-
-                jobs.append({
-                    "id": f"sjf_{apply_link}",
-                    "title": job_title, "organization": "N/A", "deadline": "N/A",
-                    "applyLink": apply_link
-                })
-            except (AttributeError, KeyError):
+            job = build_job('fja', source_name, base_url, title, href)
+            if job:
+                jobs.append(job)
+    # Fallback: anchors with common recruitment cues
+    if not jobs:
+        for a in soup.select('a[href]'):
+            title = clean_text(a.get_text())
+            href = a.get('href')
+            if not title or not href:
                 continue
+            if any(k in title.lower() for k in ["recruit", "vacancy", "notification"]):
+                job = build_job('fja', source_name, base_url, title, href)
+                if job:
+                    jobs.append(job)
     return jobs
 
-def parse_resultbharat(content):
-    """
-    Parses the HTML content from resultbharat.com.
-    """
+def parse_sarkarijobfind(content, source_name, base_url):
     soup = BeautifulSoup(content, 'html.parser')
     jobs = []
-    tables = soup.find_all('table')
-    for table in tables:
-        try:
-            headers = [th.text.strip() for th in table.find_all('th')]
-            if 'Latest Jobs' in headers:
-                job_col_index = headers.index('Latest Jobs')
-                for row in table.find_all('tr'):
-                    cells = row.find_all('td')
-                    if len(cells) > job_col_index:
-                        link = cells[job_col_index].find('a')
-                        if not link: continue
-                        
-                        job_title = link.text.strip()
-                        apply_link = link['href']
-
-                        jobs.append({
-                            "id": f"rb_{apply_link}",
-                            "title": job_title, "organization": "N/A", "deadline": "N/A",
-                            "applyLink": apply_link
-                        })
-        except (ValueError, IndexError, AttributeError):
-            continue
+    # Look for headings with 'New Update' and list under it
+    for h in soup.find_all(re.compile('^h[1-6]$')):
+        if re.search(r'new\\s*update', h.get_text(), re.I):
+            ul = h.find_next_sibling(['ul','ol'])
+            if not ul:
+                continue
+            for li in ul.select('li'):
+                a = li.find('a', href=True)
+                if not a:
+                    continue
+                title = clean_text(a.get_text())
+                href = a['href']
+                job = build_job('sjf', source_name, base_url, title, href)
+                if job:
+                    jobs.append(job)
+            break
     return jobs
 
-def parse_add247(content):
-    """
-    Parses the HTML content from adda247.com/jobs.
-    (This is a placeholder; selectors need to be verified against the actual site structure).
-    """
+def parse_resultbharat(content, source_name, base_url):
     soup = BeautifulSoup(content, 'html.parser')
     jobs = []
-    # This is an assumed selector. It might be 'article', 'div.job-post', etc.
-    job_listings = soup.find_all('div', class_='job-card') 
-    for item in job_listings:
-        try:
-            link_tag = item.find('a')
-            if not link_tag: continue
-
-            job_title = link_tag.text.strip()
-            apply_link = link_tag['href']
-
-            if not job_title or not apply_link: continue
-            
-            jobs.append({
-                "id": f"add247_{apply_link}",
-                "title": job_title, "organization": "N/A", "deadline": "N/A",
-                "applyLink": requests.compat.urljoin("https://www.adda247.com", apply_link)
-            })
-        except (AttributeError, KeyError):
+    for table in soup.select('table'):
+        headers = [clean_text(th.get_text()) for th in table.select('th')]
+        if not headers:
             continue
+        col_idx = -1
+        for i, h in enumerate(headers):
+            if re.search(r'latest\\s*jobs', h, re.I):
+                col_idx = i
+                break
+        if col_idx == -1:
+            continue
+        for tr in table.select('tr'):
+            tds = tr.select('td')
+            if col_idx < len(tds):
+                a = tds[col_idx].find('a', href=True)
+                if not a:
+                    continue
+                title = clean_text(a.get_text())
+                href = a['href']
+                job = build_job('rb', source_name, base_url, title, href)
+                if job:
+                    jobs.append(job)
     return jobs
 
-# --- Main Scraper Logic ---
+def parse_adda247(content, source_name, base_url):
+    soup = BeautifulSoup(content, 'html.parser')
+    jobs = []
+    # Try common card/article anchors
+    for a in soup.select('article a[href], div.post-card a[href], div.card a[href]'):
+        title = clean_text(a.get_text())
+        href = a.get('href')
+        if not title or not href:
+            continue
+        job = build_job('adda', source_name, base_url, title, href)
+        if job:
+            jobs.append(job)
+    return jobs
+
+# --------------- Fetch / Save / Main ----------------
 
 def fetch_and_parse(source):
-    """
-    Fetches content from a URL and passes it to the correct parser.
-    """
-    parser_func_name = source["parser"]
-    parser_func = globals().get(parser_func_name)
-
+    parser_func = globals().get(source["parser"])
     if not parser_func:
-        logging.error(f"Parser function '{parser_func_name}' not found for source '{source['name']}'.")
+        logging.error(f"Missing parser: {source['parser']}")
         return []
-
     try:
-        logging.info(f"Attempting to scrape {source['name']} at {source['url']}...")
-        response = requests.get(source["url"], headers=HEADERS, timeout=20)
-        response.raise_for_status()
-        
-        jobs = parser_func(response.content)
-        logging.info(f"Successfully scraped {len(jobs)} jobs from {source['name']}.")
+        logging.info(f"Fetching {source['name']} -> {source['url']}")
+        r = requests.get(source["url"], headers=HEADERS, timeout=REQUEST_TIMEOUT)
+        r.raise_for_status()
+        jobs = parser_func(r.content, source["name"], source["url"])
+        logging.info(f"{source['name']}: {len(jobs)} jobs parsed.")
         return jobs
-        
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Failed to fetch content from {source['name']}: {e}")
+    except requests.RequestException as e:
+        logging.error(f"{source['name']} request failed: {e}")
         return []
     except Exception as e:
-        logging.error(f"An error occurred while parsing {source['name']}: {e}")
+        logging.error(f"{source['name']} parsing error: {e}")
         return []
 
-def save_to_json(jobs, source_used):
-    """
-    Saves the final list of jobs and health data.
-    """
+def enforce_schema_defaults(jobs):
+    # Ensure required keys exist for every item
+    for j in jobs:
+        j.setdefault("slug", derive_slug(j.get("title"), j.get("applyLink")))
+        j.setdefault("qualificationLevel", "N/A")
+        j.setdefault("domicile", "All India")
+        j.setdefault("source", "N/A")
+        j.setdefault("type", "General")
+        j.setdefault("extractedAt", now_iso())
+    return jobs
+
+def save_outputs(jobs, sources_used):
+    jobs = enforce_schema_defaults(jobs)
     output_data = {
-        "lastUpdated": datetime.now().isoformat(),
+        "lastUpdated": now_iso(),
         "totalJobs": len(jobs),
-        "jobListings": jobs
+        "jobListings": jobs,
+        # Required by your schema
+        "transparencyInfo": {
+            "notes": "General vacancies only (10th/12th/Any graduate). Excludes teacher roles and technical/management/postgraduate requirements. Allowed skills: typing/computer operations/physical.",
+            "sourcesTried": sources_used if isinstance(sources_used, list) else [sources_used],
+            "schemaVersion": "1.0"
+        }
     }
-    with open('data.json', 'w', encoding='utf-8') as f:
+    with open("data.json", "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=4, ensure_ascii=False)
-    logging.info(f"Successfully saved {len(jobs)} jobs to data.json.")
+    logging.info(f"Saved {len(jobs)} jobs to data.json")
 
-    health_data = {
+    health = {
         "ok": bool(jobs),
-        "lastChecked": datetime.now().isoformat(),
+        "lastChecked": now_iso(),
         "totalActive": len(jobs),
-        "sourceUsed": source_used
+        "sourceUsed": sources_used if not isinstance(sources_used, list) else (sources_used[0] if sources_used else "None")
     }
-    with open('health.json', 'w') as f:
-        json.dump(health_data, f, indent=4)
-
+    with open("health.json", "w", encoding="utf-8") as f:
+        json.dump(health, f, indent=4)
 
 if __name__ == "__main__":
-    all_jobs = []
-    successful_source = "None"
-    
-    for source in SOURCES:
-        jobs_from_source = fetch_and_parse(source)
-        if jobs_from_source:
-            logging.info(f"Using data from '{source['name']}' as the source for this run.")
-            all_jobs = jobs_from_source
-            successful_source = source['name']
-            break
-        else:
-            logging.warning(f"'{source['name']}' failed or returned no data. Trying next source...")
-            
-    if not all_jobs:
-        logging.error("All scraping sources failed. No data was collected.")
-    
-    save_to_json(all_jobs, successful_source)
+    collected = []
+    used = []
+    if FIRST_SUCCESS_MODE:
+        for src in SOURCES:
+            jobs = fetch_and_parse(src)
+            if jobs:
+                collected = jobs
+                used = [src["name"]]
+                break
+            time.sleep(REQUEST_SLEEP_SECONDS)
+    else:
+        for src in SOURCES:
+            jobs = fetch_and_parse(src)
+            if jobs:
+                collected.extend(jobs)
+                used.append(src["name"])
+            time.sleep(REQUEST_SLEEP_SECONDS)
+
+    if not collected:
+        logging.error("No data collected from any source.")
+    save_outputs(collected, used or ["None"])
