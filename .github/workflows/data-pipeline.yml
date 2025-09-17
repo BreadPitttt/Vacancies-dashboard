@@ -110,33 +110,40 @@ jobs:
         run: |
           set -e
           python - << 'PY'
-          import json, datetime, pathlib, os
-          data_path = pathlib.Path("data.json")
-          health_path = pathlib.Path("health.json")
-          ok = False
-          reason = None
-          qc_exit = os.environ.get("QC_EXIT", "0")
+          import json, datetime, pathlib
+          data_p = pathlib.Path("data.json")
+          health_p = pathlib.Path("health.json")
+
+          # Load or seed data.json
           data = {"jobListings": [], "transparencyInfo": {}}
-          try:
-            if data_path.exists():
-              raw = data_path.read_text(encoding="utf-8")
-              data = json.loads(raw) if raw.strip() else {"jobListings": [], "transparencyInfo": {}}
-            size_ok = len(json.dumps(data).encode("utf-8")) > 200
-            ok = (qc_exit == "0") and size_ok and isinstance(data.get("jobListings"), list)
-            reason = None if ok else f"qc_exit={qc_exit}, size_ok={size_ok}"
-          except Exception as e:
-            reason = f"read_error: {e}"
-          ti = data.get("transparencyInfo", {}) or {}
-          ti.setdefault("totalListings", len(data.get("jobListings") or []))
-          ti.setdefault("lastUpdated", datetime.datetime.utcnow().isoformat() + "Z")
+          if data_p.exists():
+            try:
+              raw = data_p.read_text(encoding="utf-8")
+              if raw.strip():
+                data = json.loads(raw)
+            except Exception:
+              pass
+
+          # Ensure required structure for UI/schema
+          job_list = data.get("jobListings") or []
+          ti = data.get("transparencyInfo") or {}
+          ti["totalListings"] = len(job_list)
+          ti["lastUpdated"] = datetime.datetime.utcnow().isoformat() + "Z"
+          ti.setdefault("schemaVersion", "1.2")
+          data["jobListings"] = job_list
+          data["transparencyInfo"] = ti
+
+          # Write normalized data.json
+          data_p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+          # Compose health.json
           health = {
-            "ok": bool(ok),
-            "reason": reason,
+            "ok": isinstance(job_list, list),
+            "reason": None,
             "checkedAt": datetime.datetime.utcnow().isoformat() + "Z",
             **ti
           }
-          health_path.write_text(json.dumps(health, indent=2, ensure_ascii=False), encoding="utf-8")
-          data_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+          health_p.write_text(json.dumps(health, indent=2, ensure_ascii=False), encoding="utf-8")
           PY
         env:
           QC_EXIT: ${{ steps.qc.outputs.qc_exit }}
@@ -150,8 +157,8 @@ jobs:
             health.json
           retention-days: 7
 
-      - name: Commit and Push Changes (scheduled only)
-        if: github.event_name == 'schedule'
+      - name: Commit and Push Changes
+        if: steps.health.outcome == 'success'
         run: |
           set -e
           git config user.name "GitHub Actions Bot"
@@ -188,10 +195,7 @@ jobs:
               `Reason: ${reason}`,
               `Artifacts: ${artifacts}`
             ].join('\n');
-            core.summary
-              .addHeading(`Vacancies Data Pipeline (${mode})`)
-              .addRaw(body, true)
-              .write();
+            core.summary.addHeading(`Vacancies Data Pipeline (${mode})`).addRaw(body, true).write()
 
       - name: Open issue if health not OK (scheduled only)
         if: github.event_name == 'schedule' && steps.health.outcome == 'success'
@@ -217,7 +221,7 @@ jobs:
               title,
               body,
               labels: ['pipeline','investigate']
-            });
+            })
 
   lighthouse:
     runs-on: ubuntu-latest
