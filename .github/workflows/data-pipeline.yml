@@ -1,5 +1,4 @@
 name: Data Pipeline
-
 on:
   workflow_dispatch:
     inputs:
@@ -8,28 +7,23 @@ on:
         required: false
         default: ""
   schedule:
-    - cron: '17 18 * * *' # nightly, 18:17 UTC ≈ 11:47 PM IST
-    - cron: '28 20 * * 0' # weekly,  20:28 UTC Sunday ≈ Monday 02:58 AM IST
-
+    - cron: '17 18 * * *'
+    - cron: '28 20 * * 0'
 permissions:
   contents: write
   issues: write
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
   pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 240
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Decide mode (nightly or weekly)
         id: decide
         shell: bash
@@ -48,26 +42,26 @@ jobs:
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "timeout=$TIMEOUT" >> "$GITHUB_OUTPUT"
           echo "is_weekly=$IS_WEEKLY" >> "$GITHUB_OUTPUT"
-          echo "run_label=$([ "$IS_WEEKLY" = "true" ] && echo "Weekly hard recheck" || echo "Nightly recheck")" >> "$GITHUB_OUTPUT"
-
+          if $IS_WEEKLY; then
+            echo "run_label=Weekly hard recheck" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_label=Nightly recheck" >> "$GITHUB_OUTPUT"
+          fi
       - name: Set up Python and cache dependencies
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Run scraper
         id: scrape
         env:
           PYTHONUNBUFFERED: "1"
           IS_HARD_RECHECK: ${{ steps.decide.outputs.is_weekly }}
           TELEGRAM_RSS_BASE: ${{ secrets.TELEGRAM_RSS_BASE }}
-          # Optional tunables via repo Variables (safe defaults are in code)
           MAX_WORKERS: ${{ vars.MAX_WORKERS }}
           PER_SOURCE_MAX: ${{ vars.PER_SOURCE_MAX }}
           CONNECT_TIMEOUT: ${{ vars.CONNECT_TIMEOUT }}
@@ -77,31 +71,29 @@ jobs:
           RETRY_READ: ${{ vars.RETRY_READ }}
           BACKOFF_FACTOR: ${{ vars.BACKOFF_FACTOR }}
           MAX_BACKOFF_SECONDS: ${{ vars.MAX_BACKOFF_SECONDS }}
-          PER_HOST_RPM: ${{ vars.PER_HOST_RPM }}
+          PER_HOST_RPM: ${{ vars.PERM_HOST_RPM || vars.PER_HOST_RPM }}
           BASELINE_SLEEP_S: ${{ vars.BASELINE_SLEEP_S }}
           JITTER_MIN: ${{ vars.JITTER_MIN }}
           JITTER_MAX: ${{ vars.JITTER_MAX }}
           CB_FAILURE_THRESHOLD: ${{ vars.CB_FAILURE_THRESHOLD }}
           CB_OPEN_SECONDS: ${{ vars.CB_OPEN_SECONDS }}
           CB_HALF_OPEN_PROBE: ${{ vars.CB_HALF_OPEN_PROBE }}
+          MULTI_AGG_DAYS: ${{ vars.MULTI_AGG_DAYS }}
         run: |
           set -e
           echo "Running mode=${{ steps.decide.outputs.mode }} with per-step timeout=${{ steps.decide.outputs.timeout }}m"
           timeout "${{ steps.decide.outputs.timeout }}m" python scraper.py
-
       - name: Validate JSON Schema
         id: validate
         run: |
           set -e
           python validate.py
-
       - name: Quality checks (links, dates, dups)
         id: qc
         run: |
           set +e
           python qc_checks.py
           echo "qc_exit=$?" >> $GITHUB_OUTPUT
-
       - name: Generate and Format Data Files with Health
         id: health
         run: |
@@ -110,11 +102,9 @@ jobs:
           import json, datetime, pathlib, os
           data_path = pathlib.Path("data.json")
           health_path = pathlib.Path("health.json")
-
           ok = False
           reason = None
           qc_exit = os.environ.get("QC_EXIT", "0")
-
           data = {"jobListings": [], "transparencyInfo": {}}
           try:
             if data_path.exists():
@@ -125,7 +115,6 @@ jobs:
             reason = None if ok else f"qc_exit={qc_exit}, size_ok={size_ok}"
           except Exception as e:
             reason = f"read_error: {e}"
-
           ti = data.get("transparencyInfo", {})
           health = {
             "ok": bool(ok),
@@ -133,13 +122,11 @@ jobs:
             "checkedAt": datetime.datetime.utcnow().isoformat() + "Z",
             **ti
           }
-
           health_path.write_text(json.dumps(health, indent=2, ensure_ascii=False), encoding="utf-8")
           data_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
           PY
         env:
           QC_EXIT: ${{ steps.qc.outputs.qc_exit }}
-
       - name: Upload artifacts (data.json, health.json)
         uses: actions/upload-artifact@v4
         with:
@@ -148,7 +135,6 @@ jobs:
             data.json
             health.json
           retention-days: 7
-
       - name: Commit and Push Changes (scheduled only)
         if: github.event_name == 'schedule'
         run: |
@@ -164,7 +150,6 @@ jobs:
           else
             echo "No data changes to commit."
           fi
-
       - name: Post run summary
         if: always()
         uses: actions/github-script@v7
@@ -186,9 +171,8 @@ jobs:
               `Source success rate: ${rate}%`,
               `Reason: ${reason}`,
               `Artifacts: ${artifacts}`
-            ].join('\\n');
+            ].join('\n');
             core.summary.addHeading(`Vacancies Data Pipeline (${mode})`).addRaw(body, true).write();
-
       - name: Open issue if health not OK (scheduled only)
         if: github.event_name == 'schedule' && steps.health.outcome == 'success'
         uses: actions/github-script@v7
@@ -206,9 +190,8 @@ jobs:
               `Health status: ${JSON.stringify(health, null, 2)}`,
               '',
               `Artifacts (data.json, health.json): ${artifacts}`,
-            ].join('\\n');
+            ].join('\n');
             await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body, labels: ['pipeline','investigate'] });
-
   lighthouse:
     runs-on: ubuntu-latest
     needs: pipeline
@@ -221,7 +204,6 @@ jobs:
             echo "Sleep $i..."
             sleep 10
           done
-
       - name: Audit homepage with Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
@@ -229,7 +211,6 @@ jobs:
             ${{ vars.PAGES_URL }}
           budgetPath: ./.github/lighthouse/budget.json
           uploadArtifacts: true
-
       - name: Check health.json endpoint (retry)
         shell: bash
         run: |
