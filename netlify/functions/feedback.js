@@ -6,64 +6,60 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
   try {
+    // Guard: env must exist
+    if (!process.env.FEEDBACK_TOKEN) {
+      return { statusCode: 500, body: "Missing FEEDBACK_TOKEN" };
+    }
+
     const { type, payload } = JSON.parse(event.body || "{}");
     if (!type || !payload) {
       return { statusCode: 400, body: "Bad Request" };
     }
 
-    // Map friendly alias: 'vote' uses reports.jsonl
-    const path =
-      type === "missing"
-        ? "submissions.jsonl"
-        : "reports.jsonl";
+    // Map to file
+    const filePath = (type === "missing") ? "submissions.jsonl" : "reports.jsonl";
 
-    // Prepare record (normalize both forms and on‑card votes)
+    // Normalize record shapes
     const record = normalizeRecord(type, payload);
 
-    // Configure your repo
-    const owner = "BreadPitttt"; // keep as in your working setup
-    const repo = "Vacancies-dashboard";
-    const gh = "https://api.github.com";
+    // GitHub config
+    const owner = "BreadPitttt";               // exact username
+    const repo  = "Vacancies-dashboard";       // repository
+    const gh    = "https://api.github.com";
     const headers = {
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${process.env.FEEDBACK_TOKEN}`,
       "Content-Type": "application/json",
+      "User-Agent": "netlify-fn-feedback"
     };
 
-    // Read current file
-    const getRes = await fetch(
-      `${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
-      { headers }
-    );
-    if (!getRes.ok) {
-      return { statusCode: getRes.status, body: `Failed to read ${path}` };
+    // Read file if exists, otherwise start fresh (404 tolerant)
+    const getUrl = `${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`;
+    let sha = undefined, current = "";
+    let getRes = await fetch(getUrl, { headers });
+    if (getRes.status === 404) {
+      sha = undefined; current = "";
+    } else if (getRes.ok) {
+      const fileJson = await getRes.json();
+      sha = fileJson.sha;
+      current = Buffer.from(fileJson.content || "", fileJson.encoding || "base64").toString("utf-8");
+    } else {
+      const txt = await getRes.text().catch(()=> "");
+      return { statusCode: getRes.status, body: `Read failed: ${txt}` };
     }
-    const fileJson = await getRes.json();
-    const sha = fileJson.sha;
-    const current = Buffer.from(
-      fileJson.content || "",
-      fileJson.encoding || "base64"
-    ).toString("utf-8");
 
-    // Append line
+    // Append one JSONL line with server timestamp
     const line = JSON.stringify({ ...record, ts: new Date().toISOString() }) + "\n";
     const updated = Buffer.from(current + line).toString("base64");
 
     // Write back
-    const putRes = await fetch(
-      `${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
-      {
-        method: "PUT",
-        headers,
-        body: JSON.stringify({
-          message: `feedback: append to ${path}`,
-          content: updated,
-          sha,
-        }),
-      }
-    );
+    const putUrl = `${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`;
+    const putBody = { message: `feedback: append to ${filePath}`, content: updated };
+    if (sha) putBody.sha = sha;
+
+    const putRes = await fetch(putUrl, { method: "PUT", headers, body: JSON.stringify(putBody) });
     if (!putRes.ok) {
-      const t = await putRes.text();
+      const t = await putRes.text().catch(()=> "");
       return { statusCode: putRes.status, body: `Update failed: ${t}` };
     }
     return { statusCode: 200, body: "OK" };
@@ -73,7 +69,7 @@ exports.handler = async (event) => {
 };
 
 function normalizeRecord(type, payload){
-  // On‑card vote shape: {jobId, title, url, flag:'right'|'not general vacancy'}
+  // On-card vote: {jobId,title,url,flag:'right'|'not general vacancy'}
   if (payload && (payload.flag || payload.jobId)) {
     return {
       type: "report",
@@ -84,7 +80,7 @@ function normalizeRecord(type, payload){
       note: payload.note || ""
     };
   }
-  // Old report form: {listingId, reason, evidenceUrl, note}
+  // Old report modal: {listingId, reason, evidenceUrl, note}
   if (type === "report") {
     return {
       type: "report",
@@ -95,7 +91,7 @@ function normalizeRecord(type, payload){
       note: payload.note || ""
     };
   }
-  // Missing form: {title, url, note}
+  // Missing modal: {title,url,note}
   return {
     type: "missing",
     title: payload.title || "",
