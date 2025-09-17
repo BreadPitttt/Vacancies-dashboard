@@ -1,7 +1,17 @@
 "use strict";
 
-// CORS: allow your Pages origin
-const ALLOW_ORIGIN = "https://breadpitttt.github.io";
+/*
+  Netlify Function: feedback.js
+  - Uses global fetch (Node 18+) — no node-fetch import required.
+  - CORS enabled for GitHub Pages origin.
+  - Accepts:
+      type: 'report' with payload { listingId, reason, evidenceUrl, note }  // modal
+      type: 'missing' with payload { title, url, note }                     // modal
+      type: 'report' with payload { jobId, title, url, flag }               // on-card vote
+  - Appends JSONL lines to reports.jsonl or submissions.jsonl in the repo.
+*/
+
+const ALLOW_ORIGIN = "https://breadpitttt.github.io"; // dashboard origin (no trailing slash)
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": ALLOW_ORIGIN,
   "Access-Control-Allow-Methods": "OPTIONS, POST",
@@ -32,22 +42,25 @@ exports.handler = async (event) => {
     const filePath = (type === "missing") ? "submissions.jsonl" : "reports.jsonl";
     const record = normalizeRecord(type, payload);
 
-    const owner = "BreadPitttt";               // exact username
-    const repo  = "Vacancies-dashboard";       // repo name
-    const gh    = "https://api.github.com";
-    const headers = {
+    // GitHub repo details
+    const owner = "BreadPitttt";            // exact username
+    const repo  = "Vacancies-dashboard";    // repository name
+
+    const ghBase = "https://api.github.com";
+    const ghHeaders = {
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       "User-Agent": "netlify-fn-feedback"
     };
 
-    // Read existing file if present
-    const getUrl = `${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`;
+    // Fetch existing file (404 tolerated on first write)
+    const getUrl = `${ghBase}/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`;
     let sha, current = "";
-    const getRes = await fetch(getUrl, { headers });
+    const getRes = await fetch(getUrl, { headers: ghHeaders });
     if (getRes.status === 404) {
-      sha = undefined; current = "";
+      sha = undefined;
+      current = "";
     } else if (getRes.ok) {
       const fileJson = await getRes.json();
       sha = fileJson.sha;
@@ -57,16 +70,16 @@ exports.handler = async (event) => {
       return { statusCode: getRes.status, headers: CORS_HEADERS, body: `Read failed: ${txt}` };
     }
 
-    // Append JSONL line
+    // Append JSONL
     const line = JSON.stringify({ ...record, ts: new Date().toISOString() }) + "\n";
     const updated = Buffer.from(current + line).toString("base64");
 
-    // Write back
-    const putUrl = `${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`;
+    // Write file back
+    const putUrl = `${ghBase}/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`;
     const body = { message: `feedback: append to ${filePath}`, content: updated };
     if (sha) body.sha = sha;
 
-    const putRes = await fetch(putUrl, { method: "PUT", headers, body: JSON.stringify(body) });
+    const putRes = await fetch(putUrl, { method: "PUT", headers: ghHeaders, body: JSON.stringify(body) });
     if (!putRes.ok) {
       const t = await putRes.text().catch(()=> "");
       return { statusCode: 500, headers: CORS_HEADERS, body: `Update failed: ${t}` };
@@ -79,6 +92,7 @@ exports.handler = async (event) => {
 };
 
 function normalizeRecord(type, payload){
+  // On-card vote form
   if (payload && (payload.flag || payload.jobId)) {
     return {
       type: "report",
@@ -89,6 +103,7 @@ function normalizeRecord(type, payload){
       note: payload.note || ""
     };
   }
+  // Report modal
   if (type === "report") {
     return {
       type: "report",
@@ -99,6 +114,7 @@ function normalizeRecord(type, payload){
       note: payload.note || ""
     };
   }
+  // Missing modal
   return {
     type: "missing",
     title: payload.title || "",
