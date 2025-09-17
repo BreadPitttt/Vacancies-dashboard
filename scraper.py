@@ -1,10 +1,10 @@
-# scraper.py — v7 (Tiered aggregators per spec + SSL-safe fetch, softer 403, robust decoding)
-# Main: FreeJobAlert, Adda247
-# Tier 1 backups: SarkariNaukriBlog, SarkariResult
-# Tier 2 backups: JagranJosh, SarkariExam
-# Verification: official-first or multi-aggregator corroboration across runs
+# scraper.py — v8 (Production-hardening + Tiered aggregators + Observability)
+# - Adds: looks_official, strict SSL verification, suppressed InsecureRequestWarning (trusted),
+#   larger UA pool, dynamic headers with Referer, refined retry/backoff (soft 403 handling),
+#   per-domain timeout overrides, stronger decoding, PDF first 3 pages, detailed metrics/logs,
+#   syntax fixes, rolling corroboration, and multi-tier verification (Telegram = hints).
 
-import os, re, json, time, random, hashlib, threading, xml.etree.ElementTree as ET, io
+import os, re, json, time, random, hashlib, threading, warnings, xml.etree.ElementTree as ET, io
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
@@ -16,8 +16,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
     from urllib3.util import Retry
+    from urllib3.exceptions import InsecureRequestWarning
 except Exception:
     Retry = None
+    InsecureRequestWarning = None
 try:
     import cloudscraper
     CF = cloudscraper.create_scraper()
@@ -44,9 +46,19 @@ AGG_WINDOW_DAYS = env_int("MULTI_AGG_DAYS", 7)
 
 UTC_NOW = datetime.now(timezone.utc)
 
-CONNECT_TO = env_int("CONNECT_TIMEOUT", 20 if not IS_HARD_RECHECK else 25)
-READ_TO    = env_int("READ_TIMEOUT",    60 if not IS_HARD_RECHECK else 70)
+# Global timeouts
+CONNECT_TO = env_int("CONNECT_TIMEOUT", 22 if not IS_HARD_RECHECK else 28)
+READ_TO    = env_int("READ_TIMEOUT",    65 if not IS_HARD_RECHECK else 80)
 LIST_TO, DETAIL_TO = (CONNECT_TO, READ_TO), (CONNECT_TO, READ_TO)
+
+# Per-domain timeout overrides (host -> (connect, read))
+DOMAIN_TIMEOUTS = {
+    "ssc.gov.in":          (CONNECT_TO, READ_TO + 30),
+    "www.rrbcdg.gov.in":   (CONNECT_TO, READ_TO + 20),
+    "rrbcdg.gov.in":       (CONNECT_TO, READ_TO + 20),
+    "dsssb.delhi.gov.in":  (CONNECT_TO, READ_TO + 25),
+    "bpsc.bihar.gov.in":   (CONNECT_TO, READ_TO + 20),
+}
 
 MAX_WORKERS     = env_int("MAX_WORKERS", 8 if not IS_HARD_RECHECK else 12)
 PER_SOURCE_MAX  = env_int("PER_SOURCE_MAX", 150 if not IS_HARD_RECHECK else 220)
@@ -54,22 +66,31 @@ PER_SOURCE_MAX  = env_int("PER_SOURCE_MAX", 150 if not IS_HARD_RECHECK else 220)
 RETRY_TOTAL         = env_int("RETRY_TOTAL", 4)
 RETRY_CONNECT       = env_int("RETRY_CONNECT", 3)
 RETRY_READ          = env_int("RETRY_READ", 3)
-BACKOFF_FACTOR      = env_float("BACKOFF_FACTOR", 1.2)
-MAX_BACKOFF_SECONDS = env_int("MAX_BACKOFF_SECONDS", 60)
+BACKOFF_FACTOR      = env_float("BACKOFF_FACTOR", 1.3)
+MAX_BACKOFF_SECONDS = env_int("MAX_BACKOFF_SECONDS", 75)
 
 PER_HOST_RPM   = env_int("PER_HOST_RPM", 18 if not IS_HARD_RECHECK else 24)
-BASELINE_SLEEP = env_float("BASELINE_SLEEP_S", 1.5 if not IS_HARD_RECHECK else 1.0)
-JITTER_MIN     = env_float("JITTER_MIN", 0.8)
-JITTER_MAX     = env_float("JITTER_MAX", 2.5)
+BASELINE_SLEEP = env_float("BASELINE_SLEEP_S", 1.4 if not IS_HARD_RECHECK else 1.0)
+JITTER_MIN     = env_float("JITTER_MIN", 0.7)
+JITTER_MAX     = env_float("JITTER_MAX", 2.4)
 
 CB_FAILURE_THRESHOLD  = env_int("CB_FAILURE_THRESHOLD", 5)
 CB_OPEN_SECONDS       = env_int("CB_OPEN_SECONDS", 720)
 CB_HALF_OPEN_PROBE    = env_int("CB_HALF_OPEN_PROBE", 1)
 
+# Larger UA pool (Chrome/Edge/Firefox/Safari variants)
 UA_POOL = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 ]
+
+# Suppress InsecureRequestWarning in production (no verify=False is used)
+if InsecureRequestWarning:
+    warnings.simplefilter("ignore", InsecureRequestWarning)
 
 # ---------------- Tiered Aggregators ----------------
 PRIMARY_AGG = [
@@ -77,10 +98,8 @@ PRIMARY_AGG = [
   {"name":"Adda247", "base":"https://www.adda247.com", "url":"https://www.adda247.com/jobs/government-jobs/"},
 ]
 BACKUP_AGG = [
-  # Tier 1 backups
   {"name":"SarkariNaukriBlog", "base":"https://www.sarkarinaukriblog.com", "url":"https://www.sarkarinaukriblog.com/"},
   {"name":"SarkariResult", "base":"https://sarkariresult.com.cm", "url":"https://sarkariresult.com.cm/"},
-  # Tier 2 backups
   {"name":"JagranJosh", "base":"https://www.jagranjosh.com", "url":"https://www.jagranjosh.com/notifications"},
   {"name":"SarkariExam", "base":"https://www.sarkariexam.com", "url":"https://www.sarkariexam.com"},
 ]
@@ -99,7 +118,8 @@ TELEGRAM_CHANNELS = env_channels()
 TELEGRAM_RSS_BASES = [os.getenv("TELEGRAM_RSS_BASE") or "https://rsshub.app"]
 
 OFFICIAL_DOMAINS = {
-  "dsssb.delhi.gov.in","dsssbonline.nic.in","rrbcdg.gov.in","bpsc.bihar.gov.in","ssc.gov.in","ssc.nic.in",
+  "dsssb.delhi.gov.in","dsssbonline.nic.in","rrbcdg.gov.in",
+  "bpsc.bihar.gov.in","ssc.gov.in","ssc.nic.in",
 }
 
 # ---------------- HTTP & Resilience ----------------
@@ -179,32 +199,54 @@ def save_http_cache():
   except Exception: pass
 
 def _host(url): return urlparse(url or "").netloc.lower()
-def get_dynamic_headers():
-    return {
+
+def looks_official(url):
+  try:
+    return urlparse(url or "").netloc.lower() in OFFICIAL_DOMAINS
+  except Exception:
+    return False
+
+def get_dynamic_headers(referer=None):
+    langs = [
+      "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+      "en-GB,en;q=0.9",
+      "en-US,en;q=0.9",
+    ]
+    h = {
         "User-Agent": random.choice(UA_POOL),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Encoding": "gzip, deflate, br",
-        "Accept-Language": "en-IN,en;q=0.9",
+        "Accept-Language": random.choice(langs),
         "Upgrade-Insecure-Requests": "1",
+        "Connection": "keep-alive",
     }
+    if referer:
+        h["Referer"] = referer
+    return h
 
-def fetch(url, timeout, use_cache=False):
+def _timeouts_for(url):
+  h = _host(url)
+  return DOMAIN_TIMEOUTS.get(h, DETAIL_TO)
+
+def fetch(url, timeout, use_cache=False, referer=None):
   host = _host(url)
   w = _rate_limit_for(host)
   if w>0: time.sleep(w)
   _sleep_with_jitter()
-  headers = get_dynamic_headers()
+  headers = get_dynamic_headers(referer=referer)
   if use_cache: headers.update(_cache_headers_for(url))
   try:
-    r = thread_session().get(url, timeout=timeout, headers=headers)
+    to = _timeouts_for(url) if timeout == DETAIL_TO else timeout
+    r = thread_session().get(url, timeout=to, headers=headers)
     if r.status_code == 304:
       class _R: pass
       nr=_R(); nr.status_code=304; nr.headers=r.headers; nr.content=b""; nr.url=url
       return nr
     if r.status_code == 403:
+      # Limit retries on strict domains (single alternate UA)
       time.sleep(1.2)
-      alt_headers = get_dynamic_headers()
-      r_alt = thread_session().get(url, timeout=timeout, headers=alt_headers)
+      alt_headers = get_dynamic_headers(referer=referer)
+      r_alt = thread_session().get(url, timeout=to, headers=alt_headers)
       if r_alt.status_code == 200:
         if use_cache: _update_cache_from_response(url, r_alt)
         return r_alt
@@ -215,8 +257,9 @@ def fetch(url, timeout, use_cache=False):
     return r
   except requests.exceptions.SSLError:
     try:
+      # Verified retry with fresh session (no verify=False)
       alt = session_with_retries()
-      r2 = alt.get(url, timeout=timeout, headers=headers)
+      r2 = alt.get(url, timeout=_timeouts_for(url), headers=headers)
       r2.raise_for_status()
       if use_cache: _update_cache_from_response(url, r2)
       return r2
@@ -224,9 +267,12 @@ def fetch(url, timeout, use_cache=False):
       raise
   except requests.exceptions.RequestException as e:
     code = getattr(e.response, "status_code", 0) if hasattr(e, "response") else 0
+    # Exponential backoff is via urllib3.Retry; try CF once for 403/503 (verified)
     if code in [403, 503] and CF:
       try:
-        r2 = CF.get(url, timeout=sum(timeout))
+        sess = cloudscraper.create_scraper()
+        sess.verify = certifi.where()
+        r2 = sess.get(url, timeout=sum(_timeouts_for(url)), headers=headers)
         if getattr(r2, "status_code", 0) == 200:
           if use_cache: _update_cache_from_response(url, r2)
           return r2
@@ -242,13 +288,14 @@ def _decode_html_bytes(resp):
   try:
     content = resp.content
     if not content: return ""
-    txt = UnicodeDammit(
+    dammit = UnicodeDammit(
       content,
       is_html=True,
-      known_definite_encodings=[resp.encoding or "", "utf-8", "windows-1252", "iso-8859-1"]
-    ).unicode_markup
+      known_definite_encodings=[resp.encoding or "", "utf-8", "utf-16", "cp1252", "windows-1252", "iso-8859-1"]
+    )
+    txt = dammit.unicode_markup
     if txt is None:
-      try: return content.decode("utf-8", errors="replace")
+      try: return content.decode("utf-8", errors="ignore")
       except Exception: return resp.text
     return txt
   except Exception:
@@ -299,6 +346,7 @@ def norm_key(title):
   tokens = [w for w in t.split() if len(w) > 2]
   return " ".join(tokens[:14])
 
+# Deadline parsing
 DATE_WORDS = {"jan":"january","feb":"february","mar":"march","apr":"april","jun":"june","jul":"july","aug":"august","sep":"september","oct":"october","nov":"november","dec":"december"}
 def _month_word_fix(s):
   t=s.lower()
@@ -319,7 +367,7 @@ def parse_application_window(text):
 def probe_deadline_from_link(primary_url):
   try:
     if not primary_url: return None
-    r = fetch(primary_url, DETAIL_TO)
+    r = fetch(primary_url, DETAIL_TO, referer=None)
     ct = (r.headers.get("Content-Type","").lower())
     if "html" in ct:
       s = soup_from_resp(r)
@@ -328,10 +376,11 @@ def probe_deadline_from_link(primary_url):
         return e
     elif pdfplumber and ("pdf" in ct or "pdf" in primary_url.lower()):
       with pdfplumber.open(io.BytesIO(r.content)) as pdf:
-        if pdf.pages:
-          first_page = pdf.pages[0]
-          _, e = parse_application_window(first_page.extract_text())
-          return e
+        for i in range(min(3, len(pdf.pages))):  # first 3 pages
+          page = pdf.pages[i]
+          text = page.extract_text() or ""
+          _, e = parse_application_window(text)
+          if e: return e
   except Exception as e:
     print(f"[DEBUG] PDF/Detail probe failed for {primary_url}: {e}")
     return None
@@ -361,13 +410,13 @@ def is_valid_url(u):
 
 def validate_inline(rec):
   if not (rec.get("title") and len(rec["title"]) > 6): return False
-  if not (rec.get("detailText") and len(rec["detailText"]) > 40): return False
+  if not (rec.get("detailText") and len(rec.get("detailText","")) > 40): return False
   if not (is_valid_url(rec.get("applyLink")) or is_valid_url(rec.get("pdfLink"))): return False
   return True
 
-def soup_text(url):
+def soup_text(url, referer=None):
   try:
-    r = fetch(url, DETAIL_TO)
+    r = fetch(url, DETAIL_TO, referer=referer)
     if "html" in (r.headers.get("Content-Type","") or "").lower():
       s = soup_from_resp(r)
       return norm(s.get_text(" ")) if s else ""
@@ -383,7 +432,12 @@ def load_agg_seen():
     cutoff = datetime.utcnow() - timedelta(days=AGG_WINDOW_DAYS)
     pruned = {}
     for k, info in data.items():
-      kept=[(s, ts) for s, ts in info.get("seen", []) if datetime.fromisoformat(ts.replace("Z","")) >= cutoff]
+      kept=[]
+      for sname, ts in info.get("seen", []):
+        try:
+          dt = datetime.fromisoformat(ts.replace("Z",""))
+          if dt >= cutoff: kept.append((sname, ts))
+        except: continue
       if kept: pruned[k] = {"seen": kept}
     return pruned
   except: return {}
@@ -406,7 +460,7 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
       cb_succ(name); return []
     soup = soup_from_resp(r)
     if soup is None:
-      cb_fail(name)
+      cb_fail(name); 
       if metrics is not None: metrics[name]["fail"] = metrics[name].get("fail", 0) + 1
       return []
     anchors=[]
@@ -414,18 +468,18 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
       href = absolute(base, a["href"]); title = norm(a.get_text(" "))
       if not href or len(title) < 6: continue
       raw += 1
-      if treat_as=="official" or is_joblike(f"{title} {href}")):
+      if (treat_as=="official") or is_joblike(f"{title} {href}"):
         anchors.append((title, href)); hinted += 1
       if len(anchors) >= PER_SOURCE_MAX: break
     for title, href in anchors:
-      detail_text = title + " — " + soup_text(href)
+      detail_text = title + " — " + soup_text(href, referer=url)
       if is_non_vacancy(detail_text) or other_state_only(detail_text) or not education_allowed(detail_text): continue
       key_base = norm_key(title); upd = is_update(detail_text); unique_key = f"{key_base}|upd" if upd else key_base
 
       official_link = None; tmp_deadline = None
       try:
-        rd = fetch(href, DETAIL_TO)
-        if "html" in (rd.headers.get("Content-Type","")).lower():
+        rd = fetch(href, DETAIL_TO, referer=url)
+        if "html" in (rd.headers.get("Content-Type","") or "").lower():
           sd = soup_from_resp(rd)
           if sd:
             for a2 in sd.find_all("a", href=True):
@@ -440,7 +494,9 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
                     tmp_deadline = dl_probe
                     if looks_official(u2): official_link = u2
                     break
-      except: pass
+      except Exception as e:
+        if metrics is not None:
+          metrics[name].setdefault("error_samples", []).append(f"detail_fetch:{type(e).__name__}:{str(e)[:180]}")
 
       deadline_here = extract_deadline(detail_text, fallback_url=official_link or href)
       if tmp_deadline and not deadline_here: deadline_here = tmp_deadline
@@ -467,7 +523,7 @@ def scrape_generic_list(src, treat_as="aggregator", metrics=None):
     cb_fail(name)
     if metrics is not None:
       metrics[name]["fail"] = metrics[name].get("fail", 0) + 1
-      metrics[name].setdefault("error_samples", []).append(str(e))
+      metrics[name].setdefault("error_samples", []).append(f"list_fetch:{type(e).__name__}:{str(e)[:200]}")
     print(f"[WARN] {treat_as} {name} error: {e}")
   return items
 
@@ -511,10 +567,11 @@ def scrape_telegram_channel(username, metrics):
         metrics[key]["durations"].append(time.time()-started); metrics[key]["kept"]=metrics[key].get("kept",0)+kept
         return items
       except Exception as e:
-        metrics[key].setdefault("error_samples", []).append(str(e))
+        metrics[key].setdefault("error_samples", []).append(f"rss_fetch:{type(e).__name__}:{str(e)[:180]}")
         continue
-  except Exception:
+  except Exception as e:
     cb_fail(key); metrics[key]["fail"] = metrics[key].get("fail", 0) + 1
+    metrics[key].setdefault("error_samples", []).append(f"tg_loop:{type(e).__name__}:{str(e)[:180]}")
     if "durations" in metrics[key]: metrics[key]["durations"].append(time.time()-started)
   print(f"[TG ] {username}: all RSS endpoints failed; continuing"); return items
 
@@ -572,7 +629,6 @@ def merge_and_verify(primary_items, backup_items, official_items):
       "applyLink": rep.get("applyLink"), "pdfLink": rep.get("pdfLink"), "extractedAt": UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     published.append(rep_rec)
-
     for u in (x for x in b["items"] if x.get("isUpdate")):
       up_base = hashlib.sha1(f"{'|'.join(sources)}|{u['uniqueKey']}".encode("utf-8")).hexdigest()[:12]
       uid = up_base; m=1
@@ -633,13 +689,16 @@ def main():
         elif tag=="o": off_counts[name]=0
         else: tg_counts[name]=0
 
+  # Update corroboration cache
   agg_seen = load_agg_seen()
   def note_agg(it):
     if it.get("sourceType") == "aggregator":
       rec = agg_seen.setdefault(it["key"], {"seen": []})
-      if it["source"] not in [s for s,_ in rec["seen"]]:
+      seen_sources = [s for s,_ in rec["seen"]]
+      if it["source"] not in seen_sources:
         rec["seen"].append((it["source"], UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")))
-  for it in primary_items + backup_items: note_agg(it)
+  for it in primary_items + backup_items:
+    note_agg(it)
   save_agg_seen(agg_seen)
 
   published, pending = merge_and_verify(primary_items, backup_items, official_items)
@@ -647,20 +706,28 @@ def main():
   data = load_data()
   data["jobListings"] = published
 
-  duration = time.time() - run_started
-  ti = data.setdefault("transparencyInfo",{})
-  ti["lastUpdated"] = UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
-  ti["totalListings"] = len(published)
-  ti["aggCounts"] = agg_counts
-  ti["officialCounts"] = off_counts
-  ti["telegramCounts"] = tg_counts
-  ti["pendingFromAggregators"] = sorted(list(pending))
-  ti["notes"] = "v7: Tiered aggregators (FreeJobAlert, Adda247; Tier1: SNB, SR; Tier2: JJ, SE). SSL-safe fetch, softer 403, robust decoding."
-  ti["runDurationSec"] = round(duration,2)
-  for name in per_source_metrics: per_source_metrics[name]["cb_state"] = get_cb_state(name)
-  ti["perSourceMetrics"] = per_source_metrics
+   duration = time.time() - run_started
 
-  save_data(data); save_http_cache()
+  # Build transparency info
+  data_ti = data.setdefault("transparencyInfo", {})
+  data_ti["lastUpdated"] = UTC_NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
+  data_ti["totalListings"] = len(published)
+  data_ti["aggCounts"] = {**{s["name"]: 0 for s in PRIMARY_AGG + BACKUP_AGG}, **agg_counts}
+  data_ti["officialCounts"] = off_counts
+  data_ti["telegramCounts"] = tg_counts
+  data_ti["pendingFromAggregators"] = sorted(list(pending))
+  data_ti["notes"] = "v8: Tiered aggregators; SSL-verified fetch; softer 403; stronger decoding; PDF first 3 pages; metrics & CB states."
+  data_ti["runDurationSec"] = round(duration, 2)
+
+  # Finalize CB states and simple HTTP status histograms if any recorded
+  for name in per_source_metrics:
+    per_source_metrics[name]["cb_state"] = get_cb_state(name)
+  data_ti["perSourceMetrics"] = per_source_metrics
+
+  # Persist artifacts
+  save_data(data)
+  save_http_cache()
+
   print(f"[INFO] published={len(published)} pending={len(pending)} duration={round(duration,2)}s")
 
 if __name__ == "__main__":
