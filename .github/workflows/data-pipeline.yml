@@ -1,4 +1,5 @@
 name: Data Pipeline
+
 on:
   workflow_dispatch:
     inputs:
@@ -9,12 +10,15 @@ on:
   schedule:
     - cron: '17 18 * * *'
     - cron: '28 20 * * 0'
+
 permissions:
   contents: write
   issues: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
+
 jobs:
   pipeline:
     runs-on: ubuntu-latest
@@ -24,6 +28,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Decide mode (nightly or weekly)
         id: decide
         shell: bash
@@ -47,15 +52,18 @@ jobs:
           else
             echo "run_label=Nightly recheck" >> "$GITHUB_OUTPUT"
           fi
+
       - name: Set up Python and cache dependencies
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Run scraper
         id: scrape
         env:
@@ -83,17 +91,20 @@ jobs:
           set -e
           echo "Running mode=${{ steps.decide.outputs.mode }} with per-step timeout=${{ steps.decide.outputs.timeout }}m"
           timeout "${{ steps.decide.outputs.timeout }}m" python scraper.py
+
       - name: Validate JSON Schema
         id: validate
         run: |
           set -e
           python validate.py
+
       - name: Quality checks (links, dates, dups)
         id: qc
         run: |
           set +e
           python qc_checks.py
           echo "qc_exit=$?" >> $GITHUB_OUTPUT
+
       - name: Generate and Format Data Files with Health
         id: health
         run: |
@@ -111,11 +122,13 @@ jobs:
               raw = data_path.read_text(encoding="utf-8")
               data = json.loads(raw) if raw.strip() else {"jobListings": [], "transparencyInfo": {}}
             size_ok = len(json.dumps(data).encode("utf-8")) > 200
-            ok = (qc_exit == "0") and size_ok and (data.get("jobListings") is not None)
+            ok = (qc_exit == "0") and size_ok and isinstance(data.get("jobListings"), list)
             reason = None if ok else f"qc_exit={qc_exit}, size_ok={size_ok}"
           except Exception as e:
             reason = f"read_error: {e}"
-          ti = data.get("transparencyInfo", {})
+          ti = data.get("transparencyInfo", {}) or {}
+          ti.setdefault("totalListings", len(data.get("jobListings") or []))
+          ti.setdefault("lastUpdated", datetime.datetime.utcnow().isoformat() + "Z")
           health = {
             "ok": bool(ok),
             "reason": reason,
@@ -127,6 +140,7 @@ jobs:
           PY
         env:
           QC_EXIT: ${{ steps.qc.outputs.qc_exit }}
+
       - name: Upload artifacts (data.json, health.json)
         uses: actions/upload-artifact@v4
         with:
@@ -135,6 +149,7 @@ jobs:
             data.json
             health.json
           retention-days: 7
+
       - name: Commit and Push Changes (scheduled only)
         if: github.event_name == 'schedule'
         run: |
@@ -150,6 +165,7 @@ jobs:
           else
             echo "No data changes to commit."
           fi
+
       - name: Post run summary
         if: always()
         uses: actions/github-script@v7
@@ -172,7 +188,11 @@ jobs:
               `Reason: ${reason}`,
               `Artifacts: ${artifacts}`
             ].join('\n');
-            core.summary.addHeading(`Vacancies Data Pipeline (${mode})`).addRaw(body, true).write();
+            core.summary
+              .addHeading(`Vacancies Data Pipeline (${mode})`)
+              .addRaw(body, true)
+              .write();
+
       - name: Open issue if health not OK (scheduled only)
         if: github.event_name == 'schedule' && steps.health.outcome == 'success'
         uses: actions/github-script@v7
@@ -191,7 +211,14 @@ jobs:
               '',
               `Artifacts (data.json, health.json): ${artifacts}`,
             ].join('\n');
-            await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body, labels: ['pipeline','investigate'] });
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['pipeline','investigate']
+            });
+
   lighthouse:
     runs-on: ubuntu-latest
     needs: pipeline
