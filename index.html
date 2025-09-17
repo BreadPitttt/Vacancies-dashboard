@@ -9,38 +9,57 @@
 <body>
   <header class="topbar">
     <h1>General Vacancies</h1>
-    <div id="status" class="status">Loading…</div>
+    <div class="status-wrap">
+      <span id="health-pill" class="pill">Health: —</span>
+      <span id="last-updated" class="muted">Last updated: —</span>
+      <span id="total-listings" class="muted">Listings: —</span>
+    </div>
     <div class="actions">
-      <button id="btn-missing">Submit a Missing Vacancy</button>
-      <button id="btn-report">Report an Issue</button>
+      <button id="btn-show-missing-form" class="btn primary">Submit a Missing Vacancy</button>
+      <button id="btn-report" class="btn">Open Report Form</button>
     </div>
   </header>
 
   <main>
-    <div id="list" class="list"></div>
+    <div id="jobs-root" class="list"></div>
   </main>
 
-  <!-- Existing report/missing modals can stay; here are minimal placeholders -->
-  <div id="modal-report" class="modal hidden">
+  <!-- Report modal -->
+  <div id="report-modal" class="modal hidden">
     <div class="modal-box">
-      <h3>Report</h3>
-      <textarea id="report-text" rows="4" placeholder="Why is this wrong?"></textarea>
-      <div class="right">
-        <button class="btn" id="report-cancel">Cancel</button>
-        <button class="btn primary" id="report-send">Send</button>
-      </div>
+      <h3>Report a Listing</h3>
+      <form id="reportForm">
+        <input id="reportListingId" type="hidden">
+        <label>Reason</label>
+        <input id="reportReason" placeholder="Why is this wrong?">
+        <label>Evidence URL (optional)</label>
+        <input id="reportEvidenceUrl" placeholder="Link to notice or proof">
+        <label>Note (optional)</label>
+        <textarea id="reportNote" rows="4"></textarea>
+        <div class="right">
+          <button type="button" class="btn">Cancel</button>
+          <button type="submit" class="btn primary">Send</button>
+        </div>
+      </form>
     </div>
   </div>
 
-  <div id="modal-missing" class="modal hidden">
+  <!-- Missing vacancy modal -->
+  <div id="missing-modal" class="modal hidden">
     <div class="modal-box">
       <h3>Submit a Missing Vacancy</h3>
-      <input id="missing-url" placeholder="Vacancy URL">
-      <textarea id="missing-note" rows="3" placeholder="Notes (optional)"></textarea>
-      <div class="right">
-        <button class="btn" id="missing-cancel">Cancel</button>
-        <button class="btn primary" id="missing-send">Send</button>
-      </div>
+      <form id="missingForm">
+        <label>Title</label>
+        <input id="missingTitle" placeholder="Vacancy title">
+        <label>Vacancy URL</label>
+        <input id="missingUrl" placeholder="https://">
+        <label>Note (optional)</label>
+        <textarea id="missingNote" rows="3"></textarea>
+        <div class="right">
+          <button type="button" class="btn">Cancel</button>
+          <button type="submit" class="btn primary">Send</button>
+        </div>
+      </form>
     </div>
   </div>
 
