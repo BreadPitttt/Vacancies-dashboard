@@ -1,152 +1,41 @@
 {
   "exclusions": {
-    "titleKeywords": [
-      "engineer",
-      "developer",
-      "scientist",
-      "analyst",
-      "specialist",
-      "technical manager",
-      "architect",
-      "research",
-      "research associate",
-      "data scientist",
-      "ml engineer",
-      "cloud engineer",
-      "sde",
-      "devops",
-      "mba",
-      "m.tech",
-      "mca",
-      "b.tech",
-      "b.e",
-      "phd",
-      "postgraduate",
-      "professor",
-      "lecturer",
-      "teacher",
-      "tgt",
-      "pgt",
-      "prt",
-      "b.ed",
-      "ctet",
-      "tet"
+    "titleKeywords": ["teacher","tgt","pgt","prt","b.ed","ctet","tet"],
+    "skillKeywords": ["advanced analytics","cloud architecture","machine learning","cad"],
+    "scoredTitle": [
+      {"token":"engineer","score":0.9,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"developer","score":0.9,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"scientist","score":0.9,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"analyst","score":0.85,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"mba","score":0.95,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"m.tech","score":0.95,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"mca","score":0.95,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"b.tech","score":0.95,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"b.e","score":0.95,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"phd","score":0.98,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"postgraduate","score":0.9,"hits":0,"falsePos":0,"lastSeen":""},
+      {"token":"research","score":0.8,"hits":0,"falsePos":0,"lastSeen":""}
     ],
-    "skillKeywords": [
-      "advanced analytics",
-      "cloud architecture",
-      "machine learning",
-      "cad"
-    ],
-    "domicileCloseSignals": [
-      "domicile",
-      "resident",
-      "locals only",
-      "local candidates",
-      "state quota",
-      "only"
-    ]
+    "domicileCloseSignals": ["domicile","resident","locals only","local candidates","state quota","only"]
   },
   "inclusions": {
-    "educationKeywords": [
-      "10th",
-      "matric",
-      "ssc",
-      "12th",
-      "intermediate",
-      "hsc",
-      "graduate",
-      "any degree",
-      "bachelor"
-    ],
-    "skillKeywords": [
-      "typing",
-      "computer",
-      "physical",
-      "field duty"
-    ],
-    "domicileOpenSignals": [
-      "all india",
-      "any state",
-      "open to all",
-      "pan india",
-      "indian nationals",
-      "across india",
-      "from any state"
-    ]
+    "educationKeywords": ["10th","matric","ssc","12th","intermediate","hsc","graduate","any degree","bachelor"],
+    "skillKeywords": ["typing","computer","physical","field duty"],
+    "domicileOpenSignals": ["all india","any state","open to all","pan india","indian nationals","across india","from any state"]
   },
   "siteHints": {
-    "www.adda247.com": {
-      "excludeSections": ["sarkari result", "admit card", "answer key"]
-    },
-    "www.resultbharat.com": {
-      "excludeSections": ["result", "admit card", "answer key"]
-    },
-    "sarkarijobfind.com": {
-      "excludeSections": ["result", "admit card", "answer key"]
-    },
-    "www.freejobalert.com": {
-      "excludeSections": ["admit card", "result", "answer key", "syllabus"]
-    }
+    "www.adda247.com": {"excludeSections": ["sarkari result","admit card","answer key"]},
+    "www.resultbharat.com": {"excludeSections": ["result","admit card","answer key"]},
+    "sarkarijobfind.com": {"excludeSections": ["result","admit card","answer key"]},
+    "www.freejobalert.com": {"excludeSections": ["admit card","result","answer key","syllabus"]}
   },
   "domicile": {
-    "states": [
-      "andhra pradesh",
-      "arunachal pradesh",
-      "assam",
-      "bihar",
-      "chhattisgarh",
-      "goa",
-      "gujarat",
-      "haryana",
-      "himachal pradesh",
-      "jharkhand",
-      "karnataka",
-      "kerala",
-      "madhya pradesh",
-      "maharashtra",
-      "manipur",
-      "meghalaya",
-      "mizoram",
-      "nagaland",
-      "odisha",
-      "punjab",
-      "rajasthan",
-      "sikkim",
-      "tamil nadu",
-      "telangana",
-      "tripura",
-      "uttar pradesh",
-      "uttarakhand",
-      "west bengal",
-      "jammu",
-      "kashmir",
-      "ladakh",
-      "delhi",
-      "puducherry",
-      "chandigarh",
-      "andaman",
-      "nicobar",
-      "dadra",
-      "nagar haveli",
-      "daman",
-      "diu",
-      "lakshadweep"
-    ],
+    "states": ["andhra pradesh","arunachal pradesh","assam","bihar","chhattisgarh","goa","gujarat","haryana","himachal pradesh","jharkhand","karnataka","kerala","madhya pradesh","maharashtra","manipur","meghalaya","mizoram","nagaland","odisha","punjab","rajasthan","sikkim","tamil nadu","telangana","tripura","uttar pradesh","uttarakhand","west bengal","jammu","kashmir","ladakh","delhi","puducherry","chandigarh","andaman","nicobar","dadra","nagar haveli","daman","diu","lakshadweep"],
     "biharAllowed": true
   },
   "metadata": {
     "updatedAt": "",
-    "hitCounts": {
-      "exclusions.titleKeywords": {},
-      "exclusions.skillKeywords": {},
-      "inclusions.educationKeywords": {},
-      "inclusions.skillKeywords": {},
-      "inclusions.domicileOpenSignals": {}
-    },
-    "prune": {
-      "days": 14,
-      "maxRules": 200
-    }
+    "changelog": [],
+    "prune": {"days": 14, "maxRules": 220, "dailyDecay": 0.98, "promoteAt": 0.70, "demoteBelow": 0.30}
   }
 }
