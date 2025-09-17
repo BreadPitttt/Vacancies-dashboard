@@ -13,7 +13,7 @@ exports.handler = async (event) => {
     }
 
     // TODO: replace with your GitHub username exactly
-    const owner = "<your-github-username>";
+    const owner = "<BreadPitttt>";
     const repo = "Vacancies-dashboard";
 
     const path =
