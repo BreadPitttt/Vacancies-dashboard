@@ -9,12 +9,14 @@ import os
 from urllib.parse import urljoin, urlparse
 
 # ============ NEW: mode flag & rules capture hints ============
-import argparse
+import argparse, hashlib, pathlib
+import cloudscraper  # fallback for anti-bot
+
 def get_run_mode():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", default=os.getenv("RUN_MODE","nightly"))
     m = (ap.parse_args().mode or "nightly").lower()
-    return "weekly" if m == "weekly" else "nightly"
+    return "weekly" if m == "weekly" else ("light" if m == "light" else "nightly")
 
 def load_rules_file(path="rules.json"):
     try:
@@ -22,18 +24,42 @@ def load_rules_file(path="rules.json"):
             return json.load(f) or {}
     except Exception:
         return {}
+
 RUN_MODE = get_run_mode()
 RULES_FILE = load_rules_file()
+IS_LIGHT = (RUN_MODE == "light")
+
+# Simple HTML cache (stability for slow/blocked sites)
+CACHE_DIR = pathlib.Path(".cache"); CACHE_DIR.mkdir(exist_ok=True)
+CACHE_TTL = 24*3600
+def cache_key(url): return CACHE_DIR / (hashlib.sha1(url.encode()).hexdigest() + ".html")
+def get_html(url, headers, timeout, allow_cache):
+    ck = cache_key(url)
+    if allow_cache and ck.exists() and (time.time() - ck.stat().st_mtime) < CACHE_TTL:
+        return ck.read_bytes()
+    try:
+        r = requests.get(url, headers=headers, timeout=timeout)
+        r.raise_for_status()
+        ck.write_bytes(r.content)
+        return r.content
+    except Exception:
+        try:
+            scraper = cloudscraper.create_scraper()
+            c = scraper.get(url, timeout=timeout+5).content
+            ck.write_bytes(c)
+            return c
+        except Exception:
+            return b""
 # ==============================================================
 
 # ---------------- Configuration ----------------
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
-REQUEST_TIMEOUT = 20
+REQUEST_TIMEOUT = 15 if IS_LIGHT else 20
 REQUEST_SLEEP_SECONDS = 1.2
 FIRST_SUCCESS_MODE = True  # stop at first source that returns jobs
 
-# ============ NEW: optional extra weekly seeds ============
-EXTRA_SEEDS = RULES_FILE.get("captureHints", []) if RUN_MODE == "weekly" else []
+# ============ NEW: optional extra weekly/light seeds ============
+EXTRA_SEEDS = RULES_FILE.get("captureHints", []) if RUN_MODE in ("weekly","light") else []
 # ==========================================================
 
 SOURCES = [
@@ -43,11 +69,13 @@ SOURCES = [
     {"name": "adda247",        "url": "https://www.adda247.com/jobs/", "parser": "parse_adda247"},
 ]
 
-# ============ NEW: prepend extra seeds in weekly ============
+# ============ NEW: prepend extra seeds (generic parser) ============
 if EXTRA_SEEDS:
-    # Treat each extra URL as its own “source” that reuses the adda parser (generic link harvesting)
     for i, u in enumerate(EXTRA_SEEDS[:25]):  # cap to avoid overrun
         SOURCES.insert(0, {"name": f"hint{i+1}", "url": u, "parser": "parse_adda247"})
+# In light mode, only crawl seeds
+if IS_LIGHT:
+    SOURCES = [s for s in SOURCES if s["name"].startswith("hint")]
 # ===========================================================
 
 HEADERS = {
@@ -269,7 +297,7 @@ def feedback_adapter(rules):
         save_rules(rules)
     return rules
 
-RULES = load_rules()
+RULES = feedback_adapter(load_rules())
 
 def scored_match_excluded(title):
     t = (title or "").lower()
@@ -306,8 +334,6 @@ def update_scored_rules_from_feedback(token, positive=True):
     for it in scored:
         if it["score"] >= promote and it["token"] not in RULES["exclusions"]["titleKeywords"]:
             RULES["exclusions"]["titleKeywords"].append(it["token"])
-
-RULES = feedback_adapter(RULES)
 
 def title_hits_excluded(title):
     t = (title or "").lower()
@@ -362,7 +388,7 @@ def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
     }
     return job
 
-# ---------------- Parsers (unchanged) ----------------
+# ---------------- Parsers ----------------
 def parse_freejobalert(content, source_name, base_url):
     soup = BeautifulSoup(content, 'html.parser')
     jobs = []
@@ -371,7 +397,8 @@ def parse_freejobalert(content, source_name, base_url):
         tl = (t or "").lower()
         if any(x in tl for x in ["admit card","result","answer key","syllabus"]):
             return False
-        return any(x in tl for x in ["recruit","vacancy","notification","apply online"])
+        # NEW: include corrigendum/extension
+        return any(x in tl for x in ["recruit","vacancy","notification","apply online","corrigendum","extension","extended"])
     for tbl in soup.select('table'):
         for a in tbl.select('a[href]'):
             title = clean_text(a.get_text())
@@ -430,7 +457,7 @@ def parse_resultbharat(content, source_name, base_url):
                 break
         if col_idx == -1:
             continue
-        for tr in table.select('tr'):
+        for tr in soup.select('tr'):
             tds = tr.select('td')
             if col_idx < len(tds):
                 a = tds[col_idx].find('a', href=True)
@@ -449,7 +476,8 @@ def parse_adda247(content, source_name, base_url):
     soup = BeautifulSoup(content, 'html.parser')
     jobs = []
     host = urlparse(base_url).netloc
-    for a in soup.select('article a[href], .post-card a[href], .card a[href]'):
+    # NEW: broaden selectors a bit under main for layout changes
+    for a in soup.select('article a[href], .post-card a[href], .card a[href], main a[href*="recruit"], main a[href*="notific"]'):
         title = clean_text(a.get_text())
         href = a.get('href')
         if not title or not href:
@@ -468,17 +496,16 @@ def fetch_and_parse(source):
         logging.error(f"Missing parser: {source['parser']}")
         return []
     try:
-        logging.info(f"[{RUN_MODE}] Fetching {source['name']} -> {source['url']}")
-        r = requests.get(source["url"], headers=HEADERS, timeout=REQUEST_TIMEOUT)
-        r.raise_for_status()
-        jobs = parser_func(r.content, source["name"], source["url"])
-        logging.info(f"{source['name']}: {len(jobs)} jobs parsed.")
+        allow_cache = RUN_MODE in ("weekly","light")
+        content = get_html(source["url"], HEADERS, REQUEST_TIMEOUT, allow_cache)
+        if not content:
+            logging.error(f"{source['name']} fetch failed (empty).")
+            return []
+        jobs = parser_func(content, source["name"], source["url"])
+        logging.info(f"[{RUN_MODE}] {source['name']}: {len(jobs)} jobs parsed.")
         return jobs
-    except requests.RequestException as e:
-        logging.error(f"{source['name']} request failed: {e}")
-        return []
     except Exception as e:
-        logging.error(f"{source['name']} parsing error: {e}")
+        logging.error(f"{source['name']} error: {e}")
         return []
 
 def enforce_schema_defaults(jobs):
@@ -503,7 +530,7 @@ def save_outputs(jobs, sources_used):
             "schemaVersion": "1.2",
             "totalListings": len(jobs),
             "lastUpdated": now_iso(),
-            "runMode": RUN_MODE  # NEW: transparency signal
+            "runMode": RUN_MODE
         }
     }
     with open("data.json", "w", encoding="utf-8") as f:
@@ -522,7 +549,10 @@ def save_outputs(jobs, sources_used):
 if __name__ == "__main__":
     collected = []
     used = []
-    if FIRST_SUCCESS_MODE:
+    # In light mode we want breadth from seeds; disable first-success
+    use_first_success = FIRST_SUCCESS_MODE and not IS_LIGHT
+
+    if use_first_success:
         for src in SOURCES:
             jobs = fetch_and_parse(src)
             if jobs:
@@ -538,7 +568,20 @@ if __name__ == "__main__":
                 used.append(src["name"])
             time.sleep(REQUEST_SLEEP_SECONDS)
 
-    if not collected:
-        logging.warning("No data collected from any source. Check selectors for the last changed site or relax that parser only.")
-
-    save_outputs(collected, used or ["None"])
+    if not collected and os.path.exists("data.json"):
+        # Fail-safe: retain previous snapshot so UI doesn't go empty
+        try:
+            prev = json.load(open("data.json","r",encoding="utf-8"))
+            prev["transparencyInfo"]["fallback_last_good"] = True
+            prev["transparencyInfo"]["runMode"] = RUN_MODE
+            with open("data.json","w",encoding="utf-8") as f:
+                json.dump(prev, f, indent=2, ensure_ascii=False)
+            h = json.load(open("health.json","r",encoding="utf-8")) if os.path.exists("health.json") else {}
+            h.update({"ok": False, "lastChecked": now_iso(), "fallback_last_good": True, "runMode": RUN_MODE})
+            with open("health.json","w",encoding="utf-8") as f:
+                json.dump(h, f, indent=2)
+            logging.warning("No fresh data; served last good snapshot.")
+        except Exception:
+            save_outputs(collected, used or ["None"])
+    else:
+        save_outputs(collected, used or ["None"])
