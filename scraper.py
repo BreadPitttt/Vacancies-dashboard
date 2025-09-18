@@ -98,3 +98,314 @@ def violates_general_policy(text):
     t=(text or "").lower()
     if any(k in t for k in TEACHER_TERMS): return True
     disallow=["b.tech","btech","b.e"," be ","m.tech","mtech","m.e","mca","bca","b.sc (engg)","bsc (engg)","engineering degree","m.sc","msc","m.a"," m a ","m.com","mcom","mba","cma","cfa"," ca ","cs ","company secretary","pg ","post graduate","postgraduate","phd","m.phil","mphil","engineer","developer","scientist","specialist","analyst","technical manager","architect","research","research associate","data scientist","ml engineer","cloud engineer","sde","devops"]
+    return any(k in t for k in disallow)
+STATE_NAMES=["andhra pradesh","arunachal pradesh","assam","bihar","chhattisgarh","goa","gujarat","haryana","himachal pradesh","jharkhand","karnataka","kerala","madhya pradesh","maharashtra","manipur","meghalaya","mizoram","nagaland","odisha","punjab","rajasthan","sikkim","tamil nadu","telangana","tripura","uttar pradesh","uttarakhand","west bengal","jammu","kashmir","ladakh","delhi","puducherry","chandigarh","andaman","nicobar","dadra","nagar haveli","daman","diu","lakshadweep"]
+OPEN_SIGNALS=["all india","any state","open to all","pan india","indian nationals","across india","from any state"]
+CLOSE_SIGNALS=["domicile","resident","locals only","local candidates","state quota","only"]
+def domicile_allow(title):
+    t=(title or "").lower()
+    if any(k in t for k in OPEN_SIGNALS): return True
+    if "bihar" in t and any(k in t for k in CLOSE_SIGNALS): return True
+    for st in STATE_NAMES:
+        if st=="bihar": continue
+        if st in t and any(k in t for k in CLOSE_SIGNALS): return False
+    return True
+def title_hits_excluded(title):
+    t=(title or "").lower()
+    for k in ["teacher","tgt","pgt","prt","b.ed","ctet","tet"]:
+        if k in t: return True, f"Excluded by rule: {k}"
+    return False, ""
+def site_section_excluded(host, title):
+    hint = {
+        "www.adda247.com":{"excludeSections":["sarkari result","admit card","answer key"]},
+        "www.resultbharat.com":{"excludeSections":["result","admit card","answer key"]},
+        "sarkarijobfind.com":{"excludeSections":["result","admit card","answer key"]},
+        "www.freejobalert.com":{"excludeSections":["admit card","result","answer key","syllabus"]}
+    }.get(host,{})
+    if not hint: return False
+    t=(title or "").lower()
+    for w in hint.get("excludeSections",[]): 
+        if w in t: return True
+    return False
+
+# ---------------- Job builder ----------------
+def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
+    title=clean_text(title)
+    href_abs = href if href and href.startswith("http") else normalize_url(base_url, href)
+    hit,_=title_hits_excluded(title)
+    if hit: return None
+    if violates_general_policy(title): return None
+    if not domicile_allow(title): return None
+    edu=education_band_from_text(title)
+    return {
+        "id": make_id(prefix, href_abs or base_url),
+        "title": title or "N/A",
+        "organization": "N/A",
+        "deadline": deadline or "N/A",
+        "applyLink": href_abs or base_url,
+        "slug": derive_slug(title, href_abs or base_url),
+        "qualificationLevel": edu if edu in ["10th pass","12th pass","Any graduate"] else "N/A",
+        "domicile": "All India",
+        "source": "aggregator",
+        "type": "VACANCY",
+        "extractedAt": now_iso(),
+        "meta": {"sourceUrl": base_url, "sourceSite": source_name}
+    }
+
+# ---------------- Seed host helpers ----------------
+def host_of(u):
+    try: return urlparse(u).netloc.lower()
+    except: return ""
+
+DATE_RE = re.compile(r'(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})')
+PAST_YEARS = {"2019","2020","2021","2022","2023","2024"}
+
+def looks_future_date(title):
+    m = DATE_RE.search(title or "")
+    if not m: return True
+    txt = m.group(1)
+    for fmt in ("%d-%m-%Y","%d/%m/%Y","%d %B %Y","%d %b %Y","%d-%m-%y","%d/%m/%y"):
+        try:
+            d = datetime.strptime(txt, fmt).date()
+            return (date.today() - d).days <= 60
+        except: 
+            continue
+    return True
+
+def parse_seed_rrb(soup, base_url):
+    jobs=[]; seen=set()
+    for a in soup.select('a[href]'):
+        t=clean_text(a.get_text()); h=a.get('href','')
+        if not t or not h: continue
+        abs_url = normalize_url(base_url, h)
+        if not abs_url or abs_url in seen: continue
+        if not re.search(r'(recruit|vacanc|employment|notice|advert)', t, re.I) and not re.search(r'(vacanc|recruit|notice)', h, re.I):
+            continue
+        if any(y in t for y in PAST_YEARS if y!="2025"): 
+            continue
+        if not looks_future_date(t): 
+            continue
+        j=build_job('hint','hint_rrb',base_url,t,abs_url)
+        if j:
+            jobs.append(j); seen.add(abs_url)
+    return jobs
+
+def parse_seed_bssc(soup, base_url):
+    jobs=[]; seen=set()
+    sel = '#NoticeBoard a[href], .notice a[href], ul li a[href], a[href*="Advt"], a[href*="Advertisement"], a[href*="Notice"]'
+    for a in soup.select(sel):
+        t=clean_text(a.get_text()); h=a.get('href','')
+        if not t or not h: continue
+        abs_url = normalize_url(base_url, h)
+        if not abs_url or abs_url in seen: continue
+        if not re.search(r'(advt|advertisement|notice|recruit|vacanc|cgl|graduate level|inter level|office attendant)', t, re.I):
+            continue
+        j=build_job('hint','hint_bssc',base_url,t,abs_url)
+        if j:
+            jobs.append(j); seen.add(abs_url)
+    return jobs
+
+def parse_seed_rbi(soup, base_url):
+    jobs=[]; seen=set()
+    rows = soup.select('table tr') or soup.select('div table tr')
+    for tr in rows:
+        a=tr.find('a', href=True)
+        if not a: continue
+        t=clean_text(a.get_text()); h=a['href']
+        if not t or not h: continue
+        abs_url = normalize_url(base_url, h)
+        if not abs_url or abs_url in seen: continue
+        if not re.search(r'(recruit|vacanc|advert|grade|officer)', t, re.I): continue
+        j=build_job('hint','hint_rbi',base_url,t,abs_url)
+        if j:
+            jobs.append(j); seen.add(abs_url)
+    return jobs
+
+def parse_seed_dsssb(soup, base_url):
+    jobs=[]; seen=set()
+    for a in soup.select('.view-content a[href], li a[href], a[href]'):
+        t=clean_text(a.get_text()); h=a.get('href','')
+        if not t or not h: continue
+        abs_url = normalize_url(base_url, h)
+        if not abs_url or abs_url in seen: continue
+        if not re.search(r'(advert|advertisement|recruit|vacanc|notice|corrigendum|extension)', t, re.I) and not re.search(r'(advert|recruit|vacanc|notice)', h, re.I):
+            continue
+        j=build_job('hint','hint_dsssb',base_url,t,abs_url)
+        if j:
+            jobs.append(j); seen.add(abs_url)
+    return jobs
+
+def parse_seed_ibps(soup, base_url):
+    jobs=[]; seen=set()
+    for a in soup.select('a[href]'):
+        t=clean_text(a.get_text()); h=a.get('href','')
+        if not t or not h: continue
+        abs_url = normalize_url(base_url, h)
+        if not abs_url or abs_url in seen: continue
+        if not re.search(r'(crp|recruit|vacanc|officer|clerk|rrb|po|so)', t, re.I) and not re.search(r'(crp|recruit|vacanc)', h, re.I):
+            continue
+        j=build_job('hint','hint_ibps',base_url,t,abs_url)
+        if j:
+            jobs.append(j); seen.add(abs_url)
+    return jobs
+
+# ---------------- Parsers ----------------
+def parse_freejobalert(content, source_name, base_url):
+    soup = BeautifulSoup(content,'html.parser'); jobs=[]; host=urlparse(base_url).netloc
+    def looks_job(t):
+        tl=(t or "").lower()
+        if any(x in tl for x in ["admit card","result","answer key","syllabus"]): return False
+        return any(x in tl for x in ["recruit","vacancy","notification","apply online","corrigendum","extension","extended"])
+    for tbl in soup.select('table'):
+        for a in tbl.select('a[href]'):
+            title=clean_text(a.get_text())
+            if not looks_job(title): continue
+            j=build_job('fja', source_name, base_url, title, a.get('href'))
+            if j and not site_section_excluded(host, title): jobs.append(j)
+    if not jobs:
+        for a in soup.select('main a[href], .entry-content a[href], a[href]'):
+            title=clean_text(a.get_text())
+            if not looks_job(title): continue
+            j=build_job('fja', source_name, base_url, title, a.get('href'))
+            if j and not site_section_excluded(host, title): jobs.append(j)
+    return jobs
+
+def parse_sarkarijobfind(content, source_name, base_url):
+    soup=BeautifulSoup(content,'html.parser'); jobs=[]; host=urlparse(base_url).netloc
+    for h in soup.find_all(re.compile('^h[1-6]$')):
+        if re.search(r'new\s*update', h.get_text(), re.I):
+            ul=h.find_next_sibling(['ul','ol']); 
+            if not ul: continue
+            for li in ul.select('li'):
+                a=li.find('a', href=True); 
+                if not a: continue
+                title=clean_text(a.get_text())
+                if site_section_excluded(host, title): continue
+                j=build_job('sjf', source_name, base_url, title, a['href'])
+                if j: jobs.append(j)
+            break
+    return jobs
+
+def parse_resultbharat(content, source_name, base_url):
+    soup=BeautifulSoup(content,'html.parser'); jobs=[]; host=urlparse(base_url).netloc
+    for table in soup.select('table'):
+        headers=[clean_text(th.get_text()) for th in table.select('th')]
+        if not headers: continue
+        col_idx=-1
+        for i,h in enumerate(headers):
+            if re.search(r'latest\s*jobs', h, re.I): col_idx=i; break
+        if col_idx==-1: continue
+        for tr in soup.select('tr'):
+            tds=tr.select('td')
+            if col_idx < len(tds):
+                a=tds[col_idx].find('a', href=True)
+                if not a: continue
+                title=clean_text(a.get_text())
+                if site_section_excluded(host, title): continue
+                j=build_job('rb', source_name, base_url, title, a['href'])
+                if j: jobs.append(j)
+    return jobs
+
+def parse_adda247(content, source_name, base_url):
+    soup=BeautifulSoup(content,'html.parser'); host=urlparse(base_url).netloc
+    # Seed dispatch
+    if source_name.startswith("hint"):
+        hostn = host_of(base_url)
+        if 'rrbcdg.gov.in' in hostn or 'rrbapply.gov.in' in hostn:
+            return parse_seed_rrb(soup, base_url)
+        if 'bssc.bihar.gov.in' in hostn or 'onlinebssc.com' in hostn:
+            return parse_seed_bssc(soup, base_url)
+        if 'opportunities.rbi.org.in' in hostn:
+            return parse_seed_rbi(soup, base_url)
+        if 'dsssb.delhi.gov.in' in hostn:
+            return parse_seed_dsssb(soup, base_url)
+        if 'ibps.in' in hostn:
+            return parse_seed_ibps(soup, base_url)
+        # fallback broad seed harvesting with keyword filter + de-dup
+        anchors = soup.select('main a[href], section a[href], article a[href], a[href]')
+        seen=set(); jobs=[]
+        def looks_seed(t, h):
+            tl=(t or "").lower(); hl=(h or "").lower()
+            kw=["recruit","vacancy","notific","advert","employment","application","corrigendum","extension","extended","grade","officer","crp","po","clerk","rrb"]
+            return any(k in tl for k in kw) or any(k in hl for k in kw)
+        for a in anchors:
+            title=clean_text(a.get_text()); href=a.get('href')
+            if not title or not href: continue
+            abs_url = normalize_url(base_url, href)
+            if not abs_url or abs_url in seen: continue
+            if not looks_seed(title, href): continue
+            if site_section_excluded(host, title): continue
+            j=build_job('hint', source_name, base_url, title, abs_url)
+            if j: jobs.append(j); seen.add(abs_url)
+        return jobs
+    # Regular Adda with broadened selectors
+    jobs=[]
+    for a in soup.select('article a[href], .post-card a[href], .card a[href], main a[href*="recruit"], main a[href*="notific"]'):
+        title=clean_text(a.get_text()); href=a.get('href')
+        if not title or not href: continue
+        if site_section_excluded(host, title): continue
+        j=build_job('adda', source_name, base_url, title, href)
+        if j: jobs.append(j)
+    return jobs
+
+# ---------------- Fetch / Save / Main ----------------
+def fetch_and_parse(source):
+    parser_func=globals().get(source["parser"])
+    if not parser_func:
+        logging.error(f"Missing parser: {source['parser']}"); return []
+    allow_cache = RUN_MODE in ("weekly","light")
+    content = get_html(source["url"], HEADERS, REQUEST_TIMEOUT, allow_cache)
+    if not content:
+        logging.error(f"{source['name']} fetch failed (empty)."); return []
+    try:
+        jobs = parser_func(content, source["name"], source["url"])
+        logging.info(f"[{RUN_MODE}] {source['name']}: {len(jobs)} jobs")
+        return jobs
+    except Exception as e:
+        logging.error(f"{source['name']} parsing error: {e}")
+        return []
+
+def enforce_schema_defaults(jobs):
+    for j in jobs:
+        j.setdefault("slug", derive_slug(j.get("title"), j.get("applyLink")))
+        j.setdefault("qualificationLevel","N/A")
+        j.setdefault("domicile","All India")
+        j.setdefault("source","aggregator")
+        j.setdefault("type","VACANCY")
+        j.setdefault("extractedAt", now_iso())
+    return jobs
+
+def save_outputs(jobs, sources_used):
+    jobs=enforce_schema_defaults(jobs)
+    output={"lastUpdated": now_iso(),"totalJobs": len(jobs),"jobListings": jobs,"transparencyInfo":{"notes":"General vacancies (10th/12th/Any graduate). Excludes teacher and technical/management/PG roles. Domicile: All‑India and Bihar‑only allowed; other states allowed only if title signals open to any state.","sourcesTried": sources_used if isinstance(sources_used,list) else [sources_used],"schemaVersion":"1.2","totalListings": len(jobs),"lastUpdated": now_iso(),"runMode": RUN_MODE}}
+    open("data.json","w",encoding="utf-8").write(json.dumps(output,indent=4,ensure_ascii=False))
+    health={"ok": bool(jobs),"lastChecked": now_iso(),"totalActive": len(jobs),"sourceUsed": (sources_used[0] if isinstance(sources_used,list) and sources_used else str(sources_used)),"runMode": RUN_MODE}
+    open("health.json","w",encoding="utf-8").write(json.dumps(health,indent=4))
+
+if __name__=="__main__":
+    collected=[]; used=[]
+    use_first_success = FIRST_SUCCESS_MODE and not IS_LIGHT
+    if use_first_success:
+        for src in SOURCES:
+            jobs=fetch_and_parse(src)
+            if jobs:
+                collected=jobs; used=[src["name"]]; break
+            time.sleep(REQUEST_SLEEP_SECONDS)
+    else:
+        for src in SOURCES:
+            jobs=fetch_and_parse(src)
+            if jobs:
+                collected.extend(jobs); used.append(src["name"])
+            time.sleep(REQUEST_SLEEP_SECONDS)
+
+    if not collected and os.path.exists("data.json"):
+        try:
+            prev=json.load(open("data.json","r",encoding="utf-8"))
+            prev["transparencyInfo"]["fallback_last_good"]=True
+            prev["transparencyInfo"]["runMode"]=RUN_MODE
+            open("data.json","w",encoding="utf-8").write(json.dumps(prev,indent=2,ensure_ascii=False))
+            logging.warning("No fresh data; served last good snapshot.")
+        except Exception:
+            save_outputs(collected, used or ["None"])
+    else:
+        save_outputs(collected, used or ["None"])
