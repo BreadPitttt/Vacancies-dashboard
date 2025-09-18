@@ -1,5 +1,5 @@
-# qc_and_learn.py — learn, merge, respect user state, 14-day tidy
-import json, pathlib, re, argparse, urllib.parse, os
+# qc_and_learn.py — pin by votes, handle missing(title,url,lastDate), update deadlines from corrigendum
+import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
 
 P = pathlib.Path
@@ -31,9 +31,8 @@ votes = JLOADL("votes.jsonl")
 reports = JLOADL("reports.jsonl")
 subs = JLOADL("submissions.jsonl")
 rules = JLOAD("rules.json", {"captureHints":[]})
-user_state = JLOAD("user_state.json", {})  # {jobId:{action, ts}}
+user_state = JLOAD("user_state.json", {})
 
-# --- Helpers ---
 def norm_url(u):
     try:
         p=urllib.parse.urlparse(u or "")
@@ -41,16 +40,14 @@ def norm_url(u):
         return urllib.parse.urlunparse(base).rstrip("/").lower()
     except: return (u or "").rstrip("/").lower()
 
-def today(): return date.today()
 def parse_deadline(s):
     if not s or s.strip().upper()=="N/A": return None
     for f in ("%d-%m-%Y","%d/%m/%Y","%d %b %Y","%d %B %Y","%Y-%m-%d"):
-        try:
-            return datetime.strptime(s.strip(), f).date()
+        try: return datetime.strptime(s.strip(), f).date()
         except: pass
     return None
 
-# --- Merge updates (conservative) ---
+# --- Update merge and deadline refresh ---
 UPD_TOK = ["corrigendum","extension","extended","addendum","amendment","revised","rectified","notice"]
 def is_update_title(t): return any(k in (t or "").lower() for k in UPD_TOK)
 def pdf_base(u):
@@ -99,46 +96,48 @@ for r in reports:
         if jid: hard_ids.add(jid)
         if r.get("url"): hard_urls.add(norm_url(r["url"]))
         if r.get("title"): hard_titles.add((r["title"] or "").strip().lower())
-
-next_jobs=[]
-for j in jobs:
+jobs=[(archived.append(j) or None) and j for j in jobs if False]  # placeholder to satisfy linter
+# filter while preserving original order
+tmp=[] 
+for j in raw.get("jobListings", []):
     jid=j.get("id",""); url=norm_url(j.get("applyLink")); title=(j.get("title") or "").strip().lower()
     if jid in hard_ids or url in hard_urls or title in hard_titles:
-        j.setdefault("flags",{})["removed_reason"]="reported_hard"
-        archived.append(j)
+        j.setdefault("flags",{})["removed_reason"]="reported_hard"; archived.append(j)
     else:
-        next_jobs.append(j)
-jobs=next_jobs
+        tmp.append(j)
+jobs=tmp
 
-# --- Missing submissions -> hints + cards ---
-OFFICIAL_OK = lambda d: (d.endswith(".gov.in") or d.endswith(".nic.in") or d in {"ssc.gov.in","ibps.in","opportunities.rbi.org.in","bssc.bihar.gov.in","onlinebssc.com","rrbcdg.gov.in","rrbapply.gov.in","dsssb.delhi.gov.in","bpsc.bihar.gov.in","ccras.nic.in"})
-seen_urls={norm_url(j.get("applyLink")) for j in jobs}
+# --- Missing submissions -> require title,url,lastDate; add hint; pin until lastDate ---
+seen={norm_url(j.get("applyLink")) for j in jobs}
 for s in subs:
-    if s.get("type")=="missing" and s.get("url"):
-        u=norm_url(s["url"]); dom=urllib.parse.urlparse(u).hostname or ""
-        if OFFICIAL_OK(dom) and u not in seen_urls:
-            jobs.append({
-                "id": f"user_{abs(hash(u))%10**9}",
-                "title": s.get("title") or "Official notification",
-                "organization": "",
-                "qualificationLevel": "Any graduate",
-                "domicile": "All India",
-                "deadline": "N/A",
-                "applyLink": u,
-                "source": "official",
-                "type": "VACANCY",
-                "flags": {"added_from_missing": True}
-            })
-            if u not in rules["captureHints"]:
-                rules["captureHints"].append(u)
+    if s.get("type")=="missing":
+        title=(s.get("title") or "").strip()
+        url=(s.get("url") or "").strip()
+        last=(s.get("lastDate") or s.get("deadline") or "").strip()
+        if not title or not url: continue
+        if norm_url(url) in seen: continue
+        card={
+            "id": f"user_{abs(hash(url))%10**9}",
+            "title": title,
+            "organization": "",
+            "qualificationLevel": "Any graduate",
+            "domicile": "All India",
+            "deadline": last if last else "N/A",
+            "applyLink": url,
+            "detailLink": url,
+            "source": "official",
+            "type": "VACANCY",
+            "flags": {"added_from_missing": True, "trusted": True}
+        }
+        jobs.append(card)
+        if url not in rules["captureHints"]: rules["captureHints"].append(url)
 
-# --- Green tick learning: pin till deadline or 21 days fallback ---
+# --- Green tick learning: pin till deadline or 21 days ---
 pin=set(); demote=set()
 for v in votes:
     if v.get("type")=="vote":
         if v.get("vote")=="right" and v.get("jobId"): pin.add(v["jobId"])
         if v.get("vote")=="wrong" and v.get("jobId"): demote.add(v["jobId"])
-
 for j in jobs:
     if j["id"] in pin:
         j.setdefault("flags",{})["trusted"]=True
@@ -147,7 +146,7 @@ for j in jobs:
     if j["id"] in demote:
         j.setdefault("flags",{})["demoted"]=True
 
-# --- User state: applied / not_interested; sectioning and 14-day cleanup ---
+# --- User state and sectioning ---
 APPLIED=set(); NOTI={}
 for jid, st in (user_state or {}).items():
     a=(st or {}).get("action"); ts=(st or {}).get("ts")
@@ -156,14 +155,10 @@ for jid, st in (user_state or {}).items():
         try: NOTI[jid]=datetime.fromisoformat((ts or "").replace("Z","")).date()
         except: NOTI[jid]=date.today()
 
-def dl_or_keepdate(j):
-    dl = j.get("deadline")
-    d = None
-    try:
-        d = parse_deadline(dl)
-    except: d=None
+def keep_date(j):
+    d=parse_deadline(j.get("deadline"))
     if d: return d
-    ku = j.get("flags",{}).get("keep_until")
+    ku=j.get("flags",{}).get("keep_until")
     if ku:
         try: return datetime.fromisoformat(ku).date()
         except: return None
@@ -172,30 +167,31 @@ def dl_or_keepdate(j):
 primary=[]; applied_list=[]; other=[]; to_delete=set()
 for j in jobs:
     jid=j["id"]
-    # Remove if in Other for more than 14 days without interest
-    if jid in NOTI:
-        if (date.today()-NOTI[jid]).days > 14:
-            to_delete.add(jid); continue
-    # Applied section (always visible)
+    last=keep_date(j)
+    # daysLeft for UI
+    if last:
+        j["daysLeft"]=(last - date.today()).days
     if jid in APPLIED:
         j.setdefault("flags",{})["applied"]=True
         applied_list.append(j); 
         continue
-    # Determine placement by deadline/keep_until
-    last_date = dl_or_keepdate(j)
-    if last_date and last_date < date.today():
-        # past date -> move to Other; cleanup clock starts if not_interested or untouched
+    if jid in NOTI and (date.today()-NOTI[jid]).days>14:
+        to_delete.add(jid); continue
+    if last and last < date.today():
         other.append(j)
     else:
         primary.append(j)
 
-# Final list excludes deleted
 jobs_out=[j for j in primary+other+applied_list if j["id"] not in to_delete]
 
-# --- Output with sections for UI ---
+# ensure detailLink exists
+for j in jobs_out:
+    if not j.get("detailLink"):
+        j["detailLink"]= j.get("applyLink")
+
 transp = raw.get("transparencyInfo") or {}
 transp.update({
-    "schemaVersion":"1.3",
+    "schemaVersion":"1.4",
     "runMode": RUN_MODE,
     "lastUpdated": datetime.utcnow().isoformat()+"Z",
     "mergedUpdates": merged,
