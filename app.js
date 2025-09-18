@@ -4,10 +4,12 @@
 const CF_BASE = 'https://649b07cd.vacancies-dashboard.pages.dev';
 const feedbackEndpoint = CF_BASE + '/feedback';
 
+// Helpers
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return String(s||'').replace(/"/g,'&quot;'); }
 const bust = () => `?t=${Date.now()}`;
 
+// Health banner
 async function renderStatusBanner() {
   const pill = document.getElementById('health-pill');
   const last = document.getElementById('last-updated');
@@ -31,6 +33,7 @@ async function renderStatusBanner() {
   }
 }
 
+// Jobs list
 async function renderJobs() {
   const mount = document.getElementById('jobs-root');
   if (!mount) return;
@@ -71,6 +74,7 @@ async function renderJobs() {
   }
 }
 
+// Wire up forms and votes
 function setupFeedbackForms() {
   document.addEventListener('click', function(e) {
     if (e.target && e.target.classList.contains('btn-report')) {
