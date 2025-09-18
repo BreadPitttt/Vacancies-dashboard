@@ -8,12 +8,33 @@ import time
 import os
 from urllib.parse import urljoin, urlparse
 
+# ============ NEW: mode flag & rules capture hints ============
+import argparse
+def get_run_mode():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--mode", default=os.getenv("RUN_MODE","nightly"))
+    m = (ap.parse_args().mode or "nightly").lower()
+    return "weekly" if m == "weekly" else "nightly"
+
+def load_rules_file(path="rules.json"):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f) or {}
+    except Exception:
+        return {}
+RUN_MODE = get_run_mode()
+RULES_FILE = load_rules_file()
+# ==============================================================
+
 # ---------------- Configuration ----------------
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
-
 REQUEST_TIMEOUT = 20
 REQUEST_SLEEP_SECONDS = 1.2
 FIRST_SUCCESS_MODE = True  # stop at first source that returns jobs
+
+# ============ NEW: optional extra weekly seeds ============
+EXTRA_SEEDS = RULES_FILE.get("captureHints", []) if RUN_MODE == "weekly" else []
+# ==========================================================
 
 SOURCES = [
     {"name": "freejobalert",   "url": "https://www.freejobalert.com/", "parser": "parse_freejobalert"},
@@ -21,6 +42,13 @@ SOURCES = [
     {"name": "resultbharat",   "url": "https://www.resultbharat.com/", "parser": "parse_resultbharat"},
     {"name": "adda247",        "url": "https://www.adda247.com/jobs/", "parser": "parse_adda247"},
 ]
+
+# ============ NEW: prepend extra seeds in weekly ============
+if EXTRA_SEEDS:
+    # Treat each extra URL as its own “source” that reuses the adda parser (generic link harvesting)
+    for i, u in enumerate(EXTRA_SEEDS[:25]):  # cap to avoid overrun
+        SOURCES.insert(0, {"name": f"hint{i+1}", "url": u, "parser": "parse_adda247"})
+# ===========================================================
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
@@ -302,7 +330,6 @@ def site_section_excluded(host, title):
 def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
     title = clean_text(title)
     href_abs = normalize_url(base_url, href)
-
     hit, _ = title_hits_excluded(title)
     if hit:
         return None
@@ -313,7 +340,6 @@ def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
         return None
     if not domicile_allow(title):
         return None
-
     education = education_band_from_text(title)
     job = {
         "id": make_id(prefix, href_abs),
@@ -324,30 +350,28 @@ def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
         "slug": derive_slug(title, href_abs),
         "qualificationLevel": education if education in ["10th pass", "12th pass", "Any graduate"] else "N/A",
         "domicile": "All India",
-        "source": "aggregator",          # schema enum
-        "type": "VACANCY",               # schema enum
+        "source": "aggregator",
+        "type": "VACANCY",
         "extractedAt": now_iso(),
         "meta": {
             "post": derive_post(title),
             "allowedSkills": [k for k in ["Typing","Computer operations","Physical"] if allowed_basic_skill(title)],
             "sourceUrl": base_url,
-            "sourceSite": source_name     # keep original site here
+            "sourceSite": source_name
         }
     }
     return job
 
-# ---------------- Parsers ----------------
+# ---------------- Parsers (unchanged) ----------------
 def parse_freejobalert(content, source_name, base_url):
     soup = BeautifulSoup(content, 'html.parser')
     jobs = []
     host = urlparse(base_url).netloc
-
     def looks_job(t):
         tl = (t or "").lower()
         if any(x in tl for x in ["admit card","result","answer key","syllabus"]):
             return False
         return any(x in tl for x in ["recruit","vacancy","notification","apply online"])
-
     for tbl in soup.select('table'):
         for a in tbl.select('a[href]'):
             title = clean_text(a.get_text())
@@ -357,7 +381,6 @@ def parse_freejobalert(content, source_name, base_url):
             job = build_job('fja', source_name, base_url, title, href)
             if job and not site_section_excluded(host, title):
                 jobs.append(job)
-
     if not jobs:
         for a in soup.select('main a[href], .entry-content a[href], a[href]'):
             title = clean_text(a.get_text())
@@ -373,7 +396,6 @@ def parse_sarkarijobfind(content, source_name, base_url):
     soup = BeautifulSoup(content, 'html.parser')
     jobs = []
     host = urlparse(base_url).netloc
-
     for h in soup.find_all(re.compile('^h[1-6]$')):
         if re.search(r'new\s*update', h.get_text(), re.I):
             ul = h.find_next_sibling(['ul','ol'])
@@ -397,7 +419,6 @@ def parse_resultbharat(content, source_name, base_url):
     soup = BeautifulSoup(content, 'html.parser')
     jobs = []
     host = urlparse(base_url).netloc
-
     for table in soup.select('table'):
         headers = [clean_text(th.get_text()) for th in table.select('th')]
         if not headers:
@@ -428,7 +449,6 @@ def parse_adda247(content, source_name, base_url):
     soup = BeautifulSoup(content, 'html.parser')
     jobs = []
     host = urlparse(base_url).netloc
-
     for a in soup.select('article a[href], .post-card a[href], .card a[href]'):
         title = clean_text(a.get_text())
         href = a.get('href')
@@ -448,7 +468,7 @@ def fetch_and_parse(source):
         logging.error(f"Missing parser: {source['parser']}")
         return []
     try:
-        logging.info(f"Fetching {source['name']} -> {source['url']}")
+        logging.info(f"[{RUN_MODE}] Fetching {source['name']} -> {source['url']}")
         r = requests.get(source["url"], headers=HEADERS, timeout=REQUEST_TIMEOUT)
         r.raise_for_status()
         jobs = parser_func(r.content, source["name"], source["url"])
@@ -481,28 +501,27 @@ def save_outputs(jobs, sources_used):
             "notes": "General vacancies (10th/12th/Any graduate). Excludes teacher and technical/management/PG roles. Domicile: All‑India and Bihar‑only allowed; other states allowed only if title signals open to any state.",
             "sourcesTried": sources_used if isinstance(sources_used, list) else [sources_used],
             "schemaVersion": "1.2",
-            "totalListings": len(jobs),          # required by schema
-            "lastUpdated": now_iso()             # required by schema
+            "totalListings": len(jobs),
+            "lastUpdated": now_iso(),
+            "runMode": RUN_MODE  # NEW: transparency signal
         }
     }
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=4, ensure_ascii=False)
-
     health = {
         "ok": bool(jobs),
         "lastChecked": now_iso(),
         "totalActive": len(jobs),
         "sourceUsed": sources_used if not isinstance(sources_used, list) else (sources_used[0] if sources_used else "None"),
-        "rulesUpdatedAt": RULES.get("metadata", {}).get("updatedAt", "N/A")
+        "rulesUpdatedAt": RULES.get("metadata", {}).get("updatedAt", "N/A"),
+        "runMode": RUN_MODE
     }
     with open("health.json", "w", encoding="utf-8") as f:
         json.dump(health, f, indent=4)
 
-# ---------------- Entrypoint ----------------
 if __name__ == "__main__":
     collected = []
     used = []
-
     if FIRST_SUCCESS_MODE:
         for src in SOURCES:
             jobs = fetch_and_parse(src)
