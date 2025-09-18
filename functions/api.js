@@ -3,8 +3,10 @@ const ALLOW_ORIGIN = "https://breadpitttt.github.io";
 
 // This handler responds to the browser's initial "handshake" request
 const handleOptions = (request) => {
-  if (request.headers.get("Origin") === ALLOW_ORIGIN &&
-      request.headers.get("Access-Control-Request-Method") === "POST") {
+  if (
+    request.headers.get("Origin") === ALLOW_ORIGIN &&
+    request.headers.get("Access-Control-Request-Method") === "POST"
+  ) {
     return new Response(null, {
       status: 204,
       headers: {
