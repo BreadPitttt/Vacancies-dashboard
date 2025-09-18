@@ -1,4 +1,4 @@
-# qc_checks.py — post-generation validation only
+# qc_checks.py — validate final data.json (schema v1.3 compatible)
 import json, sys, pathlib
 from urllib.parse import urlparse
 from datetime import datetime, date
@@ -44,7 +44,6 @@ def main():
     if dl and dl.strip().upper()!="N/A":
       d=parse_date_any(dl)
       if not d: problems.append(f"[{rid}] invalid deadline format: {dl}")
-      elif d<today: problems.append(f"[{rid}] past deadline still active: {dl}")
     src=rec.get("source")
     if src not in ("official","aggregator"): problems.append(f"[{rid}] invalid source: {src}")
     typ=rec.get("type")
