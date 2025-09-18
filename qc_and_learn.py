@@ -1,4 +1,4 @@
-# qc_and_learn.py — generator with learning, conservative update-merging, and modes
+# qc_and_learn.py — generator with conservative corrigendum/extension merge
 import json, pathlib, datetime, re, urllib.parse, argparse
 from collections import Counter
 
@@ -8,6 +8,7 @@ def JLOAD(p, default):
         if P(p).exists(): return json.loads(P(p).read_text(encoding="utf-8"))
     except: pass
     return default
+def JWRITE(p, obj): P(p).write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
 def JLOADL(p):
     out=[]; 
     if P(p).exists():
@@ -17,7 +18,6 @@ def JLOADL(p):
             try: out.append(json.loads(line))
             except: pass
     return out
-def JWRITE(p, obj): P(p).write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
 
 def norm_url(u):
     try:
@@ -36,7 +36,6 @@ RUN_MODE = (ap.parse_args().mode or "nightly").lower()
 raw = JLOAD("data.json", {"jobListings": [], "transparencyInfo": {}})
 listings = list(raw.get("jobListings") or [])
 reports = JLOADL("reports.jsonl")
-votes   = JLOADL("votes.jsonl")
 subs    = JLOADL("submissions.jsonl")
 rules   = JLOAD("rules.json", {"blacklistedDomains": [], "autoRemoveReasons": ["expired"], "minQualification": None, "captureHints": []})
 
@@ -44,9 +43,8 @@ if RUN_MODE == "weekly":
     rules["blacklistedDomains"] = []
     rules["autoRemoveReasons"] = ["expired"]
 
-# Accept official-like missing submissions and learn captureHints (no ssc.nic.in)
+# Accept official-like missing submissions (no ssc.nic.in)
 OFFICIAL_WHITELIST = {"ssc.gov.in","upsconline.gov.in","upsconline.nic.in","ibps.in","bpsc.bihar.gov.in","opportunities.rbi.org.in","dsssb.delhi.gov.in","bssc.bihar.gov.in","onlinebssc.com","rrbcdg.gov.in","rrbapply.gov.in","ccras.nic.in"}
-added_from_missing = 0
 for s in subs:
     if s.get("type")=="missing" and s.get("url") and s.get("title"):
         u = norm_url(s["url"]); dom = urllib.parse.urlparse(u).hostname or ""
@@ -64,10 +62,9 @@ for s in subs:
               "type": "UPDATE",
               "flags": {"added_from_missing": True}
             })
-            added_from_missing += 1
             if u not in rules["captureHints"]: rules["captureHints"].append(u)
 
-# -------- Corrigendum/Extension merger (conservative) --------
+# -------- Corrigendum/Extension merger --------
 UPDATE_TOKENS = ["corrigendum","amendment","addendum","extension","extended","notice","revised","rectified"]
 ADV_RE = re.compile(r"(advt|advertisement|notice)\s*(no\.?|number)?\s*[:\-]?\s*([A-Za-z0-9\/\-\._]+)", re.I)
 
@@ -158,6 +155,7 @@ def try_merge_updates(items, parents):
 listings, merged_updates = try_merge_updates(listings, parents)
 
 # ---------------- Hard reports ----------------
+reports = reports  # already loaded
 hard_ids, hard_urls, hard_titles, hard_meta = set(), set(), set(), {}
 for r in reports:
     if r.get("type")=="report":
@@ -193,14 +191,14 @@ transp.update({
   "totalListings": len(kept),
   "lastUpdated": datetime.datetime.utcnow().isoformat()+"Z",
   "runMode": RUN_MODE,
-  "addedFromMissing": added_from_missing,
-  "mergedUpdates": merged_updates,
-  "autoRemoveReasons": rules.get("autoRemoveReasons", []),
-  "blacklistedDomains": rules.get("blacklistedDomains", [])
+  "mergedUpdates": merged_updates
 })
 
 data={"jobListings": kept, "archivedListings": archived, "transparencyInfo": transp}
 JWRITE("data.json", data)
 JWRITE("health.json", {"ok": True, "checkedAt": datetime.datetime.utcnow().isoformat()+"Z", **transp})
 JWRITE("learn.json", {"mergedUpdates": merged_updates,"generatedAt": datetime.datetime.utcnow().isoformat()+"Z","runMode": RUN_MODE})
+# Save rules back (unchanged structure; captureHints may be appended by submissions flow)
+rules["blacklistedDomains"] = rules.get("blacklistedDomains", [])
+rules["autoRemoveReasons"] = rules.get("autoRemoveReasons", ["expired"])
 JWRITE("rules.json", rules)
