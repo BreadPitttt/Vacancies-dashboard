@@ -1,7 +1,6 @@
-// functions/feedback.js — Cloudflare Pages Function (no dependencies)
+// functions/feedback.js — Cloudflare Pages Function (no deps), CORS + JSONL writes
 
-// CORS origin: your GitHub Pages site
-const ALLOW_ORIGIN = "https://breadpitttt.github.io";
+const ALLOW_ORIGIN = "https://breadpitttt.github.io"; // your site origin
 
 export const onRequestOptions = () => new Response(null, {
   status: 204,
@@ -21,41 +20,49 @@ export const onRequestPost = async ({ request, env }) => {
     const { type, payload } = await request.json();
     if (!type || !payload) return new Response("Bad Request", { status: 400, headers: corsHeaders() });
 
-    const filePath = (type === "missing") ? "submissions.jsonl" : "reports.jsonl";
-    const record = normalize(type, payload);
+    // Detect soft votes (card buttons) vs hard report (modal)
+    const isVote = !!(payload.flag || payload.jobId) && type === 'report';
+    const filePath = isVote ? "votes.jsonl" : (type === "missing" ? "submissions.jsonl" : "reports.jsonl");
 
-    const owner = "BreadPitttt";
-    const repo  = "Vacancies-dashboard";
-    const gh    = "https://api.github.com";
-    const headers = {
-      "Accept": "application/vnd.github+json",
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "User-Agent": "cf-pages-feedback"
-    };
-
-    // Read (404 tolerant)
-    let sha, current = "";
-    let r = await fetch(`${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`, { headers });
-    if (r.status === 404) { sha = undefined; current = ""; }
-    else if (r.ok) {
-      const j = await r.json();
-      sha = j.sha;
-      current = atob(j.content || "");
+    // Build record
+    let record;
+    if (isVote) {
+      // Soft vote with quick inline reason guess; the pipeline refines later
+      const vote = (payload.flag === "right") ? "right" : "wrong";
+      record = {
+        type: "vote",
+        vote,
+        jobId: payload.jobId || "",
+        title: payload.title || "",
+        url: payload.url || "",
+        reason: quickReason(payload), // basic guess; pipeline runs deeper checks
+        ts: new Date().toISOString()
+      };
+    } else if (type === "report") {
+      // Hard report (modal)
+      record = {
+        type: "report",
+        flag: "not general vacancy",
+        jobId: payload.listingId || "",
+        title: payload.reason || "",
+        url: payload.evidenceUrl || "",
+        note: payload.note || "",
+        ts: new Date().toISOString()
+      };
     } else {
-      return new Response(`Read failed: ${await r.text()}`, { status: r.status, headers: corsHeaders() });
+      // Missing modal
+      record = {
+        type: "missing",
+        title: payload.title || "",
+        url: payload.url || "",
+        note: payload.note || "",
+        ts: new Date().toISOString()
+      };
     }
 
-    const line = JSON.stringify({ ...record, ts: new Date().toISOString() }) + "\n";
-    const updated = btoa(current + line);
-    const body = { message: `feedback: append to ${filePath}`, content: updated };
-    if (sha) body.sha = sha;
-
-    r = await fetch(`${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`, {
-      method: "PUT", headers, body: JSON.stringify(body)
-    });
-    if (!r.ok) return new Response(`Update failed: ${await r.text()}`, { status: 500, headers: corsHeaders() });
-
+    // GitHub write
+    const ok = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", filePath, record);
+    if (!ok.ok) return new Response(ok.body, { status: ok.status, headers: corsHeaders() });
     return new Response("OK", { status: 200, headers: corsHeaders() });
   } catch (e) {
     return new Response(`Error: ${e.message}`, { status: 500, headers: corsHeaders() });
@@ -71,12 +78,47 @@ function corsHeaders(){
     "Content-Type": "text/plain; charset=utf-8"
   };
 }
-function normalize(type, p){
-  if (p && (p.flag || p.jobId)) {
-    return { type:"report", flag:p.flag || "not general vacancy", jobId:p.jobId||"", title:p.title||"", url:p.url||"", note:p.note||"" };
+
+// Quick, conservative guess; refined in pipeline
+function quickReason(p){
+  const t = (p.title || "").toLowerCase();
+  if (/aiims|cisf|rsmssb/.test(t)) return { code: "named_org", details: t.slice(0, 40) };
+  if (/apply online|notification/.test(t)) return { code: "generic_title", details: t.slice(0, 40) };
+  return { code: "unknown", details: "" };
+}
+
+async function appendJsonl(token, owner, repo, path, record){
+  const gh = "https://api.github.com";
+  const headers = {
+    "Accept": "application/vnd.github+json",
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json",
+    "User-Agent": "cf-pages-feedback"
+  };
+
+  // Get current file (404 tolerant)
+  let get = await fetch(`${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, { headers });
+  let sha, current = "";
+  if (get.status === 404) {
+    sha = undefined; current = "";
+  } else if (get.ok) {
+    const j = await get.json();
+    sha = j.sha;
+    current = atob(j.content || "");
+  } else {
+    return { ok:false, status:get.status, body:`Read failed: ${await get.text()}` };
   }
-  if (type === "report") {
-    return { type:"report", flag:"not general vacancy", jobId:p.listingId||"", title:p.reason||"", url:p.evidenceUrl||"", note:p.note||"" };
+
+  const line = JSON.stringify(record) + "\n";
+  const updated = btoa(current + line);
+  const body = { message: `feedback: append to ${path}`, content: updated };
+  if (sha) body.sha = sha;
+
+  const put = await fetch(`${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, {
+    method: "PUT", headers, body: JSON.stringify(body)
+  });
+  if (!put.ok) {
+    return { ok:false, status:500, body:`Update failed: ${await put.text()}` };
   }
-  return { type:"missing", title:p.title||"", url:p.url||"", note:p.note||"" };
+  return { ok:true, status:200, body:"OK" };
 }
