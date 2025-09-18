@@ -12,7 +12,7 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T08:35:19.082128",
+      "extractedAt": "2025-09-18T09:35:27.812895",
       "meta": {
         "post": "N/A",
         "allowedSkills": [],
@@ -36,7 +36,7 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T08:35:19.082244",
+      "extractedAt": "2025-09-18T09:35:27.812980",
       "meta": {
         "post": "Constable",
         "allowedSkills": [],
@@ -60,7 +60,7 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T08:35:19.082320",
+      "extractedAt": "2025-09-18T09:35:27.813060",
       "meta": {
         "post": "N/A",
         "allowedSkills": [],
@@ -81,7 +81,7 @@
     ],
     "schemaVersion": "1.2",
     "totalListings": 0,
-    "lastUpdated": "2025-09-18T08:35:19.153752Z",
+    "lastUpdated": "2025-09-18T09:35:27.875879Z",
     "runMode": "nightly",
     "removedByHardReports": 3,
     "removedByAutoReasons": 0,

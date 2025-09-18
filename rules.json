@@ -1,6 +1,8 @@
 {
   "blacklistedDomains": [],
-  "autoRemoveReasons": ["expired"],
+  "autoRemoveReasons": [
+    "expired"
+  ],
   "minQualification": null,
   "captureHints": [
     "https://dsssb.delhi.gov.in/",
