@@ -11,7 +11,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-18T17:10:31.892182Z",
+      "extractedAt": "2025-09-18T17:24:50.172332Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -32,7 +32,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-18T17:10:31.892339Z",
+      "extractedAt": "2025-09-18T17:24:50.172504Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -53,7 +53,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-18T17:10:31.892804Z",
+      "extractedAt": "2025-09-18T17:24:50.172996Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -74,7 +74,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-18T17:10:31.892935Z",
+      "extractedAt": "2025-09-18T17:24:50.173136Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -95,7 +95,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-18T17:10:31.892997Z",
+      "extractedAt": "2025-09-18T17:24:50.173199Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -125,7 +125,7 @@
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-18T17:11:08.596962Z",
+    "lastUpdated": "2025-09-18T17:25:26.426021Z",
     "mergedUpdates": 0
   }
 }
