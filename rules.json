@@ -1,8 +1,15 @@
 {
   "blacklistedDomains": [],
-  "autoRemoveReasons": [
-    "expired"
-  ],
+  "autoRemoveReasons": ["expired"],
   "minQualification": null,
-  "captureHints": []
+  "captureHints": [
+    "https://dsssb.delhi.gov.in/",
+    "https://www.bssc.bihar.gov.in/",
+    "https://www.rrbcdg.gov.in/",
+    "https://www.ibps.in/",
+    "https://www.bpsc.bih.nic.in/",
+    "https://opportunities.rbi.org.in/",
+    "https://www.ccras.nic.in/",
+    "https://ssc.gov.in/"
+  ]
 }
