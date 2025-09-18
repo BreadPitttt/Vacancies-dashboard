@@ -1,5 +1,5 @@
-// functions/feedback.js — explicit routes + safer CORS
-const ALLOW_ORIGIN = "https://breadpitttt.github.io";
+// functions/feedback.js — explicit routes + safer CORS + JSON replies
+const ALLOW_ORIGIN = "https://breadpitttt.github.io"; // your site origin
 
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders() });
 
@@ -8,41 +8,35 @@ export const onRequestPost = async ({ request, env }) => {
     const originHdr = request.headers.get("origin") || "";
     const referer = request.headers.get("referer") || "";
     const reqOrigin = safeOrigin(originHdr) || safeOrigin(referer) || "";
-    if (reqOrigin !== ALLOW_ORIGIN) return jsonRes({error:"Origin not allowed"}, 403);
+    if (reqOrigin !== ALLOW_ORIGIN) return jsonRes({ error: "Origin not allowed" }, 403);
 
     const token = env.FEEDBACK_TOKEN;
-    if (!token) return jsonRes({error:"Missing FEEDBACK_TOKEN"}, 500);
+    if (!token) return jsonRes({ error: "Missing FEEDBACK_TOKEN" }, 500);
 
-    const body = await request.json();
-    const type = body?.type;
+    let body = {};
+    try { body = await request.json(); } catch { return jsonRes({ error: "Invalid JSON" }, 400); }
+    const type = body && body.type;
 
-    if (type === "state") {
-      const { jobId, action, ts } = body?.payload || {};
-      if (!jobId || !action) return jsonRes({error:"Bad Request"}, 400);
-      const r = await upsertJsonMap(token, "BreadPitttt", "Vacancies-dashboard", "user_state.json", (state) => {
-        const copy = state && typeof state === "object" ? state : {};
-        if (action === "undo") delete copy[jobId];
-        else copy[jobId] = { action, ts: ts || new Date().toISOString() };
-        return copy;
-      });
-      return jsonRes({ok:r.ok!==false});
-    }
-
+    // Vote: {type:"vote", vote:"right"|"wrong", jobId, title, url}
     if (type === "vote") {
-      const record = {
+      const v = (body.vote === "right" || body.vote === "wrong") ? body.vote : null;
+      if (!v || !body.jobId) return jsonRes({ error: "Bad vote payload" }, 400);
+      const rec = {
         type: "vote",
-        vote: body.vote === "right" ? "right" : "wrong",
+        vote: v,
         jobId: body.jobId || "",
         title: body.title || "",
         url: body.url || "",
         ts: new Date().toISOString()
       };
-      const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "votes.jsonl", record);
-      return jsonRes({ok:r.status===200}, r.status);
+      const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "votes.jsonl", rec);
+      return jsonRes({ ok: r.status === 200 }, r.status);
     }
 
+    // Report: {type:"report", jobId, title, url, note}
     if (type === "report") {
-      const record = {
+      if (!body.jobId && !body.title && !body.url) return jsonRes({ error: "Bad report payload" }, 400);
+      const rec = {
         type: "report",
         jobId: body.jobId || "",
         title: body.title || "",
@@ -50,25 +44,41 @@ export const onRequestPost = async ({ request, env }) => {
         note: body.note || "",
         ts: new Date().toISOString()
       };
-      const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "reports.jsonl", record);
-      return jsonRes({ok:r.status===200}, r.status);
+      const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "reports.jsonl", rec);
+      return jsonRes({ ok: r.status === 200 }, r.status);
     }
 
+    // Missing: {type:"missing", title, url, lastDate?, note?}
     if (type === "missing") {
-      const record = {
+      if (!body.title || !body.url) return jsonRes({ error: "Missing title/url" }, 400);
+      const rec = {
         type: "missing",
         title: body.title || "",
         url: body.url || "",
+        lastDate: body.lastDate || body.deadline || "",
         note: body.note || "",
         ts: new Date().toISOString()
       };
-      const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "submissions.jsonl", record);
-      return jsonRes({ok:r.status===200}, r.status);
+      const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "submissions.jsonl", rec);
+      return jsonRes({ ok: r.status === 200 }, r.status);
     }
 
-    return jsonRes({error:"Bad Request"}, 400);
+    // State: {type:"state", payload:{jobId, action:"applied"|"not_interested"|"undo", ts}}
+    if (type === "state") {
+      const p = body.payload || {};
+      if (!p.jobId || !p.action) return jsonRes({ error: "Bad state payload" }, 400);
+      const r = await upsertJsonMap(token, "BreadPitttt", "Vacancies-dashboard", "user_state.json", (state) => {
+        const copy = state && typeof state === "object" ? state : {};
+        if (p.action === "undo") delete copy[p.jobId];
+        else copy[p.jobId] = { action: p.action, ts: p.ts || new Date().toISOString() };
+        return copy;
+      });
+      return jsonRes({ ok: r.ok !== false });
+    }
+
+    return jsonRes({ error: "Unknown type" }, 400);
   } catch (e) {
-    return jsonRes({error:e.message}, 500);
+    return jsonRes({ error: e.message }, 500);
   }
 };
 
@@ -93,7 +103,7 @@ async function appendJsonl(token, owner, repo, path, record){
     "Content-Type": "application/json",
     "User-Agent": "cf-pages-feedback"
   };
-  let get = await fetch(`${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, { headers });
+  const get = await fetch(`${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, { headers });
   let sha, current = "";
   if (get.status === 404) { sha = undefined; current = ""; }
   else if (get.ok) { const j = await get.json(); sha = j.sha; current = atob(j.content||""); }
@@ -113,7 +123,7 @@ async function upsertJsonMap(token, owner, repo, path, transform){
     "Content-Type": "application/json",
     "User-Agent": "cf-pages-feedback"
   };
-  let get = await fetch(`${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, { headers });
+  const get = await fetch(`${gh}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, { headers });
   let sha, obj = {};
   if (get.status === 404) { sha = undefined; obj = {}; }
   else if (get.ok) { const j = await get.json(); sha = j.sha; obj = JSON.parse(atob(j.content||"") || "{}"); }
