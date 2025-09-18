@@ -1,274 +1,171 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>General Vacancy Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Cache-Control" content="no-store" />
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <h1>General Vacancy Dashboard</h1>
-      <div class="meta">
-        <span id="health-pill" class="pill">Health: Unknown</span>
-        <span id="last-updated" class="muted">Last updated: —</span>
-        <span id="total-listings" class="muted">Listings: —</span>
-      </div>
-    </div>
-    <div class="actions">
-      <button id="btn-missing" class="btn ghost" type="button">Submit missing</button>
-    </div>
-  </header>
+<script>
+  (function(){
+    var CF_BASE = "https://649b07cd.vacancies-dashboard.pages.dev";
+    var feedbackEndpoint = CF_BASE + "/feedback";
+    var bust = function(){ return "?t=" + Date.now(); };
 
-  <main class="container">
-    <section>
-      <h2 class="section-title">Open vacancies</h2>
-      <div id="jobs-root" class="cards-grid"></div>
-    </section>
+    function qs(s, r){ return (r||document).querySelector(s); }
+    function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":""}[c]; }); }
+    function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
 
-    <section>
-      <h2 class="section-title">Applied</h2>
-      <div id="applied-root" class="cards-grid"></div>
-    </section>
+    async function postJSON(payload){
+      try{
+        var res = await fetch(feedbackEndpoint, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+        if(!res.ok){
+          var txt = "";
+          try{ txt = await res.text(); }catch(_){}
+          alert("Request failed (HTTP "+res.status+"). "+(txt||""));
+          return false;
+        }
+        return true;
+      }catch(e){
+        alert("Network issue, please retry.");
+        return false;
+      }
+    }
 
-    <section>
-      <h2 class="section-title">Other</h2>
-      <div id="other-root" class="cards-grid"></div>
-    </section>
-  </main>
+    function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
+    function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
 
-  <!-- Missing Vacancy Modal -->
-  <div id="missing-modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-body">
-      <div class="modal-head">
-        <h3>Submit Missing Vacancy</h3>
-        <button type="button" class="icon-btn" data-close>&times;</button>
-      </div>
-      <form id="missingForm" class="form">
-        <label>Post name</label>
-        <input id="missingTitle" placeholder="e.g., BSSC 4th Graduate Level 2025" required />
-        <label>Notification link (official)</label>
-        <input id="missingUrl" placeholder="https://...gov.in/..." required />
-        <label>Last date (DD-MM-YYYY or N/A)</label>
-        <input id="missingLastDate" placeholder="27-10-2025 or N/A" />
-        <label>Note (optional)</label>
-        <textarea id="missingNote" rows="3" placeholder="Any extra info"></textarea>
-        <div class="row end">
-          <button type="button" class="btn ghost" data-close>Close</button>
-          <button type="submit" class="btn primary">Submit</button>
-        </div>
-      </form>
-    </div>
-  </div>
+    async function renderStatus(){
+      var pill = qs("#health-pill"), last = qs("#last-updated"), total = qs("#total-listings");
+      try{
+        var res = await fetch("health.json"+bust(), { cache:"no-store" });
+        var h = await res.json();
+        pill.textContent = h.ok ? "Health: OK" : "Health: Not OK";
+        pill.className = "pill " + (h.ok ? "ok" : "bad");
+        var ts = h.lastUpdated || h.checkedAt || h.lastChecked || "";
+        last.textContent = "Last updated: " + (ts ? new Date(ts).toLocaleString() : "—");
+        total.textContent = "Listings: " + (typeof h.totalListings==="number" ? h.totalListings : "—");
+      }catch(e){
+        pill.textContent="Health: Unknown"; pill.className="pill";
+        last.textContent="Last updated: —"; total.textContent="Listings: —";
+      }
+    }
 
-  <!-- Report Modal -->
-  <div id="report-modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-body">
-      <div class="modal-head">
-        <h3>Report Listing</h3>
-        <button type="button" class="icon-btn" data-close>&times;</button>
-      </div>
-      <form id="reportForm" class="form">
-        <input type="hidden" id="reportListingId" />
-        <label>Reason</label>
-        <input id="reportReason" placeholder="Why is this wrong?" />
-        <label>Evidence URL (optional)</label>
-        <input id="reportEvidenceUrl" placeholder="https://..." />
-        <label>Note (optional)</label>
-        <textarea id="reportNote" rows="3"></textarea>
-        <div class="row end">
-          <button type="button" class="btn ghost" data-close>Close</button>
-          <button type="submit" class="btn danger">Report</button>
-        </div>
-      </form>
-    </div>
-  </div>
+    function cardHTML(job){
+      var trusted = job.flags && job.flags.trusted;
+      var badge = trusted ? '<span class="chip ok">✓ trusted</span>' : "";
+      var daysLeft = (job.daysLeft != null ? job.daysLeft : "—");
+      var apply = esc(job.applyLink || "#");
+      var details = esc(job.detailLink || job.applyLink || "#");
+      return '' +
+      '<article class="card" data-id="'+esc(job.id||"")+'">' +
+        '<header class="card-head"><h3 class="title">'+esc(job.title||"No Title")+'</h3>'+badge+'</header>' +
+        '<div class="card-body">' +
+          '<div class="rowline"><span class="muted">Organization</span><span>'+esc(job.organization||"N/A")+'</span></div>' +
+          '<div class="rowline"><span class="muted">Qualification</span><span>'+esc(job.qualificationLevel||"N/A")+'</span></div>' +
+          '<div class="rowline"><span class="muted">Domicile</span><span>'+esc(job.domicile||"All India")+'</span></div>' +
+          '<div class="rowline"><span class="muted">Last date</span><span>'+esc(fmtDate(job.deadline))+' <span class="muted">('+daysLeft+' days)</span></span></div>' +
+        '</div>' +
+        '<footer class="card-actions">' +
+          '<a class="btn primary" href="'+apply+'" target="_blank" rel="noopener">Apply</a>' +
+          '<a class="btn ghost" href="'+details+'" target="_blank" rel="noopener">Details</a>' +
+          '<span class="spacer"></span>' +
+          '<button class="btn ok" data-act="right">Right</button>' +
+          '<button class="btn warn" data-act="wrong">Wrong</button>' +
+          '<button class="btn" data-act="applied">Applied</button>' +
+          '<button class="btn" data-act="not_interested">Not interested</button>' +
+          '<button class="btn danger" data-act="report">Report</button>' +
+        '</footer>' +
+      '</article>';
+    }
 
-  <script>
-    (function(){
-      // Config
-      var CF_BASE = "https://649b07cd.vacancies-dashboard.pages.dev";
-      var feedbackEndpoint = CF_BASE + "/feedback";
-      var bust = function(){ return "?t=" + Date.now(); };
+    async function render(){
+      var root = qs("#jobs-root"), appRoot = qs("#applied-root"), otherRoot = qs("#other-root");
+      root.innerHTML = appRoot.innerHTML = otherRoot.innerHTML = "";
+      var data;
+      try{
+        var res = await fetch("data.json"+bust(), { cache:"no-store" });
+        data = await res.json();
+      }catch(e){
+        root.innerHTML = '<div class="empty">Could not load data.json</div>';
+        return;
+      }
+      var list = Array.isArray(data.jobListings) ? data.jobListings : [];
+      var sections = data.sections || {};
+      qs("#total-listings").textContent = "Listings: " + list.length;
 
-      // Helpers
-      function qs(s, r){ return (r||document).querySelector(s); }
-      function safe(s){ return s==null ? "" : String(s); }
-      function esc(s){ return safe(s).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":""}[c]; }); }
-      function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
+      var idsApplied = new Set(sections.applied || []);
+      var idsOther = new Set(sections.other || []);
 
-      function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
-      function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
-
-      async function send(payload){
-        try{
-          var res = await fetch(feedbackEndpoint, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
-          return res.ok;
-        }catch(e){ return false; }
+      if (list.length === 0){
+        root.innerHTML = '<div class="empty">No active job listings found.</div>';
+        return;
       }
 
-      async function renderStatus(){
-        var pill = qs("#health-pill"), last = qs("#last-updated"), total = qs("#total-listings");
-        try{
-          var res = await fetch("health.json"+bust(), { cache:"no-store" });
-          var h = await res.json();
-          pill.textContent = h.ok ? "Health: OK" : "Health: Not OK";
-          pill.className = "pill " + (h.ok ? "ok" : "bad");
-          var ts = h.lastUpdated || h.checkedAt || h.lastChecked || "";
-          last.textContent = "Last updated: " + (ts ? new Date(ts).toLocaleString() : "—");
-          total.textContent = "Listings: " + (typeof h.totalListings==="number" ? h.totalListings : "—");
-        }catch(e){
-          pill.textContent="Health: Unknown"; pill.className="pill";
-          last.textContent="Last updated: —"; total.textContent="Listings: —";
-        }
-      }
+      var fP = document.createDocumentFragment();
+      var fA = document.createDocumentFragment();
+      var fO = document.createDocumentFragment();
 
-      function cardHTML(job){
-        var trusted = job.flags && job.flags.trusted;
-        var badge = trusted ? '<span class="chip ok">✓ trusted</span>' : "";
-        var daysLeft = (job.daysLeft != null ? job.daysLeft : "—");
-        var apply = esc(job.applyLink || "#");
-        var details = esc(job.detailLink || job.applyLink || "#");
-        return '' +
-        '<article class="card" data-id="'+esc(job.id||"")+'">' +
-          '<header class="card-head"><h3 class="title">'+esc(job.title||"No Title")+'</h3>'+badge+'</header>' +
-          '<div class="card-body">' +
-            '<div class="rowline"><span class="muted">Organization</span><span>'+esc(job.organization||"N/A")+'</span></div>' +
-            '<div class="rowline"><span class="muted">Qualification</span><span>'+esc(job.qualificationLevel||"N/A")+'</span></div>' +
-            '<div class="rowline"><span class="muted">Domicile</span><span>'+esc(job.domicile||"All India")+'</span></div>' +
-            '<div class="rowline"><span class="muted">Last date</span><span>'+esc(fmtDate(job.deadline))+' <span class="muted">('+daysLeft+' days)</span></span></div>' +
-          '</div>' +
-          '<footer class="card-actions">' +
-            '<a class="btn primary" href="'+apply+'" target="_blank" rel="noopener">Apply</a>' +
-            '<a class="btn ghost" href="'+details+'" target="_blank" rel="noopener">Details</a>' +
-            '<span class="spacer"></span>' +
-            '<button class="btn ok" data-act="right">Right</button>' +
-            '<button class="btn warn" data-act="wrong">Wrong</button>' +
-            '<button class="btn" data-act="applied">Applied</button>' +
-            '<button class="btn" data-act="not_interested">Not interested</button>' +
-            '<button class="btn danger" data-act="report">Report</button>' +
-          '</footer>' +
-        '</article>';
-      }
+      for (var i=0;i<list.length;i++){
+        var job = list[i];
+        var wrap = document.createElement("div");
+        wrap.innerHTML = cardHTML(job);
+        var card = wrap.firstElementChild;
 
-      async function render(){
-        var root = qs("#jobs-root"), appRoot = qs("#applied-root"), otherRoot = qs("#other-root");
-        root.innerHTML = appRoot.innerHTML = otherRoot.innerHTML = "";
-        var data = null;
-        try{
-          var res = await fetch("data.json"+bust(), { cache:"no-store" });
-          data = await res.json();
-        }catch(e){
-          root.innerHTML = '<div class="empty">Could not load data.json</div>';
-          return;
-        }
-        var list = Array.isArray(data.jobListings) ? data.jobListings : [];
-        var sections = data.sections || {};
-        qs("#total-listings").textContent = "Listings: " + list.length;
-
-        var idsApplied = new Set(sections.applied || []);
-        var idsOther = new Set(sections.other || []);
-
-        if (list.length === 0){
-          root.innerHTML = '<div class="empty">No active job listings found.</div>';
-          return;
-        }
-
-        var fP = document.createDocumentFragment();
-        var fA = document.createDocumentFragment();
-        var fO = document.createDocumentFragment();
-
-        for (var i=0;i<list.length;i++){
-          var job = list[i];
-          var wrap = document.createElement("div");
-          wrap.innerHTML = cardHTML(job);
-          var card = wrap.firstElementChild;
-
-          card.addEventListener("click", async function(e){
-            var btn = e.target.closest("[data-act]"); if(!btn) return;
-            var act = btn.getAttribute("data-act");
-            var id = this.getAttribute("data-id");
-            var titleEl = this.querySelector(".title");
-            var title = titleEl ? titleEl.textContent.trim().slice(0,240) : "";
-            var urlEl = this.querySelector("a.primary");
-            var url = urlEl ? urlEl.href : "";
-            var payload = null;
-            if (act==="right" || act==="wrong"){
-              payload = { type:"vote", vote:act, jobId:id, title:title, url:url, clientTs:new Date().toISOString() };
-            } else if (act==="report"){
-              payload = { type:"report", jobId:id, title:title, url:url, note:"user report", clientTs:new Date().toISOString() };
-            } else if (act==="applied" || act==="not_interested"){
-              payload = { type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } };
-            }
-            if (payload){
-              var ok = await send(payload);
-              if(!ok) alert("Network issue, please retry.");
-            }
-          });
-
-          if (idsApplied.has(job.id)) fA.appendChild(card);
-          else if (idsOther.has(job.id)) fO.appendChild(card);
-          else fP.appendChild(card);
-        }
-
-        root.appendChild(fP);
-        appRoot.appendChild(fA);
-        otherRoot.appendChild(fO);
-      }
-
-      // Wire events after DOM is ready
-      document.addEventListener("DOMContentLoaded", function(){
-        // Top-right button to open missing modal
-        var btn = qs("#btn-missing");
-        if (btn){
-          btn.addEventListener("click", function(){ openModal("#missing-modal"); });
-        }
-        // Close buttons on any modal
-        document.addEventListener("click", function(e){
-          if (e.target && e.target.hasAttribute("data-close")) closeModal(e.target);
+        card.addEventListener("click", async function(e){
+          var btn = e.target.closest("[data-act]"); if(!btn) return;
+          var act = btn.getAttribute("data-act");
+          var id = this.getAttribute("data-id");
+          var titleEl = this.querySelector(".title");
+          var title = titleEl ? titleEl.textContent.trim().slice(0,240) : "";
+          var urlEl = this.querySelector("a.primary");
+          var url = urlEl ? urlEl.href : "";
+          var payload = null;
+          if (act==="right" || act==="wrong"){
+            payload = { type:"vote", vote:act, jobId:id, title:title, url:url, clientTs:new Date().toISOString() };
+          } else if (act==="report"){
+            payload = { type:"report", jobId:id, title:title, url:url, note:"user report", clientTs:new Date().toISOString() };
+          } else if (act==="applied" || act==="not_interested"){
+            payload = { type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } };
+          }
+          if (payload){ await postJSON(payload); }
         });
-        // Report form
-        var reportForm = qs("#reportForm");
-        if (reportForm){
-          reportForm.addEventListener("submit", async function(e){
-            e.preventDefault();
-            var id = qs("#reportListingId").value.trim();
-            var reason = qs("#reportReason").value.trim();
-            var url = qs("#reportEvidenceUrl").value.trim();
-            var note = qs("#reportNote").value.trim();
-            var ok = await send({ type:"report", jobId:id, title:reason, url:url, note:note, clientTs:new Date().toISOString() });
-            if (!ok) return alert("Failed to submit.");
-            closeModal(e.target);
-            e.target.reset();
-            alert("Reported.");
-          });
-        }
-        // Missing form
-        var missingForm = qs("#missingForm");
-        if (missingForm){
-          missingForm.addEventListener("submit", async function(e){
-            e.preventDefault();
-            var title = qs("#missingTitle").value.trim();
-            var url = qs("#missingUrl").value.trim();
-            var lastDate = qs("#missingLastDate").value.trim();
-            var note = qs("#missingNote").value.trim();
-            if (!title || !url) return alert("Post name and official link are required.");
-            var ok = await send({ type:"missing", title:title, url:url, lastDate:lastDate, note:note, clientTs:new Date().toISOString() });
-            if (!ok) return alert("Failed to submit.");
-            closeModal(e.target);
-            e.target.reset();
-            alert("Saved. It will appear after the next refresh.");
-          });
-        }
-        // Initial render
-        (async function(){
-          await renderStatus();
-          await render();
-        })();
-      });
-    })();
-  </script>
-</body>
-</html>
+
+        if (idsApplied.has(job.id)) fA.appendChild(card);
+        else if (idsOther.has(job.id)) fO.appendChild(card);
+        else fP.appendChild(card);
+      }
+
+      root.appendChild(fP);
+      appRoot.appendChild(fA);
+      otherRoot.appendChild(fO);
+    }
+
+    document.addEventListener("DOMContentLoaded", function(){
+      var btn = qs("#btn-missing");
+      if (btn){ btn.addEventListener("click", function(){ openModal("#missing-modal"); }); }
+      document.addEventListener("click", function(e){ if (e.target && e.target.hasAttribute("data-close")) closeModal(e.target); });
+
+      var missingForm = qs("#missingForm");
+      if (missingForm){
+        missingForm.addEventListener("submit", async function(e){
+          e.preventDefault();
+          var title = qs("#missingTitle").value.trim();
+          var url = qs("#missingUrl").value.trim();
+          var lastDate = qs("#missingLastDate").value.trim();
+          var note = qs("#missingNote").value.trim();
+          if (!title || !url){ alert("Post name and official link are required."); return; }
+          var ok = await postJSON({ type:"missing", title:title, url:url, lastDate:lastDate, note:note, clientTs:new Date().toISOString() });
+          if (ok){ closeModal(e.target); e.target.reset(); alert("Saved. It will appear after the next refresh."); }
+        });
+      }
+
+      var reportForm = qs("#reportForm");
+      if (reportForm){
+        reportForm.addEventListener("submit", async function(e){
+          e.preventDefault();
+          var id = qs("#reportListingId").value.trim();
+          var reason = qs("#reportReason").value.trim();
+          var ev = qs("#reportEvidenceUrl").value.trim();
+          var note = qs("#reportNote").value.trim();
+          var ok = await postJSON({ type:"report", jobId:id, title:reason, url:ev, note:note, clientTs:new Date().toISOString() });
+          if (ok){ closeModal(e.target); e.target.reset(); alert("Reported."); }
+        });
+      }
+
+      (async function init(){ await renderStatus(); await render(); })();
+    });
+  })();
+</script>
