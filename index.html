@@ -5,40 +5,72 @@
   <title>General Vacancy Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif; margin: 0; background: #0b1220; color: #eef2ff; }
-    header { padding: 16px 20px; background: #0f172a; position: sticky; top: 0; z-index: 2; }
-    h1 { margin: 0; font-size: 20px; }
-    #stats { opacity: 0.8; font-size: 13px; margin-top: 6px; }
-    main { padding: 16px 20px; max-width: 960px; margin: auto; }
-    .section-title { margin: 18px 0 8px; font-size: 16px; opacity: 0.9; }
-    .card { background: #161b2d; margin-bottom: 12px; border-radius: 8px; padding: 16px; }
-    .card-title { font-weight: bold; font-size: 15px; color: #62dafb; }
-    .meta div { font-size: 13px; margin-top: 4px; }
-    .actions { margin-top: 12px; }
-    .btn, a.btn { font-size: 12px; padding: 6px 10px; border-radius: 4px; border: none; cursor: pointer; user-select: none; margin-right: 6px; }
-    a.btn { text-decoration: none; color: #fff; }
-    .btn:hover, a.btn:hover { opacity: 0.85; }
-    .btn-apply { background: #3b82f6; }
-    .btn-right { background: #22c55e; color: white; }
-    .btn-wrong { background: #ef4444; color: white; }
-    .btn-report { background: #f97316; color: white; }
-    .btn-applied { background: #0ea5e9; color: white; }
-    .btn-noti { background: #64748b; color: white; }
-    .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius:4px; margin-left:6px; background:#1f2937; color:#a7f3d0; }
-    .trusted { color:#22c55e; }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
+  <div class="topbar">
     <h1>General Vacancy Dashboard</h1>
-    <div id="stats">Loading...</div>
-  </header>
-  <main id="app"></main>
+    <div class="stats">
+      <span id="health-pill" class="pill">Health: Unknown</span>
+      <span id="last-updated">Last updated: —</span>
+      <span id="total-listings">Listings: —</span>
+    </div>
+    <div class="actions">
+      <button id="btn-show-missing-form" class="btn outline">Submit Missing Vacancy</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div id="jobs-root"></div>
+  </div>
+
+  <!-- Missing Vacancy Modal -->
+  <div id="missing-modal" class="modal hidden">
+    <div class="modal-body">
+      <h3>Submit Missing Vacancy</h3>
+      <form id="missingForm">
+        <label>Post name</label>
+        <input id="missingTitle" placeholder="e.g., BSSC 4th Graduate Level 2025" required />
+        <label>Notification link (official)</label>
+        <input id="missingUrl" placeholder="https://...gov.in/..." required />
+        <label>Last date (DD-MM-YYYY or N/A)</label>
+        <input id="missingLastDate" placeholder="27-10-2025 or N/A" />
+        <label>Note (optional)</label>
+        <textarea id="missingNote" rows="3" placeholder="Any extra info"></textarea>
+        <div class="row end" style="margin-top:10px;">
+          <button type="button" class="btn outline">Close</button>
+          <button type="submit" class="btn primary">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Report Modal -->
+  <div id="report-modal" class="modal hidden">
+    <div class="modal-body">
+      <h3>Report Listing</h3>
+      <form id="reportForm">
+        <input type="hidden" id="reportListingId" />
+        <label>Reason</label>
+        <input id="reportReason" placeholder="Why is this wrong?" />
+        <label>Evidence URL (optional)</label>
+        <input id="reportEvidenceUrl" placeholder="https://..." />
+        <label>Note (optional)</label>
+        <textarea id="reportNote" rows="3"></textarea>
+        <div class="row end" style="margin-top:10px;">
+          <button type="button" class="btn outline">Close</button>
+          <button type="submit" class="btn danger">Report</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script>
-    const API_ENDPOINT = 'https://vacancy.animeshkumar97.workers.dev/v1/submit';
-    const STORAGE_KEY = 'vd_vote_queue';
+    const CF_BASE = 'https://649b07cd.vacancies-dashboard.pages.dev';
+    const feedbackEndpoint = CF_BASE + '/feedback';
+    const bust = () => `?t=${Date.now()}`;
+    function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'''}[c])); }
+    function escapeAttr(s){ return String(s||'').replace(/"/g,'&quot;'); }
 
     function h(tag, cls, html){
       const e=document.createElement(tag);
@@ -47,114 +79,143 @@
       return e;
     }
     function sectionWrap(title){
-      const wrap=h('div','section');
-      wrap.appendChild(h('div','section-title',title));
-      const cont=h('div','cards'); wrap.appendChild(cont);
+      const wrap=h('section','');
+      wrap.appendChild(h('h2','',title));
+      const cont=h('div','cards-grid'); wrap.appendChild(cont);
       return {wrap, cont};
     }
     function fmtDate(s){ return s && s.toUpperCase()!=='N/A' ? s : 'N/A'; }
 
-    function getCardData(card){
-      return {
-        id: card.getAttribute('data-id') || '',
-        title: (card.querySelector('.card-title')?.textContent || '').trim().slice(0,240),
-        url: (card.querySelector('a.btn-apply')?.href || '').trim()
-      };
-    }
-
     async function send(payload){
       try{
-        const res = await fetch(API_ENDPOINT, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const res = await fetch(feedbackEndpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
         return res.ok;
       }catch{return false;}
     }
-    function enqueue(payload){
-      try{
-        const q = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        q.push({...payload, queuedAt:new Date().toISOString()});
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(q).slice(0, 200000));
-      }catch{}
-    }
-    async function flushQueue(){
-      try{
-        const q = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        if(q.length===0) return;
-        const item=q.shift();
-        const ok=await send(item);
-        if(ok){ localStorage.setItem(STORAGE_KEY, JSON.stringify(q)); if(q.length) setTimeout(flushQueue, 400); }
-        else{ q.unshift(item); localStorage.setItem(STORAGE_KEY, JSON.stringify(q)); }
-      }catch{}
-    }
 
-    async function submitVote(card, kind){
-      const c = getCardData(card);
-      if(!c.id) return alert('Missing job id.');
-      let payload;
-      if(kind==='right' || kind==='wrong'){
-        payload = { type:'vote', vote:kind, jobId:c.id, title:c.title, url:c.url, clientTs:new Date().toISOString() };
-      }else if(kind==='report'){
-        payload = { type:'report', jobId:c.id, title:c.title, url:c.url, note:'user report', clientTs:new Date().toISOString() };
-      }else if(kind==='applied' || kind==='not_interested'){
-        payload = { type:'state', payload:{ jobId:c.id, action:kind, ts:new Date().toISOString() } };
-      }
-      const ok = await send(payload);
-      if(!ok){ enqueue(payload); setTimeout(flushQueue, 400); }
-    }
-
-    function cardHTML(job, sections){
+    function buildCard(job){
+      const card = h('div','job-card'); card.setAttribute('data-id', job.id || '');
       const trusted = job.flags && job.flags.trusted;
-      const applied = job.flags && job.flags.applied;
-      return `
-        <div class="card-title">${job.title || 'N/A'} ${trusted?'<span class="badge trusted">✓ trusted</span>':''}</div>
-        <div class="meta">
-          <div>Organization: ${job.organization || 'N/A'}</div>
-          <div>Qualification: ${job.qualificationLevel || 'N/A'}</div>
-          <div>Domicile: ${job.domicile || 'All India'}</div>
-          <div>Last date: ${fmtDate(job.deadline)}</div>
-        </div>
-        <div class="actions">
-          <a href="${job.applyLink || '#'}" class="btn btn-apply" target="_blank" rel="noopener noreferrer">Apply Here</a>
-          <button data-act="report" class="btn btn-report">Report</button>
-          <button data-act="right" class="btn btn-right">Right</button>
-          <button data-act="wrong" class="btn btn-wrong">Wrong</button>
-          <button data-act="applied" class="btn btn-applied">Applied</button>
-          <button data-act="not_interested" class="btn btn-noti">Not interested</button>
-        </div>
+      const badge = trusted ? ' <span class="badge trusted">✓ trusted</span>' : '';
+      const daysLeft = (job.daysLeft ?? '—');
+      card.innerHTML = `
+        <h3>${escapeHtml(job.title || 'No Title')}${badge}</h3>
+        <p><strong>Organization:</strong> ${escapeHtml(job.organization || 'N/A')}</p>
+        <p><strong>Qualification:</strong> ${escapeHtml(job.qualificationLevel || 'N/A')}</p>
+        <p><strong>Domicile:</strong> ${escapeHtml(job.domicile || 'All India')}</p>
+        <p><strong>Last date:</strong> ${escapeHtml(fmtDate(job.deadline))} (${daysLeft} days left)</p>
+        <p class="links">
+          <a class="btn primary" href="${escapeAttr(job.applyLink || '#')}" target="_blank" rel="noopener">Apply Here</a>
+          <a class="btn outline" href="${escapeAttr(job.detailLink || job.applyLink || '#')}" target="_blank" rel="noopener">View details</a>
+          <button class="btn btn-report" data-act="report">Report</button>
+          <span class="spacer"></span>
+          <button class="btn success" data-act="right">✔ Right</button>
+          <button class="btn danger" data-act="wrong">✖ Wrong</button>
+          <button class="btn outline" data-act="applied">Applied</button>
+          <button class="btn outline" data-act="not_interested">Not interested</button>
+        </p>
       `;
+      card.addEventListener('click', async (e)=>{
+        const btn = e.target.closest('[data-act]'); if(!btn) return;
+        const id = card.getAttribute('data-id');
+        const title = (card.querySelector('h3')?.textContent || '').trim().slice(0,240);
+        const url = (card.querySelector('a.primary')?.href || '').trim();
+        let payload;
+        const act = btn.getAttribute('data-act');
+        if(act==='right' || act==='wrong'){
+          payload = { type:'vote', vote:act, jobId:id, title, url, clientTs:new Date().toISOString() };
+        }else if(act==='report'){
+          payload = { type:'report', jobId:id, title, url, note:'user report', clientTs:new Date().toISOString() };
+        }else if(act==='applied' || act==='not_interested'){
+          payload = { type:'state', payload:{ jobId:id, action:act, ts:new Date().toISOString() } };
+        }
+        if(payload){ const ok=await send(payload); if(!ok) alert('Network issue, please retry.'); }
+      });
+      return card;
+    }
+
+    async function renderStatus(){
+      const pill = document.getElementById('health-pill');
+      const last = document.getElementById('last-updated');
+      const total = document.getElementById('total-listings');
+      try {
+        const res = await fetch('health.json' + bust(), { cache: 'no-store' });
+        const h = await res.json();
+        pill.textContent = h.ok ? 'Health: OK' : 'Health: Not OK';
+        pill.className = h.ok ? 'pill ok' : 'pill bad';
+        const ts = h.lastUpdated || h.checkedAt || h.lastChecked || '';
+        last.textContent = 'Last updated: ' + (ts ? new Date(ts).toLocaleString() : '—');
+        total.textContent = 'Listings: ' + (typeof h.totalListings==='number' ? h.totalListings : '—');
+      } catch {
+        pill.textContent = 'Health: Unknown'; pill.className = 'pill';
+        last.textContent = 'Last updated: —'; total.textContent = 'Listings: —';
+      }
     }
 
     async function render(){
-      const res = await fetch('data.json', {cache:'no-store'});
+      const app = document.getElementById('jobs-root');
+      const res = await fetch('data.json' + bust(), { cache:'no-store' });
       const data = await res.json();
       const list = data.jobListings || [];
       const sections = data.sections || {};
-      const app = document.getElementById('app'); app.innerHTML = '';
-      document.getElementById('stats').textContent = `Listings: ${list.length}`;
-
-      const secApplied = sectionWrap('Applied (always visible)');
-      const secPrimary = sectionWrap('Open vacancies');
-      const secOther = sectionWrap('Other (past date or not interested)');
+      document.getElementById('total-listings').textContent = 'Listings: ' + list.length;
 
       const idsApplied = new Set(sections.applied || []);
       const idsOther = new Set(sections.other || []);
 
+      const secPrimary = sectionWrap('Open vacancies');
+      const secApplied = sectionWrap('Applied (always visible)');
+      const secOther = sectionWrap('Other (past date or not interested)');
+
       for(const job of list){
-        const card = h('div','card'); card.classList.add('job-card'); card.setAttribute('data-id', job.id || '');
-        card.innerHTML = cardHTML(job, sections);
-        card.addEventListener('click', e=>{
-          const btn = e.target.closest('[data-act]'); if(!btn) return;
-          submitVote(card, btn.getAttribute('data-act'));
-        });
+        const card = buildCard(job);
         if(idsApplied.has(job.id)) secApplied.cont.appendChild(card);
         else if(idsOther.has(job.id)) secOther.cont.appendChild(card);
         else secPrimary.cont.appendChild(card);
       }
-      app.appendChild(secPrimary.wrap);
-      app.appendChild(secApplied.wrap);
-      app.appendChild(secOther.wrap);
+      app.innerHTML=''; app.appendChild(secPrimary.wrap); app.appendChild(secApplied.wrap); app.appendChild(secOther.wrap);
     }
-    render();
-    window.addEventListener('load', flushQueue);
+
+    // Missing / Report modals
+    document.addEventListener('click', e=>{
+      if(e.target && e.target.id==='btn-show-missing-form'){
+        document.getElementById('missing-modal').classList.remove('hidden');
+      }
+      if(e.target && e.target.closest('.modal') && e.target.matches('.btn.outline')){
+        e.target.closest('.modal').classList.add('hidden');
+      }
+    });
+
+    async function submitForm(e){
+      e.preventDefault();
+      const form = e.target;
+      const formType = form.id === 'reportForm' ? 'report' : 'missing';
+      let payload;
+      if (formType === 'report') {
+        payload = {
+          listingId: document.getElementById('reportListingId').value,
+          reason: (document.getElementById('reportReason').value || '').trim(),
+          evidenceUrl: (document.getElementById('reportEvidenceUrl').value || '').trim() || null,
+          note: (document.getElementById('reportNote').value || '').trim() || null
+        };
+      } else {
+        const title = (document.getElementById('missingTitle').value || '').trim();
+        const url = (document.getElementById('missingUrl').value || '').trim();
+        const lastDate = (document.getElementById('missingLastDate').value || '').trim();
+        if (!title || !url){ alert('Post name and notification link are required.'); return; }
+        payload = { title, url, lastDate, note: (document.getElementById('missingNote').value || '').trim() || null };
+      }
+      const ok = await send({ type: formType, ...payload, payload: formType==='report' ? payload : undefined });
+      if (!ok) { alert('Failed to submit.'); return; }
+      alert('Saved!'); form.closest('.modal').classList.add('hidden'); form.reset();
+    }
+    document.getElementById('reportForm').addEventListener('submit', submitForm);
+    document.getElementById('missingForm').addEventListener('submit', submitForm);
+
+    document.addEventListener('DOMContentLoaded', async ()=>{
+      await renderStatus();
+      await render();
+    });
   </script>
 </body>
 </html>
