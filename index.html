@@ -2,79 +2,160 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>General Vacancy Dashboard</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif; margin: 0; background: #0b1220; color: #eef2ff; }
+    header { padding: 16px 20px; background: #0f172a; position: sticky; top: 0; z-index: 2; }
+    h1 { margin: 0; font-size: 20px; }
+    #stats { opacity: 0.8; font-size: 13px; margin-top: 6px; }
+    main { padding: 16px 20px; max-width: 800px; margin: auto; }
+    .card { background: #161b2d; margin-bottom: 12px; border-radius: 8px; padding: 16px; }
+    .card-title { font-weight: bold; font-size: 15px; color: #62dafb; }
+    .meta div { font-size: 13px; margin-top: 4px; }
+    .actions { margin-top: 12px; }
+    .btn, a.btn { font-size: 12px; padding: 5px 10px; border-radius: 4px; border: none; cursor: pointer; user-select: none; margin-right: 6px; }
+    a.btn { text-decoration: none; color: #fff; }
+    .btn:hover, a.btn:hover { opacity: 0.8; }
+    .btn-apply { background: #3b82f6; }
+    .btn-right { background: #22c55e; color: white; }
+    .btn-wrong { background: #ef4444; color: white; }
+    .btn-report { background: #f97316; color: white; }
+  </style>
 </head>
 <body>
-  <header class="topbar">
-    <h1>General Vacancies</h1>
-    <div class="stats">
-      <span id="health-pill" class="pill">Health: …</span>
-      <span id="last-updated">Last updated: —</span>
-      <span id="total-listings">Listings: —</span>
-    </div>
-    <div class="actions">
-      <button id="btn-show-missing-form" class="btn">Submit a Missing Vacancy</button>
-      <button id="btn-open-report" class="btn" onclick="document.getElementById('report-modal').classList.remove('hidden')">Open Report Form</button>
-    </div>
+  <header>
+    <h1>General Vacancy Dashboard</h1>
+    <div id="stats">Loading...</div>
   </header>
 
-  <main class="container">
-    <!-- Active jobs -->
-    <section>
-      <div id="jobs-root" class="cards-grid"></div>
-    </section>
-
-    <!-- Personal tracking sections -->
-    <section>
-      <h2>Applied</h2>
-      <div id="applied-root" class="applied-grid"></div>
-    </section>
-
-    <section>
-      <h2>Not Interested</h2>
-      <div id="notint-root" class="notint-grid"></div>
-    </section>
+  <main id="app">
   </main>
 
-  <!-- Report Modal -->
-  <div id="report-modal" class="modal hidden">
-    <div class="modal-body">
-      <h3>Report Listing</h3>
-      <input type="hidden" id="reportListingId" />
-      <label for="reportReason">Reason</label>
-      <input id="reportReason" placeholder="Why is it not a general vacancy?" />
-      <label for="reportEvidenceUrl">Evidence URL</label>
-      <input id="reportEvidenceUrl" placeholder="Link proving issue" />
-      <label for="reportNote">Note (optional)</label>
-      <textarea id="reportNote" rows="3"></textarea>
-      <div class="row end">
-        <button type="button" class="btn" onclick="document.getElementById('report-modal').classList.add('hidden')">Close</button>
-        <button type="submit" form="reportForm" class="btn primary">Submit</button>
-      </div>
-    </div>
-    <form id="reportForm"></form>
-  </div>
+  <script>
+    async function render() {
+      try {
+        const res = await fetch('data.json', {cache: 'no-store'});
+        const data = await res.json();
+        const list = data.jobListings || [];
+        document.getElementById('stats').textContent = `Listings: ${list.length}`;
+        const app = document.getElementById('app');
+        app.innerHTML = '';
+        for (const job of list) {
+          const card = document.createElement('div');
+          card.className = 'card card-item job-card';
+          card.setAttribute('data-id', job.id || '');
+          card.innerHTML = `
+            <div class="card-title">${job.title || 'N/A'}</div>
+            <div class="meta">
+              <div>Organization: ${job.organization || 'N/A'}</div>
+              <div>Qualification: ${job.qualificationLevel || 'N/A'}</div>
+              <div>Domicile: ${job.domicile || 'All India'}</div>
+              <div>Deadline: ${job.deadline || 'N/A'}</div>
+            </div>
+            <div class="actions">
+              <a href="${job.applyLink || '#'}" class="btn btn-apply" target="_blank" rel="noopener noreferrer">Apply Here</a>
+              <button data-vote="report" class="btn btn-report">Report</button>
+              <button data-vote="right" class="btn btn-right">Right</button>
+              <button data-vote="wrong" class="btn btn-wrong">Wrong</button>
+            </div>
+          `;
+          app.appendChild(card);
+        }
+      } catch (e) {
+        console.error('Failed to load data.json', e);
+        document.getElementById('stats').textContent = 'Failed to load vacancies';
+      }
+    }
+    render();
 
-  <!-- Missing Modal -->
-  <div id="missing-modal" class="modal hidden">
-    <div class="modal-body">
-      <h3>Submit a Missing Vacancy</h3>
-      <label for="missingTitle">Title</label>
-      <input id="missingTitle" placeholder="Vacancy title" />
-      <label for="missingUrl">URL</label>
-      <input id="missingUrl" placeholder="Official link" />
-      <label for="missingNote">Note (optional)</label>
-      <textarea id="missingNote" rows="3"></textarea>
-      <div class="row end">
-        <button type="button" class="btn" onclick="document.getElementById('missing-modal').classList.add('hidden')">Close</button>
-        <button type="submit" form="missingForm" class="btn primary">Submit</button>
-      </div>
-    </div>
-    <form id="missingForm"></form>
-  </div>
+    (function() {
+      const API_ENDPOINT = 'https://vacancy.animeshkumar97.workers.dev/v1/submit';
+      const STORAGE_KEY = 'vd_vote_queue';
 
-  <script src="app.js"></script>
+      function getCard(el) {
+        const card = el.closest('.job-card');
+        if (!card) return null;
+        return {
+          id: card.getAttribute('data-id') || '',
+          title: (card.querySelector('.card-title')?.textContent || '').trim().slice(0, 240),
+          url: (card.querySelector('a.btn-apply')?.href || '').trim()
+        };
+      }
+
+      function enqueue(payload) {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          const queue = stored ? JSON.parse(stored) : [];
+          queue.push({...payload, queuedAt: new Date().toISOString()});
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(queue).slice(0, 200000));
+        } catch (e) { console.warn('Failed to enqueue vote:', e); }
+      }
+
+      async function send(payload) {
+        try {
+          const resp = await fetch(API_ENDPOINT, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+          });
+          return resp.ok;
+        } catch {
+          return false;
+        }
+      }
+
+      async function flushQueue() {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (!stored) return;
+          const queue = JSON.parse(stored);
+          if (queue.length === 0) return;
+          const item = queue.shift();
+          const ok = await send(item);
+          if (ok) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+            if (queue.length > 0) setTimeout(flushQueue, 500);
+          } else {
+            queue.unshift(item);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+          }
+        } catch (e) {
+          console.warn('Failed to flush queue:', e);
+        }
+      }
+
+      async function submitVote(btn, vote) {
+        const card = getCard(btn);
+        if (!card || !card.id || (!card.url && !card.title)) {
+          alert('Cannot submit vote: missing ID or link.');
+          return;
+        }
+        const payload = {
+          type: vote === 'report' ? 'report' : 'vote',
+          vote: vote === 'right' ? 'right' : vote === 'wrong' ? 'wrong' : null,
+          jobId: card.id,
+          title: card.title,
+          url: card.url,
+          clientTs: new Date().toISOString()
+        };
+        const ok = await send(payload);
+        if (!ok) {
+          enqueue(payload);
+          alert('Vote queued due to network issues. Will retry automatically later.');
+        }
+        setTimeout(flushQueue, 300);
+      }
+
+      document.addEventListener('click', e => {
+        const btn = e.target.closest('[data-vote]');
+        if (!btn) return;
+        submitVote(btn, btn.getAttribute('data-vote'));
+      });
+
+      window.addEventListener('load', flushQueue);
+    })();
+  </script>
 </body>
 </html>
