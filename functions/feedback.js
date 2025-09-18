@@ -1,5 +1,5 @@
-// functions/feedback.js — explicit routes + safer CORS + JSON replies
-const ALLOW_ORIGIN = "https://breadpitttt.github.io"; // your site origin
+// functions/feedback.js — explicit routes, CORS for GitHub Pages, JSON replies
+const ALLOW_ORIGIN = "https://breadpitttt.github.io"; // your dashboard origin
 
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders() });
 
@@ -8,7 +8,7 @@ export const onRequestPost = async ({ request, env }) => {
     const originHdr = request.headers.get("origin") || "";
     const referer = request.headers.get("referer") || "";
     const reqOrigin = safeOrigin(originHdr) || safeOrigin(referer) || "";
-    if (reqOrigin !== ALLOW_ORIGIN) return jsonRes({ error: "Origin not allowed" }, 403);
+    if (reqOrigin !== ALLOW_ORIGIN) return jsonRes({ error: "Origin not allowed", origin: reqOrigin }, 403);
 
     const token = env.FEEDBACK_TOKEN;
     if (!token) return jsonRes({ error: "Missing FEEDBACK_TOKEN" }, 500);
@@ -17,32 +17,26 @@ export const onRequestPost = async ({ request, env }) => {
     try { body = await request.json(); } catch { return jsonRes({ error: "Invalid JSON" }, 400); }
     const type = body && body.type;
 
-    // Vote: {type:"vote", vote:"right"|"wrong", jobId, title, url}
+    // Vote: {type:"vote", vote:"right"|"wrong", jobId, title?, url?}
     if (type === "vote") {
       const v = (body.vote === "right" || body.vote === "wrong") ? body.vote : null;
       if (!v || !body.jobId) return jsonRes({ error: "Bad vote payload" }, 400);
       const rec = {
-        type: "vote",
-        vote: v,
-        jobId: body.jobId || "",
-        title: body.title || "",
-        url: body.url || "",
+        type: "vote", vote: v,
+        jobId: body.jobId || "", title: body.title || "", url: body.url || "",
         ts: new Date().toISOString()
       };
       const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "votes.jsonl", rec);
       return jsonRes({ ok: r.status === 200 }, r.status);
     }
 
-    // Report: {type:"report", jobId, title, url, note}
+    // Report: {type:"report", jobId?, title?, url?, note?}
     if (type === "report") {
       if (!body.jobId && !body.title && !body.url) return jsonRes({ error: "Bad report payload" }, 400);
       const rec = {
         type: "report",
-        jobId: body.jobId || "",
-        title: body.title || "",
-        url: body.url || "",
-        note: body.note || "",
-        ts: new Date().toISOString()
+        jobId: body.jobId || "", title: body.title || "", url: body.url || "",
+        note: body.note || "", ts: new Date().toISOString()
       };
       const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "reports.jsonl", rec);
       return jsonRes({ ok: r.status === 200 }, r.status);
@@ -52,18 +46,15 @@ export const onRequestPost = async ({ request, env }) => {
     if (type === "missing") {
       if (!body.title || !body.url) return jsonRes({ error: "Missing title/url" }, 400);
       const rec = {
-        type: "missing",
-        title: body.title || "",
-        url: body.url || "",
-        lastDate: body.lastDate || body.deadline || "",
-        note: body.note || "",
+        type: "missing", title: body.title || "", url: body.url || "",
+        lastDate: body.lastDate || body.deadline || "", note: body.note || "",
         ts: new Date().toISOString()
       };
       const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "submissions.jsonl", rec);
       return jsonRes({ ok: r.status === 200 }, r.status);
     }
 
-    // State: {type:"state", payload:{jobId, action:"applied"|"not_interested"|"undo", ts}}
+    // State: {type:"state", payload:{jobId, action:"applied"|"not_interested"|"undo", ts?}}
     if (type === "state") {
       const p = body.payload || {};
       if (!p.jobId || !p.action) return jsonRes({ error: "Bad state payload" }, 400);
