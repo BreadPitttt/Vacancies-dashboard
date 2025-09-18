@@ -8,8 +8,8 @@ on:
         required: false
         default: "nightly"
   schedule:
-    - cron: '17 18 * * *'   # nightly
-    - cron: '28 20 * * 1'   # Monday weekly hard recheck
+    - cron: '17 18 * * *'   # nightly (18:17 UTC daily)
+    - cron: '28 20 * * 1'   # weekly (Mon 20:28 UTC)
 
 permissions:
   contents: write
