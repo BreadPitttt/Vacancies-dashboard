@@ -152,6 +152,44 @@ def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
         "meta": {"sourceUrl": base_url, "sourceSite": source_name}
     }
 
+# ---------------- Seed host helpers ----------------
+def host_of(u):
+    try: return urlparse(u).netloc.lower()
+    except: return ""
+
+def parse_seed_rrb(soup, base_url):
+    jobs=[]
+    for a in soup.select('a[href]'):
+        t=clean_text(a.get_text()); h=a.get('href','')
+        if not t or not h: continue
+        if not re.search(r'(recruit|vacanc|employment|notice)', t, re.I) and not re.search(r'(vacanc|recruit)', h, re.I):
+            continue
+        j=build_job('hint','hint_rrb',base_url,t,h)
+        if j: jobs.append(j)
+    return jobs
+
+def parse_seed_bssc(soup, base_url):
+    jobs=[]
+    for a in soup.select('#NoticeBoard a[href], .notice a[href], a[href*="Notice"], a[href*="Advt"], a[href*="Advertisement"]'):
+        t=clean_text(a.get_text()); h=a.get('href','')
+        if not t or not h: continue
+        if not re.search(r'(advt|advertisement|notice|recruit|vacanc)', t, re.I): continue
+        j=build_job('hint','hint_bssc',base_url,t,h)
+        if j: jobs.append(j)
+    return jobs
+
+def parse_seed_rbi(soup, base_url):
+    jobs=[]
+    for tr in soup.select('table tr'):
+        a=tr.find('a', href=True)
+        if not a: continue
+        t=clean_text(a.get_text()); h=a['href']
+        if not t or not h: continue
+        if not re.search(r'(recruit|vacanc|advert|grade)', t, re.I): continue
+        j=build_job('hint','hint_rbi',base_url,t,h)
+        if j: jobs.append(j)
+    return jobs
+
 # ---------------- Parsers ----------------
 def parse_freejobalert(content, source_name, base_url):
     soup = BeautifulSoup(content,'html.parser'); jobs=[]; host=urlparse(base_url).netloc
@@ -163,14 +201,14 @@ def parse_freejobalert(content, source_name, base_url):
         for a in tbl.select('a[href]'):
             title=clean_text(a.get_text())
             if not looks_job(title): continue
-            job=build_job('fja', source_name, base_url, title, a.get('href'))
-            if job and not site_section_excluded(host, title): jobs.append(job)
+            j=build_job('fja', source_name, base_url, title, a.get('href'))
+            if j and not site_section_excluded(host, title): jobs.append(j)
     if not jobs:
         for a in soup.select('main a[href], .entry-content a[href], a[href]'):
             title=clean_text(a.get_text())
             if not looks_job(title): continue
-            job=build_job('fja', source_name, base_url, title, a.get('href'))
-            if job and not site_section_excluded(host, title): jobs.append(job)
+            j=build_job('fja', source_name, base_url, title, a.get('href'))
+            if j and not site_section_excluded(host, title): jobs.append(j)
     return jobs
 
 def parse_sarkarijobfind(content, source_name, base_url):
@@ -184,8 +222,8 @@ def parse_sarkarijobfind(content, source_name, base_url):
                 if not a: continue
                 title=clean_text(a.get_text())
                 if site_section_excluded(host, title): continue
-                job=build_job('sjf', source_name, base_url, title, a['href'])
-                if job: jobs.append(job)
+                j=build_job('sjf', source_name, base_url, title, a['href'])
+                if j: jobs.append(j)
             break
     return jobs
 
@@ -205,16 +243,23 @@ def parse_resultbharat(content, source_name, base_url):
                 if not a: continue
                 title=clean_text(a.get_text())
                 if site_section_excluded(host, title): continue
-                job=build_job('rb', source_name, base_url, title, a['href'])
-                if job: jobs.append(job)
+                j=build_job('rb', source_name, base_url, title, a['href'])
+                if j: jobs.append(j)
     return jobs
 
 def parse_adda247(content, source_name, base_url):
     soup=BeautifulSoup(content,'html.parser'); jobs=[]; host=urlparse(base_url).netloc
-    # Seed (hint) harvesting: broad anchors + URL de-dup + keyword filter
     if source_name.startswith("hint"):
+        hostn = host_of(base_url)
+        if 'rrbcdg.gov.in' in hostn or 'rrbapply.gov.in' in hostn:
+            return parse_seed_rrb(soup, base_url)
+        if 'bssc.bihar.gov.in' in hostn or 'onlinebssc.com' in hostn:
+            return parse_seed_bssc(soup, base_url)
+        if 'opportunities.rbi.org.in' in hostn:
+            return parse_seed_rbi(soup, base_url)
+        # fallback broad seed harvesting with keyword filter + de-dup
         anchors = soup.select('main a[href], section a[href], article a[href], a[href]')
-        seen_urls = set()
+        seen=set()
         def looks_seed(t, h):
             tl=(t or "").lower(); hl=(h or "").lower()
             kw=["recruit","vacancy","notific","advert","employment","application","corrigendum","extension","extended"]
@@ -223,20 +268,19 @@ def parse_adda247(content, source_name, base_url):
             title=clean_text(a.get_text()); href=a.get('href')
             if not title or not href: continue
             abs_url = normalize_url(base_url, href)
-            if not abs_url or abs_url in seen_urls: continue
+            if not abs_url or abs_url in seen: continue
             if not looks_seed(title, href): continue
             if site_section_excluded(host, title): continue
-            job=build_job('hint', source_name, base_url, title, abs_url)
-            if job:
-                jobs.append(job); seen_urls.add(abs_url)
+            j=build_job('hint', source_name, base_url, title, abs_url)
+            if j: jobs.append(j); seen.add(abs_url)
         return jobs
     # Regular Adda with broadened selectors
     for a in soup.select('article a[href], .post-card a[href], .card a[href], main a[href*="recruit"], main a[href*="notific"]'):
         title=clean_text(a.get_text()); href=a.get('href')
         if not title or not href: continue
         if site_section_excluded(host, title): continue
-        job=build_job('adda', source_name, base_url, title, href)
-        if job: jobs.append(job)
+        j=build_job('adda', source_name, base_url, title, href)
+        if j: jobs.append(j)
     return jobs
 
 # ---------------- Fetch / Save / Main ----------------
