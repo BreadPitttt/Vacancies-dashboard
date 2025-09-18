@@ -1,15 +1,13 @@
 // app.js — Cloudflare-ready, self-learning feedback
 
-// 1) Set this to your Cloudflare Pages URL (no trailing slash), then add /feedback
-const CF_BASE = 'https://<your-pages>.pages.dev';
+// Your Cloudflare Pages base
+const CF_BASE = 'https://649b07cd.vacancies-dashboard.pages.dev';
 const feedbackEndpoint = CF_BASE + '/feedback';
 
-// Small helpers
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return String(s||'').replace(/"/g,'&quot;'); }
 const bust = () => `?t=${Date.now()}`;
 
-// Health banner
 async function renderStatusBanner() {
   const pill = document.getElementById('health-pill');
   const last = document.getElementById('last-updated');
@@ -33,7 +31,6 @@ async function renderStatusBanner() {
   }
 }
 
-// Jobs list
 async function renderJobs() {
   const mount = document.getElementById('jobs-root');
   if (!mount) return;
@@ -74,9 +71,7 @@ async function renderJobs() {
   }
 }
 
-// Wire up report/missing modals and voting
 function setupFeedbackForms() {
-  // Open report modal from card button
   document.addEventListener('click', function(e) {
     if (e.target && e.target.classList.contains('btn-report')) {
       const listingId = e.target.getAttribute('data-id') || '';
@@ -85,7 +80,6 @@ function setupFeedbackForms() {
     }
   });
 
-  // Open missing modal from top button
   const showMissingBtn = document.getElementById('btn-show-missing-form');
   if (showMissingBtn) {
     showMissingBtn.addEventListener('click', () => {
@@ -93,34 +87,28 @@ function setupFeedbackForms() {
     });
   }
 
-  // Close modals
   document.querySelectorAll('.modal button[type="button"]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.target.closest('.modal').classList.add('hidden');
     });
   });
 
-  // Report/Missing forms
   const reportForm = document.getElementById('reportForm');
   if (reportForm) reportForm.addEventListener('submit', submitForm);
 
   const missingForm = document.getElementById('missingForm');
   if (missingForm) missingForm.addEventListener('submit', submitForm);
 
-  // Right/Wrong voting maps to type:'report' with compact payload
   document.addEventListener('click', async function(e){
     const t = e.target;
     if (!t || !t.classList.contains('btn-vote')) return;
-    const vote = t.getAttribute('data-vote'); // 'right' | 'wrong'
+    const vote = t.getAttribute('data-vote');
     const jobId = t.getAttribute('data-id') || '';
     const title = t.getAttribute('data-title') || '';
     const url = t.getAttribute('data-url') || '';
     t.disabled = true;
     try{
-      const payload = {
-        jobId, title, url,
-        flag: vote === 'wrong' ? 'not general vacancy' : 'right'
-      };
+      const payload = { jobId, title, url, flag: vote === 'wrong' ? 'not general vacancy' : 'right' };
       const r = await fetch(feedbackEndpoint, {
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -140,7 +128,6 @@ function setupFeedbackForms() {
   });
 }
 
-// Unified submit handler for modals
 async function submitForm(e){
   e.preventDefault();
   const form = e.target;
@@ -185,7 +172,6 @@ async function submitForm(e){
   }
 }
 
-// Boot
 document.addEventListener('DOMContentLoaded', () => {
   renderStatusBanner();
   renderJobs();
