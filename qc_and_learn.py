@@ -1,4 +1,4 @@
-# qc_and_learn.py — generator with learning and weekly mode
+# qc_and_learn.py — generator with learning and modes
 import json, pathlib, datetime, re, urllib.parse, argparse
 from collections import Counter
 
@@ -34,8 +34,7 @@ def parse_deadline(deadline):
         try: return datetime.datetime.strptime(deadline.strip(), fmt).date()
         except: pass
     return None
-OFFICIAL_WHITELIST = {"ssc.nic.in","upsconline.nic.in","upsconline.gov.in","rpsc.rajasthan.gov.in"}
-ADS_HOSTS = {"freejobalert.com","www.freejobalert.com","sarkariresult.com","www.sarkariresult.com"}
+OFFICIAL_WHITELIST = {"ssc.nic.in","upsconline.nic.in","upsconline.gov.in","rpsc.rajasthan.gov.in","ibps.in","bpsc.bih.nic.in","opportunities.rbi.org.in","dsssb.delhi.gov.in","bssc.bihar.gov.in","rrbcdg.gov.in","ccras.nic.in"}
 
 def infer_reason(listing):
     title=(listing.get("title") or "").lower()
@@ -44,7 +43,8 @@ def infer_reason(listing):
     d=parse_deadline(listing.get("deadline"))
     today=datetime.date.today()
     if d and d<today: return {"code":"expired","details":listing.get("deadline")}
-    if dom and dom in ADS_HOSTS and dom not in OFFICIAL_WHITELIST: return {"code":"ad_redirect","details":dom}
+    if dom and dom not in OFFICIAL_WHITELIST and any(x in (dom or "") for x in ["freejobalert","sarkariresult","resultbharat","adda247"]):
+        return {"code":"ad_redirect","details":dom}
     qual=(listing.get("qualificationLevel") or "").lower()
     text=" ".join([title, qual])
     if re.search(r"\b(10th|12th|class\s*10|class\s*12|matric|intermediate)\b", text):
@@ -64,12 +64,10 @@ def index_listing(lst):
         if t: by_title[t]=j
     return by_id, by_url, by_title
 
-# Mode
 ap = argparse.ArgumentParser()
 ap.add_argument("--mode", default="nightly")
 RUN_MODE = (ap.parse_args().mode or "nightly").lower()
 
-# Load
 raw = read_json("data.json", {"jobListings": [], "transparencyInfo": {}})
 listings = list(raw.get("jobListings") or [])
 reports = read_jsonl("reports.jsonl")
@@ -77,12 +75,11 @@ votes   = read_jsonl("votes.jsonl")
 subs    = read_jsonl("submissions.jsonl")
 rules   = read_json("rules.json", {"blacklistedDomains": [], "autoRemoveReasons": ["expired"], "minQualification": None, "captureHints": []})
 
-# Weekly hard recheck reset
 if RUN_MODE == "weekly":
     rules["blacklistedDomains"] = []
     rules["autoRemoveReasons"] = ["expired"]
 
-# Add from missing if official-like
+# Accept missing from official-like domains and learn hints
 added_from_missing = 0
 for s in subs:
     if s.get("type")=="missing" and s.get("url") and s.get("title"):
@@ -125,14 +122,14 @@ for v in votes:
     if v.get("type")!="vote" or v.get("vote") not in ("right","wrong"): continue
     j = by_id.get(v.get("jobId","")) or by_url.get(norm_url(v.get("url",""))) or by_title.get(norm_title(v.get("title","")))
     if not j: j={"title": v.get("title",""), "url": v.get("url",""), "deadline": None, "qualificationLevel": None}
-    reason = infer_reason(j)["code"]
-    learn_reasons[reason]+=1
+    reason = infer_reason(j)
+    code = reason["code"]
+    learn_reasons[code]+=1
     if v["vote"]=="right":
-        rightR[reason]+=1; domR[domain_of(v.get("url"))]+=1
+        rightR[code]+=1; domR[domain_of(v.get("url"))]+=1
     else:
-        wrongR[reason]+=1; domW[domain_of(v.get("url"))]+=1
+        wrongR[code]+=1; domW[domain_of(v.get("url"))]+=1
 
-# Rule evolution
 for code, cnt in rightR.items():
     if cnt>=2 and wrongR.get(code,0)==0 and code in rules.get("autoRemoveReasons", []):
         rules["autoRemoveReasons"]=[c for c in rules["autoRemoveReasons"] if c!=code]
@@ -155,13 +152,16 @@ for job in listings:
     title=norm_title(job.get("title") or "")
     dom=domain_of(url)
     drop=None; meta=None
+
     if jid and jid in hard_ids: drop="reported_hard"; meta=hard_meta.get(jid)
     elif url and url in hard_urls: drop="reported_hard"; meta=hard_meta.get(url)
     elif title and title in hard_titles: drop="reported_hard"; meta=hard_meta.get(title)
+
     if not drop:
         rsn=infer_reason(job)["code"]
         if (dom in rules.get("blacklistedDomains", [])) or (rsn in set(rules.get("autoRemoveReasons", []))):
             drop=f"auto_{rsn}"
+
     if drop:
         job.setdefault("flags",{})["removed_reason"]=drop
         if meta:
@@ -172,7 +172,6 @@ for job in listings:
     else:
         kept.append(job)
 
-# Outputs
 transp = raw.get("transparencyInfo") or {}
 transp["totalListings"]=len(kept)
 transp["lastUpdated"]=datetime.datetime.utcnow().isoformat()+"Z"
