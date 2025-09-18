@@ -1,14 +1,11 @@
 {
   "ok": true,
-  "checkedAt": "2025-09-18T15:36:58.404280Z",
-  "notes": "General vacancies (10th/12th/Any graduate). Excludes teacher and technical/management/PG roles. Domicile: All‑India and Bihar‑only allowed; other states allowed only if title signals open to any state.",
-  "sourcesTried": [
-    "freejobalert"
-  ],
-  "schemaVersion": "1.2",
-  "totalListings": 0,
-  "lastUpdated": "2025-09-18T15:36:58.404037Z",
+  "schemaVersion": "1.3",
   "runMode": "light",
-  "mergedUpdates": 0,
-  "fallback_last_good": true
+  "totalListings": 5,
+  "sourcesTried": [
+    "hint4"
+  ],
+  "lastUpdated": "2025-09-18T16:54:30.971608Z",
+  "mergedUpdates": 0
 }

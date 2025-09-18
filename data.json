@@ -1,16 +1,126 @@
 {
-  "jobListings": [],
+  "jobListings": [
+    {
+      "id": "hint_f61bb6c955a40af5",
+      "title": "Corrigendum-1 regarding revision of notified vacancies for CEN 06-2024 NTPC-Undergraduate posts",
+      "organization": "N/A",
+      "deadline": "N/A",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
+      "slug": "corrigendum-1-regarding-revision-of-notified-vacancies-for-cen-06-2024-ntpc-unde",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "source": "official",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T16:53:56.094643Z",
+      "meta": {
+        "sourceUrl": "https://rrbcdg.gov.in/",
+        "sourceSite": "hint4"
+      },
+      "flags": {
+        "no_parent_found": true
+      }
+    },
+    {
+      "id": "hint_857de82dd19ac693",
+      "title": "Corrigendum-2 regarding revision of notified vacancies of CEN 05-2024 NTPC-Graduate posts",
+      "organization": "N/A",
+      "deadline": "N/A",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
+      "slug": "corrigendum-2-regarding-revision-of-notified-vacancies-of-cen-05-2024-ntpc-gradu",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "source": "official",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T16:53:56.094806Z",
+      "meta": {
+        "sourceUrl": "https://rrbcdg.gov.in/",
+        "sourceSite": "hint4"
+      },
+      "flags": {
+        "no_parent_found": true
+      }
+    },
+    {
+      "id": "hint_a7e10b91ed5a646f",
+      "title": "Centralised Employment Notice No. 06/2024 for recruitment of various undergraduate posts of Non-Technical Popular Categories",
+      "organization": "N/A",
+      "deadline": "N/A",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
+      "slug": "centralised-employment-notice-no-06-2024-for-recruitment-of-various-undergraduat",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "source": "official",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T16:53:56.095296Z",
+      "meta": {
+        "sourceUrl": "https://rrbcdg.gov.in/",
+        "sourceSite": "hint4"
+      },
+      "flags": {
+        "no_parent_found": true
+      }
+    },
+    {
+      "id": "hint_ab48ec3436e06f17",
+      "title": "Corrigendum-1 for CEN 05-2024 NTPC-Graduate posts",
+      "organization": "N/A",
+      "deadline": "N/A",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-1.pdf",
+      "slug": "corrigendum-1-for-cen-05-2024-ntpc-graduate-posts",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "source": "official",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T16:53:56.095433Z",
+      "meta": {
+        "sourceUrl": "https://rrbcdg.gov.in/",
+        "sourceSite": "hint4"
+      },
+      "flags": {
+        "no_parent_found": true
+      }
+    },
+    {
+      "id": "hint_8cdeeddcddefdd2e",
+      "title": "Centralised Employment Notice No. 05/2024 for recruitment of various graduate posts of Non-Technical Popular Categories",
+      "organization": "N/A",
+      "deadline": "N/A",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
+      "slug": "centralised-employment-notice-no-05-2024-for-recruitment-of-various-graduate-pos",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "source": "official",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T16:53:56.095495Z",
+      "meta": {
+        "sourceUrl": "https://rrbcdg.gov.in/",
+        "sourceSite": "hint4"
+      },
+      "flags": {
+        "no_parent_found": true
+      }
+    }
+  ],
   "archivedListings": [],
+  "sections": {
+    "applied": [],
+    "other": [],
+    "primary": [
+      "hint_f61bb6c955a40af5",
+      "hint_857de82dd19ac693",
+      "hint_a7e10b91ed5a646f",
+      "hint_ab48ec3436e06f17",
+      "hint_8cdeeddcddefdd2e"
+    ]
+  },
   "transparencyInfo": {
-    "notes": "General vacancies (10th/12th/Any graduate). Excludes teacher and technical/management/PG roles. Domicile: All‑India and Bihar‑only allowed; other states allowed only if title signals open to any state.",
-    "sourcesTried": [
-      "freejobalert"
-    ],
-    "schemaVersion": "1.2",
-    "totalListings": 0,
-    "lastUpdated": "2025-09-18T15:36:58.404037Z",
+    "schemaVersion": "1.3",
     "runMode": "light",
-    "mergedUpdates": 0,
-    "fallback_last_good": true
+    "totalListings": 5,
+    "sourcesTried": [
+      "hint4"
+    ],
+    "lastUpdated": "2025-09-18T16:54:30.971608Z",
+    "mergedUpdates": 0
   }
 }
