@@ -34,7 +34,7 @@ def parse_deadline(deadline):
         try: return datetime.datetime.strptime(deadline.strip(), fmt).date()
         except: pass
     return None
-OFFICIAL_WHITELIST = {"ssc.nic.in","upsconline.nic.in","upsconline.gov.in","rpsc.rajasthan.gov.in","ibps.in","bpsc.bih.nic.in","opportunities.rbi.org.in","dsssb.delhi.gov.in","bssc.bihar.gov.in","rrbcdg.gov.in","ccras.nic.in"}
+OFFICIAL_WHITELIST = {"ssc.gov.in","upsconline.nic.in","upsconline.gov.in","rpsc.rajasthan.gov.in","ibps.in","bpsc.bih.nic.in","opportunities.rbi.org.in","dsssb.delhi.gov.in","bssc.bihar.gov.in","rrbcdg.gov.in","ccras.nic.in"}
 
 def infer_reason(listing):
     title=(listing.get("title") or "").lower()
@@ -198,3 +198,4 @@ learn={
 }
 write_json("learn.json", learn)
 write_json("rules.json", rules)
+
