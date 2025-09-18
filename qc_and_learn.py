@@ -1,5 +1,5 @@
 # qc_and_learn.py — learn, merge, respect user state, 14-day tidy
-import json, pathlib, re, argparse, urllib.parse
+import json, pathlib, re, argparse, urllib.parse, os
 from datetime import datetime, timedelta, date
 
 P = pathlib.Path
@@ -33,7 +33,7 @@ subs = JLOADL("submissions.jsonl")
 rules = JLOAD("rules.json", {"captureHints":[]})
 user_state = JLOAD("user_state.json", {})  # {jobId:{action, ts}}
 
-# --- Utilities ---
+# --- Helpers ---
 def norm_url(u):
     try:
         p=urllib.parse.urlparse(u or "")
@@ -52,17 +52,13 @@ def parse_deadline(s):
 
 # --- Merge updates (conservative) ---
 UPD_TOK = ["corrigendum","extension","extended","addendum","amendment","revised","rectified","notice"]
-def is_update_title(t): 
-    tl=(t or "").lower()
-    return any(k in tl for k in UPD_TOK)
-
+def is_update_title(t): return any(k in (t or "").lower() for k in UPD_TOK)
 def pdf_base(u):
     try:
         p=urllib.parse.urlparse(u or ""); fn=(p.path or "").rsplit("/",1)[-1]
         fn=re.sub(r"(?i)(corrigendum|extension|extended|addendum|amendment|notice|revised|rectified)","",fn)
         return re.sub(r"[\W_]+","", fn.lower())
     except: return ""
-
 def url_root(u):
     try:
         p=urllib.parse.urlparse(u or "")
@@ -70,7 +66,6 @@ def url_root(u):
         path=(root.path or "/").rsplit("/",1)[0]
         return f"{root.scheme}://{root.netloc}{path}"
     except: return u or ""
-
 def adv_no(t):
     m=re.search(r"(advt|advertisement|notice)\s*(no\.?|number)?\s*[:\-]?\s*([A-Za-z0-9\/\-\._]+)", t or "", re.I)
     return m.group(3).lower() if m else ""
@@ -89,7 +84,6 @@ for j in jobs:
         if s>score: score, best = s, p
     if best and score>=0.6:
         best.setdefault("updates", []).append({"title": j.get("title"), "link": j.get("applyLink"), "capturedAt": datetime.utcnow().isoformat()+"Z"})
-        # try date in title to extend deadline
         m=re.search(r"(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})", j.get("title") or "")
         if m: best["deadline"]=m.group(1)
         merged+=1
@@ -97,16 +91,16 @@ for j in jobs:
         j["type"]="UPDATE"; j.setdefault("flags",{})["no_parent_found"]=True; kept.append(j)
 jobs=kept
 
-# --- Hard reports -> archive (hidden on UI) ---
-hard_ids=set(); hard_urls=set(); hard_titles=set(); meta={}
+# --- Hard reports -> archive ---
+hard_ids=set(); hard_urls=set(); hard_titles=set()
 for r in reports:
     if r.get("type")=="report":
         jid=(r.get("jobId") or r.get("listingId") or "").strip()
-        if jid: hard_ids.add(jid); meta[jid]=r
-        if r.get("url"): hard_urls.add(norm_url(r["url"])); meta[norm_url(r["url"])]=r
-        if r.get("title"): hard_titles.add((r["title"] or "").strip().lower()); meta[(r.get("title") or "").strip().lower()]=r
+        if jid: hard_ids.add(jid)
+        if r.get("url"): hard_urls.add(norm_url(r["url"]))
+        if r.get("title"): hard_titles.add((r["title"] or "").strip().lower())
 
-next_jobs=[]  # visible jobs
+next_jobs=[]
 for j in jobs:
     jid=j.get("id",""); url=norm_url(j.get("applyLink")); title=(j.get("title") or "").strip().lower()
     if jid in hard_ids or url in hard_urls or title in hard_titles:
@@ -116,12 +110,13 @@ for j in jobs:
         next_jobs.append(j)
 jobs=next_jobs
 
-# --- Missing submissions -> add hints & seed cards ---
+# --- Missing submissions -> hints + cards ---
 OFFICIAL_OK = lambda d: (d.endswith(".gov.in") or d.endswith(".nic.in") or d in {"ssc.gov.in","ibps.in","opportunities.rbi.org.in","bssc.bihar.gov.in","onlinebssc.com","rrbcdg.gov.in","rrbapply.gov.in","dsssb.delhi.gov.in","bpsc.bihar.gov.in","ccras.nic.in"})
+seen_urls={norm_url(j.get("applyLink")) for j in jobs}
 for s in subs:
     if s.get("type")=="missing" and s.get("url"):
         u=norm_url(s["url"]); dom=urllib.parse.urlparse(u).hostname or ""
-        if OFFICIAL_OK(dom) and u not in [norm_url(j.get("applyLink")) for j in jobs]:
+        if OFFICIAL_OK(dom) and u not in seen_urls:
             jobs.append({
                 "id": f"user_{abs(hash(u))%10**9}",
                 "title": s.get("title") or "Official notification",
@@ -134,10 +129,10 @@ for s in subs:
                 "type": "VACANCY",
                 "flags": {"added_from_missing": True}
             })
-            if u not in rules["captureHints"]: rules["captureHints"].append(u)
+            if u not in rules["captureHints"]:
+                rules["captureHints"].append(u)
 
-# --- Green tick learning and persistence till deadline ---
-# A vote "right" pins the job (trusted=true) so it stays until its deadline; a vote "wrong" demotes (could be removed next runs).
+# --- Green tick learning: pin till deadline or 21 days fallback ---
 pin=set(); demote=set()
 for v in votes:
     if v.get("type")=="vote":
@@ -147,37 +142,78 @@ for v in votes:
 for j in jobs:
     if j["id"] in pin:
         j.setdefault("flags",{})["trusted"]=True
-        # If no deadline, keep for 21 days from first see time
-        if not parse_deadline(j.get("deadline")):
-            j["flags"]["keep_until"]= (date.today()+timedelta(days=21)).isoformat()
+        if not j.get("deadline") or j["deadline"].upper()=="N/A":
+            j["flags"]["keep_until"]=(date.today()+timedelta(days=21)).isoformat()
     if j["id"] in demote:
         j.setdefault("flags",{})["demoted"]=True
 
-# --- User state: applied / not_interested ---
-# If applied => never auto-delete; show in an Applied section.
-# If not_interested or no action => move to Secondary after 14 days; then drop.
-APPLIED, NOTI = set(), {}
+# --- User state: applied / not_interested; sectioning and 14-day cleanup ---
+APPLIED=set(); NOTI={}
 for jid, st in (user_state or {}).items():
-    a = (st or {}).get("action")
-    ts = (st or {}).get("ts")
+    a=(st or {}).get("action"); ts=(st or {}).get("ts")
     if a=="applied": APPLIED.add(jid)
     elif a=="not_interested":
-        try:
-            dt = datetime.fromisoformat(ts.replace("Z","")).date() if ts else today()
-        except: dt = today()
-        NOTI[jid] = dt
+        try: NOTI[jid]=datetime.fromisoformat((ts or "").replace("Z","")).date()
+        except: NOTI[jid]=date.today()
 
-visible=[]; secondary=[]; applied_list=[]
+def dl_or_keepdate(j):
+    dl = j.get("deadline")
+    d = None
+    try:
+        d = parse_deadline(dl)
+    except: d=None
+    if d: return d
+    ku = j.get("flags",{}).get("keep_until")
+    if ku:
+        try: return datetime.fromisoformat(ku).date()
+        except: return None
+    return None
+
+primary=[]; applied_list=[]; other=[]; to_delete=set()
 for j in jobs:
     jid=j["id"]
+    # Remove if in Other for more than 14 days without interest
+    if jid in NOTI:
+        if (date.today()-NOTI[jid]).days > 14:
+            to_delete.add(jid); continue
+    # Applied section (always visible)
     if jid in APPLIED:
         j.setdefault("flags",{})["applied"]=True
         applied_list.append(j); 
         continue
-    # determine expiry policy
-    dl = parse_deadline(j.get("deadline"))
-    keep_until = j.get("flags",{}).get("keep_until")
-    keep_date = None
-    if dl: keep_date = dl
-    elif keep_until: 
-        try: keep_date = datetime.fromisoformat(keep_until).date()
+    # Determine placement by deadline/keep_until
+    last_date = dl_or_keepdate(j)
+    if last_date and last_date < date.today():
+        # past date -> move to Other; cleanup clock starts if not_interested or untouched
+        other.append(j)
+    else:
+        primary.append(j)
+
+# Final list excludes deleted
+jobs_out=[j for j in primary+other+applied_list if j["id"] not in to_delete]
+
+# --- Output with sections for UI ---
+transp = raw.get("transparencyInfo") or {}
+transp.update({
+    "schemaVersion":"1.3",
+    "runMode": RUN_MODE,
+    "lastUpdated": datetime.utcnow().isoformat()+"Z",
+    "mergedUpdates": merged,
+    "totalListings": len(jobs_out)
+})
+out = {
+    "jobListings": jobs_out,
+    "archivedListings": archived,
+    "sections": {
+        "applied": [j["id"] for j in applied_list],
+        "other": [j["id"] for j in other],
+        "primary": [j["id"] for j in primary]
+    },
+    "transparencyInfo": transp
+}
+JWRITE("data.json", out)
+JWRITE("learn.json", {"mergedUpdates": merged,"generatedAt": datetime.utcnow().isoformat()+"Z","runMode": RUN_MODE})
+rules["blacklistedDomains"] = rules.get("blacklistedDomains", [])
+rules["autoRemoveReasons"] = rules.get("autoRemoveReasons", ["expired"])
+JWRITE("rules.json", rules)
+JWRITE("health.json", {"ok": True, **transp})
