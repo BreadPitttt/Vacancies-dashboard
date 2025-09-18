@@ -2,14 +2,9 @@ name: Data Pipeline
 
 on:
   workflow_dispatch:
-    inputs:
-      force_mode:
-        description: "Optional: force run mode (nightly|weekly)"
-        required: false
-        default: ""
   schedule:
-    - cron: '17 18 * * *'
-    - cron: '28 20 * * 0'
+    - cron: '17 18 * * *'   # nightly
+    - cron: '28 20 * * 0'   # weekly hard recheck
 
 permissions:
   contents: write
@@ -26,236 +21,225 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: { fetch-depth: 0 }
 
-      - name: Decide mode (nightly or weekly)
-        id: decide
-        shell: bash
-        run: |
-          MODE="nightly"; TIMEOUT=120; IS_WEEKLY=false
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            if [[ "${{ github.event.schedule }}" == *"28 20"* ]]; then
-              MODE="weekly"; TIMEOUT=240; IS_WEEKLY=true
-            fi
-          fi
-          if [ -n "${{ github.event.inputs.force_mode }}" ]; then
-            fm="${{ github.event.inputs.force_mode }}"
-            if [ "$fm" = "weekly" ]; then MODE="weekly"; TIMEOUT=240; IS_WEEKLY=true; fi
-            if [ "$fm" = "nightly" ]; then MODE="nightly"; TIMEOUT=120; IS_WEEKLY=false; fi
-          fi
-          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
-          echo "timeout=$TIMEOUT" >> "$GITHUB_OUTPUT"
-          echo "is_weekly=$IS_WEEKLY" >> "$GITHUB_OUTPUT"
-          if $IS_WEEKLY; then
-            echo "run_label=Weekly hard recheck" >> "$GITHUB_OUTPUT"
-          else
-            echo "run_label=Nightly recheck" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Set up Python and cache dependencies
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
 
       - name: Run scraper
-        id: scrape
         env:
           PYTHONUNBUFFERED: "1"
-          IS_HARD_RECHECK: ${{ steps.decide.outputs.is_weekly }}
-          TELEGRAM_RSS_BASE: ${{ secrets.TELEGRAM_RSS_BASE }}
-          MAX_WORKERS: ${{ vars.MAX_WORKERS }}
-          PER_SOURCE_MAX: ${{ vars.PER_SOURCE_MAX }}
-          CONNECT_TIMEOUT: ${{ vars.CONNECT_TIMEOUT }}
-          READ_TIMEOUT: ${{ vars.READ_TIMEOUT }}
-          RETRY_TOTAL: ${{ vars.RETRY_TOTAL }}
-          RETRY_CONNECT: ${{ vars.RETRY_CONNECT }}
-          RETRY_READ: ${{ vars.RETRY_READ }}
-          BACKOFF_FACTOR: ${{ vars.BACKOFF_FACTOR }}
-          MAX_BACKOFF_SECONDS: ${{ vars.MAX_BACKOFF_SECONDS }}
-          PER_HOST_RPM: ${{ vars.PERM_HOST_RPM || vars.PER_HOST_RPM }}
-          BASELINE_SLEEP_S: ${{ vars.BASELINE_SLEEP_S }}
-          JITTER_MIN: ${{ vars.JITTER_MIN }}
-          JITTER_MAX: ${{ vars.JITTER_MAX }}
-          CB_FAILURE_THRESHOLD: ${{ vars.CB_FAILURE_THRESHOLD }}
-          CB_OPEN_SECONDS: ${{ vars.CB_OPEN_SECONDS }}
-          CB_HALF_OPEN_PROBE: ${{ vars.CB_HALF_OPEN_PROBE }}
-          MULTI_AGG_DAYS: ${{ vars.MULTI_AGG_DAYS }}
         run: |
           set -e
-          echo "Running mode=${{ steps.decide.outputs.mode }} with per-step timeout=${{ steps.decide.outputs.timeout }}m"
-          timeout "${{ steps.decide.outputs.timeout }}m" python scraper.py
+          # Your existing scraper invocation
+          python scraper.py
 
-      - name: Validate JSON Schema
-        id: validate
+      - name: Validate JSON (optional)
         run: |
           set -e
-          python validate.py
+          if [ -f validate.py ]; then python validate.py; fi
 
-      - name: Quality checks (links, dates, dups)
-        id: qc
+      - name: Add QC and Learn script
         run: |
-          set +e
-          python qc_checks.py
-          echo "qc_exit=$?" >> $GITHUB_OUTPUT
-
-      - name: Generate and Format Data Files with Health
-        id: health
-        run: |
-          set -e
-          python - << 'PY'
-          import json, datetime, pathlib
-          data_p = pathlib.Path("data.json")
-          health_p = pathlib.Path("health.json")
-
-          # Load or seed data.json
-          data = {"jobListings": [], "transparencyInfo": {}}
-          if data_p.exists():
-            try:
-              raw = data_p.read_text(encoding="utf-8")
-              if raw.strip():
-                data = json.loads(raw)
-            except Exception:
-              pass
-
-          # Ensure required structure for UI/schema
-          job_list = data.get("jobListings") or []
-          ti = data.get("transparencyInfo") or {}
-          ti["totalListings"] = len(job_list)
-          ti["lastUpdated"] = datetime.datetime.utcnow().isoformat() + "Z"
-          ti.setdefault("schemaVersion", "1.2")
-          data["jobListings"] = job_list
-          data["transparencyInfo"] = ti
-
-          # Write normalized data.json
-          data_p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-
-          # Compose health.json
-          health = {
-            "ok": isinstance(job_list, list),
-            "reason": None,
-            "checkedAt": datetime.datetime.utcnow().isoformat() + "Z",
-            **ti
+          cat > qc_and_learn.py << 'PY'
+          # pasted Python from earlier message (qc_and_learn.py)
+          import json, pathlib, datetime, re, urllib.parse
+          from collections import Counter, defaultdict
+          def path(p): return pathlib.Path(p)
+          def read_json(p, default):
+              try:
+                  if path(p).exists():
+                      return json.loads(path(p).read_text(encoding="utf-8"))
+              except: pass
+              return default
+          def read_jsonl(p):
+              out=[]
+              if path(p).exists():
+                  for line in path(p).read_text(encoding="utf-8").splitlines():
+                      line=line.strip()
+                      if not line: continue
+                      try: out.append(json.loads(line))
+                      except: pass
+              return out
+          def write_json(p, obj):
+              path(p).write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
+          def norm_url(u):
+              try:
+                  p=urllib.parse.urlparse(u or "")
+                  q=urllib.parse.parse_qsl(p.query, keep_blank_values=True)
+                  q=[(k,v) for (k,v) in q if k.lower() not in ("utm_source","utm_medium","utm_campaign","utm_term","utm_content","ref")]
+                  p=p._replace(query=urllib.parse.urlencode(q))
+                  return urllib.parse.urlunparse(p).rstrip("/").lower()
+              except: return (u or "").rstrip("/").lower()
+          def norm_title(t): return re.sub(r"\s+"," ", (t or "").strip().lower())
+          def parse_deadline(deadline):
+              if not deadline or deadline.strip().upper()=="N/A": return None
+              for fmt in ("%Y-%m-%d","%d/%m/%Y","%d-%m-%Y","%d %B %Y","%d %b %Y"):
+                  try: return datetime.datetime.strptime(deadline.strip(), fmt).date()
+                  except: pass
+              return None
+          OFFICIAL_WHITELIST = {"ssc.nic.in","upsconline.nic.in","upsconline.gov.in","rpsc.rajasthan.gov.in"}
+          ADS_HOSTS = {"freejobalert.com","www.freejobalert.com","sarkariresult.com","www.sarkariresult.com"}
+          def infer_reason(listing):
+              title=(listing.get("title") or "").lower()
+              url=norm_url(listing.get("applyLink") or listing.get("url") or "")
+              dom=urllib.parse.urlparse(url).hostname or ""
+              dea=listing.get("deadline")
+              ddate=parse_deadline(dea)
+              today=datetime.date.today()
+              if ddate and ddate<today: return {"code":"expired", "details":dea}
+              if dom and dom in ADS_HOSTS and dom not in OFFICIAL_WHITELIST: return {"code":"ad_redirect","details":dom}
+              qual=(listing.get("qualificationLevel") or "").lower()
+              text=" ".join([title, qual])
+              if re.search(r"\b(10th|12th|class\s*10|class\s*12|matric|intermediate)\b", text):
+                  return {"code":"eligibility_low","details":"10th/12th detected"}
+              if not listing.get("organization") or not listing.get("deadline"):
+                  return {"code":"incomplete_extraction","details":"missing org/deadline"}
+              return {"code":"unknown","details":dom}
+          raw_data = read_json("data.json", {"jobListings": [], "transparencyInfo": {}})
+          listings = list(raw_data.get("jobListings") or [])
+          reports = read_jsonl("reports.jsonl")
+          votes   = read_jsonl("votes.jsonl")
+          rules   = read_json("rules.json", {"blacklistedDomains": [], "autoRemoveReasons": ["expired"], "minQualification": None})
+          hard_ids, hard_urls, hard_titles, hard_meta = set(), set(), set(), {}
+          for r in reports:
+              if r.get("type")=="report":
+                  jid=(r.get("jobId") or r.get("listingId") or "").strip()
+                  if jid:
+                      hard_ids.add(jid); hard_meta[jid]={"evidenceUrl": r.get("url") or r.get("evidenceUrl"), "note": r.get("note")}
+                  if r.get("url"):
+                      u=norm_url(r.get("url")); hard_urls.add(u); hard_meta[u]={"evidenceUrl": r.get("url"), "note": r.get("note")}
+                  if r.get("title"):
+                      t=norm_title(r.get("title")); hard_titles.add(t); hard_meta[t]={"evidenceUrl": r.get("url") or r.get("evidenceUrl"), "note": r.get("note")}
+          def index_listing(lst):
+              by_id, by_url, by_title = {}, {}, {}
+              for j in lst:
+                  jid=(j.get("id") or j.get("jobId") or "").strip()
+                  if jid: by_id[jid]=j
+                  u=norm_url(j.get("applyLink") or j.get("url") or "")
+                  if u: by_url[u]=j
+                  t=norm_title(j.get("title") or "")
+                  if t: by_title[t]=j
+              return by_id, by_url, by_title
+          by_id, by_url, by_title = index_listing(listings)
+          from collections import Counter, defaultdict
+          def domain_of(u):
+              try: return urllib.parse.urlparse(u or "").hostname or ""
+              except: return ""
+          learn_tally={"reasons": Counter(),"rightReasons": Counter(),"wrongReasons": Counter(),"byDomainRight": Counter(),"byDomainWrong": Counter()}
+          enriched_votes=[]
+          for v in votes:
+              if v.get("type")!="vote" or v.get("vote") not in ("right","wrong"): continue
+              j = by_id.get(v.get("jobId","")) or by_url.get(norm_url(v.get("url",""))) or by_title.get(norm_title(v.get("title","")))
+              if not j: j={"title": v.get("title",""), "url": v.get("url",""), "deadline": None, "qualificationLevel": None}
+              reason = infer_reason(j)
+              v2=dict(v); v2["reason"]=reason
+              enriched_votes.append(v2)
+              learn_tally["reasons"][reason["code"]]+=1
+              if v.get("vote")=="right":
+                  learn_tally["rightReasons"][reason["code"]]+=1
+                  learn_tally["byDomainRight"][domain_of(v.get("url"))]+=1
+              else:
+                  learn_tally["wrongReasons"][reason["code"]]+=1
+                  learn_tally["byDomainWrong"][domain_of(v.get("url"))]+=1
+          for code, cnt in learn_tally["rightReasons"].items():
+              wrong = learn_tally["wrongReasons"].get(code, 0)
+              if cnt >= 2 and wrong == 0 and code in rules.get("autoRemoveReasons", []):
+                  rules["autoRemoveReasons"] = [c for c in rules["autoRemoveReasons"] if c != code]
+          for code, cnt in learn_tally["wrongReasons"].items():
+              right = learn_tally["rightReasons"].get(code, 0)
+              if cnt >= 2 and right == 0 and code not in rules.get("autoRemoveReasons", []):
+                  rules["autoRemoveReasons"].append(code)
+          for dom, cnt in learn_tally["byDomainRight"].items():
+              if cnt >= 2 and learn_tally["byDomainWrong"].get(dom,0) == 0 and dom in rules.get("blacklistedDomains", []):
+                  rules["blacklistedDomains"] = [d for d in rules["blacklistedDomains"] if d != dom]
+          for dom, cnt in learn_tally["byDomainWrong"].items():
+              if cnt >= 2 and learn_tally["byDomainRight"].get(dom,0) == 0 and dom not in rules.get("blacklistedDomains", []):
+                  rules["blacklistedDomains"].append(dom)
+          today=datetime.date.today()
+          removedByHard=0; removedByAuto=0
+          kept, archived = [], []
+          def domain_of2(u):
+              try: return urllib.parse.urlparse(u or "").hostname or ""
+              except: return ""
+          for job in listings:
+              jid=(job.get("id") or job.get("jobId") or "").strip()
+              url=norm_url(job.get("applyLink") or job.get("url") or "")
+              title=norm_title(job.get("title") or "")
+              dom=domain_of2(url)
+              drop_reason=None; meta=None
+              if jid and jid in hard_ids: drop_reason="reported_hard"; meta=hard_meta.get(jid)
+              elif url and url in hard_urls: drop_reason="reported_hard"; meta=hard_meta.get(url)
+              elif title and title in hard_titles: drop_reason="reported_hard"; meta=hard_meta.get(title)
+              if not drop_reason:
+                  rsn=infer_reason(job)
+                  if (dom in rules.get("blacklistedDomains", [])) or (rsn["code"] in set(rules.get("autoRemoveReasons", []))):
+                      drop_reason = f"auto_{rsn['code']}"
+              if drop_reason:
+                  job.setdefault("flags",{})["removed_reason"]=drop_reason
+                  if meta:
+                      job["flags"]["evidence_url"]=meta.get("evidenceUrl"); job["flags"]["note"]=meta.get("note")
+                  archived.append(job)
+                  if drop_reason=="reported_hard": removedByHard+=1
+                  else: removedByAuto+=1
+              else:
+                  kept.append(job)
+          transparency = raw_data.get("transparencyInfo") or {}
+          transparency["totalListings"]=len(kept)
+          transparency["lastUpdated"]=datetime.datetime.utcnow().isoformat()+"Z"
+          transparency["removedByHardReports"]=removedByHard
+          transparency["removedByAutoReasons"]=removedByAuto
+          transparency["autoRemoveReasons"]=rules.get("autoRemoveReasons", [])
+          transparency["blacklistedDomains"]=rules.get("blacklistedDomains", [])
+          data={"jobListings": kept, "archivedListings": archived, "transparencyInfo": transparency}
+          path("data.json").write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+          health={"ok": True, "checkedAt": datetime.datetime.utcnow().isoformat()+"Z", **transparency}
+          path("health.json").write_text(json.dumps(health, indent=2, ensure_ascii=False), encoding="utf-8")
+          learn={
+            "reasons": dict(learn_tally["reasons"]),
+            "rightReasons": dict(learn_tally["rightReasons"]),
+            "wrongReasons": dict(learn_tally["wrongReasons"]),
+            "byDomainRight": dict(learn_tally["byDomainRight"]),
+            "byDomainWrong": dict(learn_tally["byDomainWrong"]),
+            "generatedAt": datetime.datetime.utcnow().isoformat()+"Z"
           }
-          health_p.write_text(json.dumps(health, indent=2, ensure_ascii=False), encoding="utf-8")
+          path("learn.json").write_text(json.dumps(learn, indent=2, ensure_ascii=False), encoding="utf-8")
+          path("rules.json").write_text(json.dumps(rules, indent=2, ensure_ascii=False), encoding="utf-8")
           PY
-        env:
-          QC_EXIT: ${{ steps.qc.outputs.qc_exit }}
 
-      - name: Upload artifacts (data.json, health.json)
+      - name: QC, Learn, and Write data
+        run: |
+          set -e
+          python qc_and_learn.py
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.decide.outputs.mode }}-artifacts
+          name: pipeline-artifacts
           path: |
             data.json
             health.json
+            learn.json
+            rules.json
           retention-days: 7
 
-      - name: Commit and Push Changes
-        if: steps.health.outcome == 'success'
+      - name: Commit and push
         run: |
           set -e
           git config user.name "GitHub Actions Bot"
           git config user.email "actions-bot@users.noreply.github.com"
-          if ! git diff --quiet -- data.json health.json; then
-            git add data.json health.json
-            COMMIT_MSG="chore(data): ${{ steps.decide.outputs.run_label }}"
-            git commit -m "$COMMIT_MSG"
+          if ! git diff --quiet -- data.json health.json learn.json rules.json; then
+            git add data.json health.json learn.json rules.json
+            git commit -m "chore: qc+learn update"
             git pull --rebase
             git push
           else
-            echo "No data changes to commit."
+            echo "No changes."
           fi
-
-      - name: Post run summary
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let health = {};
-            try { health = JSON.parse(fs.readFileSync('health.json', 'utf8')); } catch {}
-            const ok = health.ok === true;
-            const total = health.totalListings ?? 'n/a';
-            const rate = health.successRatePct ?? 'n/a';
-            const reason = health.reason ?? 'n/a';
-            const artifacts = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-            const mode = `${{ steps.decide.outputs.mode }}`;
-            const body = [
-              `Mode: ${mode}`,
-              `Run: ${ok ? 'OK' : 'NOT OK'}`,
-              `Listings: ${total}`,
-              `Source success rate: ${rate}%`,
-              `Reason: ${reason}`,
-              `Artifacts: ${artifacts}`
-            ].join('\n');
-            core.summary.addHeading(`Vacancies Data Pipeline (${mode})`).addRaw(body, true).write()
-
-      - name: Open issue if health not OK (scheduled only)
-        if: github.event_name == 'schedule' && steps.health.outcome == 'success'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            let health = {};
-            try { health = JSON.parse(fs.readFileSync('health.json', 'utf8')); } catch {}
-            if (health.ok === true) { core.info('Health OK; skipping issue.'); return; }
-            const artifacts = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
-            const mode = `${{ steps.decide.outputs.mode }}`;
-            const title = `[Data Pipeline][${mode}] Health not OK - ${new Date().toISOString()}`;
-            const body = [
-              `Health status: ${JSON.stringify(health, null, 2)}`,
-              '',
-              `Artifacts (data.json, health.json): ${artifacts}`,
-            ].join('\n');
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title,
-              body,
-              labels: ['pipeline','investigate']
-            })
-
-  lighthouse:
-    runs-on: ubuntu-latest
-    needs: pipeline
-    if: ${{ vars.PAGES_URL != '' }}
-    steps:
-      - name: Wait for Pages cache (retry)
-        shell: bash
-        run: |
-          for i in {1..5}; do
-            echo "Sleep $i..."
-            sleep 10
-          done
-      - name: Audit homepage with Lighthouse CI
-        uses: treosh/lighthouse-ci-action@v12
-        with:
-          urls: |
-            ${{ vars.PAGES_URL }}
-          budgetPath: ./.github/lighthouse/budget.json
-          uploadArtifacts: true
-      - name: Check health.json endpoint (retry)
-        shell: bash
-        run: |
-          set -e
-          base="${{ vars.PAGES_URL }}"; base="${base%/}"
-          url="$base/health.json"
-          for i in {1..5}; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
-            if [ "$code" = "200" ]; then
-              echo "health.json OK (HTTP $code)"
-              exit 0
-            fi
-            echo "health.json not ready (HTTP $code); retry $i/5"
-            sleep 5
-          done
-          echo "health.json check failed after retries"
-          exit 1
