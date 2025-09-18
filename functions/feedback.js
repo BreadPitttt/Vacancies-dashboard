@@ -1,5 +1,5 @@
-// functions/feedback.js — explicit routes, CORS for GitHub Pages, JSON replies
-const ALLOW_ORIGIN = "https://breadpitttt.github.io"; // your dashboard origin
+// functions/feedback.js — robust routes, dual-shape support, ping, clear errors
+const ALLOW_ORIGIN = "https://breadpitttt.github.io"; // must match your GitHub Pages origin
 
 export const onRequestOptions = () => new Response(null, { status: 204, headers: corsHeaders() });
 
@@ -8,71 +8,68 @@ export const onRequestPost = async ({ request, env }) => {
     const originHdr = request.headers.get("origin") || "";
     const referer = request.headers.get("referer") || "";
     const reqOrigin = safeOrigin(originHdr) || safeOrigin(referer) || "";
-    if (reqOrigin !== ALLOW_ORIGIN) return jsonRes({ error: "Origin not allowed", origin: reqOrigin }, 403);
+    if (reqOrigin !== ALLOW_ORIGIN) return jsonRes({ error: "Origin not allowed", got: reqOrigin, want: ALLOW_ORIGIN }, 403);
 
     const token = env.FEEDBACK_TOKEN;
     if (!token) return jsonRes({ error: "Missing FEEDBACK_TOKEN" }, 500);
 
     let body = {};
-    try { body = await request.json(); } catch { return jsonRes({ error: "Invalid JSON" }, 400); }
-    const type = body && body.type;
+    try { body = await request.json(); } catch { return jsonRes({ error: "Invalid JSON body" }, 400); }
 
-    // Vote: {type:"vote", vote:"right"|"wrong", jobId, title?, url?}
+    // Allow both new and old shapes:
+    // New: { type, ...fields }
+    // Old (from earlier client): { type, payload: {...} } for report/state
+    const type = body.type;
+    const p = body.payload && typeof body.payload === "object" ? body.payload : body;
+
+    // Smoke test route
+    if (type === "ping") return jsonRes({ ok: true, message: "pong" });
+
     if (type === "vote") {
-      const v = (body.vote === "right" || body.vote === "wrong") ? body.vote : null;
-      if (!v || !body.jobId) return jsonRes({ error: "Bad vote payload" }, 400);
-      const rec = {
-        type: "vote", vote: v,
-        jobId: body.jobId || "", title: body.title || "", url: body.url || "",
-        ts: new Date().toISOString()
-      };
+      const v = (p.vote === "right" || p.vote === "wrong") ? p.vote : null;
+      if (!v || !p.jobId) return jsonRes({ error: "Bad vote payload", need: "vote, jobId" }, 400);
+      const rec = { type: "vote", vote: v, jobId: p.jobId || "", title: p.title || "", url: p.url || "", ts: nowIso() };
       const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "votes.jsonl", rec);
       return jsonRes({ ok: r.status === 200 }, r.status);
     }
 
-    // Report: {type:"report", jobId?, title?, url?, note?}
     if (type === "report") {
-      if (!body.jobId && !body.title && !body.url) return jsonRes({ error: "Bad report payload" }, 400);
-      const rec = {
-        type: "report",
-        jobId: body.jobId || "", title: body.title || "", url: body.url || "",
-        note: body.note || "", ts: new Date().toISOString()
-      };
+      const rec = { type: "report", jobId: (p.jobId || p.listingId || ""), title: (p.title || p.reason || ""), url: (p.url || p.evidenceUrl || ""), note: (p.note || ""), ts: nowIso() };
+      if (!rec.jobId && !rec.title && !rec.url) return jsonRes({ error: "Bad report payload", need: "jobId or title or url" }, 400);
       const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "reports.jsonl", rec);
       return jsonRes({ ok: r.status === 200 }, r.status);
     }
 
-    // Missing: {type:"missing", title, url, lastDate?, note?}
     if (type === "missing") {
-      if (!body.title || !body.url) return jsonRes({ error: "Missing title/url" }, 400);
-      const rec = {
-        type: "missing", title: body.title || "", url: body.url || "",
-        lastDate: body.lastDate || body.deadline || "", note: body.note || "",
-        ts: new Date().toISOString()
-      };
+      const title = p.title || "";
+      const url = p.url || "";
+      const lastDate = p.lastDate || p.deadline || "";
+      if (!title || !url) return jsonRes({ error: "Missing title/url" }, 400);
+      const rec = { type: "missing", title, url, lastDate, note: p.note || "", ts: nowIso() };
       const r = await appendJsonl(token, "BreadPitttt", "Vacancies-dashboard", "submissions.jsonl", rec);
       return jsonRes({ ok: r.status === 200 }, r.status);
     }
 
-    // State: {type:"state", payload:{jobId, action:"applied"|"not_interested"|"undo", ts?}}
     if (type === "state") {
-      const p = body.payload || {};
-      if (!p.jobId || !p.action) return jsonRes({ error: "Bad state payload" }, 400);
-      const r = await upsertJsonMap(token, "BreadPitttt", "Vacancies-dashboard", "user_state.json", (state) => {
+      const jobId = p.jobId || "";
+      const action = p.action || "";
+      if (!jobId || !action) return jsonRes({ error: "Bad state payload", need: "jobId, action" }, 400);
+      const r = await upsertJsonMap(env.FEEDBACK_TOKEN, "BreadPitttt", "Vacancies-dashboard", "user_state.json", (state) => {
         const copy = state && typeof state === "object" ? state : {};
-        if (p.action === "undo") delete copy[p.jobId];
-        else copy[p.jobId] = { action: p.action, ts: p.ts || new Date().toISOString() };
+        if (action === "undo") delete copy[jobId];
+        else copy[jobId] = { action, ts: p.ts || nowIso() };
         return copy;
       });
       return jsonRes({ ok: r.ok !== false });
     }
 
-    return jsonRes({ error: "Unknown type" }, 400);
+    return jsonRes({ error: "Unknown type", got: type }, 400);
   } catch (e) {
     return jsonRes({ error: e.message }, 500);
   }
 };
 
+function nowIso(){ return new Date().toISOString(); }
 function corsHeaders(){
   return {
     "Access-Control-Allow-Origin": ALLOW_ORIGIN,
@@ -85,7 +82,7 @@ function corsHeaders(){
 function jsonRes(obj, status=200){ return new Response(JSON.stringify(obj), { status, headers: corsHeaders() }); }
 function safeOrigin(u){ try{ return new URL(u).origin; }catch{ return ""; } }
 
-// JSONL helpers
+// JSON helpers
 async function appendJsonl(token, owner, repo, path, record){
   const gh = "https://api.github.com";
   const headers = {
