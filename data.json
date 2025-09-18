@@ -1,7 +1,6 @@
 {
-  "lastUpdated": "2025-09-18T07:05:03.328091",
-  "totalJobs": 3,
-  "jobListings": [
+  "jobListings": [],
+  "archivedListings": [
     {
       "id": "fja_rsmssb-class-iv-2024/1130629",
       "title": "RSMSSB Group D Apply Online",
@@ -13,12 +12,17 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T07:05:03.326509",
+      "extractedAt": "2025-09-18T08:35:19.082128",
       "meta": {
         "post": "N/A",
         "allowedSkills": [],
         "sourceUrl": "https://www.freejobalert.com/",
         "sourceSite": "freejobalert"
+      },
+      "flags": {
+        "removed_reason": "reported_hard",
+        "evidence_url": "https://www.freejobalert.com/rsmssb-class-iv-2024/1130629/",
+        "note": ""
       }
     },
     {
@@ -32,12 +36,17 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T07:05:03.326596",
+      "extractedAt": "2025-09-18T08:35:19.082244",
       "meta": {
         "post": "Constable",
         "allowedSkills": [],
         "sourceUrl": "https://www.freejobalert.com/",
         "sourceSite": "freejobalert"
+      },
+      "flags": {
+        "removed_reason": "reported_hard",
+        "evidence_url": null,
+        "note": ""
       }
     },
     {
@@ -51,12 +60,17 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T07:05:03.326684",
+      "extractedAt": "2025-09-18T08:35:19.082320",
       "meta": {
         "post": "N/A",
         "allowedSkills": [],
         "sourceUrl": "https://www.freejobalert.com/",
         "sourceSite": "freejobalert"
+      },
+      "flags": {
+        "removed_reason": "reported_hard",
+        "evidence_url": null,
+        "note": ""
       }
     }
   ],
@@ -66,7 +80,15 @@
       "freejobalert"
     ],
     "schemaVersion": "1.2",
-    "totalListings": 3,
-    "lastUpdated": "2025-09-18T07:05:04.212971Z"
+    "totalListings": 0,
+    "lastUpdated": "2025-09-18T08:35:19.153752Z",
+    "runMode": "nightly",
+    "removedByHardReports": 3,
+    "removedByAutoReasons": 0,
+    "autoRemoveReasons": [
+      "expired"
+    ],
+    "blacklistedDomains": [],
+    "addedFromMissing": 0
   }
 }
