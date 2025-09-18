@@ -1,7 +1,8 @@
-// app.js — Complete Final Version (Netlify-integrated, backward-compatible)
+// app.js — Cloudflare-ready, self-learning feedback
 
-// Change this to the deployed Netlify function URL if different
-const feedbackEndpoint = 'https://phenomenal-cat-7d2563.netlify.app/.netlify/functions/feedback';
+// 1) Set this to your Cloudflare Pages URL (no trailing slash), then add /feedback
+const CF_BASE = 'https://<your-pages>.pages.dev';
+const feedbackEndpoint = CF_BASE + '/feedback';
 
 // Small helpers
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
