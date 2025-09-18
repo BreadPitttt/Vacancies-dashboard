@@ -1,4 +1,4 @@
-// functions/api.js — Final, simplified, single-file function
+// functions/api.js — Final, consolidated function
 const ALLOW_ORIGIN = "https://breadpitttt.github.io";
 
 // This handler responds to the browser's initial "handshake" request
