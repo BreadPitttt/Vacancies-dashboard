@@ -7,25 +7,25 @@ import re
 import time
 import os
 from urllib.parse import urljoin, urlparse
-# ============ Modes, cache, fallback ============
+# ============ NEW: mode flag, cache, fallback ============
 import argparse, hashlib, pathlib
-import cloudscraper
+import cloudscraper  # fallback for anti-bot
 
 def get_run_mode():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", default=os.getenv("RUN_MODE","nightly"))
     m = (ap.parse_args().mode or "nightly").lower()
-    return "weekly" if m=="weekly" else ("light" if m=="light" else "nightly")
+    return "weekly" if m == "weekly" else ("light" if m == "light" else "nightly")
 
 RUN_MODE = get_run_mode()
-IS_LIGHT = (RUN_MODE=="light")
+IS_LIGHT = (RUN_MODE == "light")
 
 CACHE_DIR = pathlib.Path(".cache"); CACHE_DIR.mkdir(exist_ok=True)
 CACHE_TTL = 24*3600
-def cache_key(url): return CACHE_DIR / (hashlib.sha1(url.encode()).hexdigest()+".html")
+def cache_key(url): return CACHE_DIR / (hashlib.sha1(url.encode()).hexdigest() + ".html")
 def get_html(url, headers, timeout, allow_cache):
     ck = cache_key(url)
-    if allow_cache and ck.exists() and (time.time()-ck.stat().st_mtime) < CACHE_TTL:
+    if allow_cache and ck.exists() and (time.time() - ck.stat().st_mtime) < CACHE_TTL:
         return ck.read_bytes()
     try:
         r = requests.get(url, headers=headers, timeout=timeout)
@@ -40,16 +40,51 @@ def get_html(url, headers, timeout, allow_cache):
             return c
         except Exception:
             return b""
-# =================================================
+# ==============================================================
 
 # ---------------- Configuration ----------------
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 REQUEST_TIMEOUT = 15 if IS_LIGHT else 20
 REQUEST_SLEEP_SECONDS = 1.2
-FIRST_SUCCESS_MODE = True  # optimized stop-on-first success
+FIRST_SUCCESS_MODE = True  # stop at first source that returns jobs
 
+# ============ NEW: seeds from rules ============
+def load_rules_file(path="rules.json"):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f) or {}
+    except Exception:
+        return {}
+RULES_FILE = load_rules_file()
+EXTRA_SEEDS = RULES_FILE.get("captureHints", []) if RUN_MODE in ("weekly","light") else []
+# ==========================================================
+
+SOURCES = [
+    {"name": "freejobalert",   "url": "https://www.freejobalert.com/", "parser": "parse_freejobalert"},
+    {"name": "sarkarijobfind", "url": "https://sarkarijobfind.com/",   "parser": "parse_sarkarijobfind"},
+    {"name": "resultbharat",   "url": "https://www.resultbharat.com/", "parser": "parse_resultbharat"},
+    {"name": "adda247",        "url": "https://www.adda247.com/jobs/", "parser": "parse_adda247"},
+]
+
+# Prepend official seeds as generic sources
+for i, u in enumerate(EXTRA_SEEDS[:25]):  # cap to avoid overrun
+    SOURCES.insert(0, {"name": f"hint{i+1}", "url": u, "parser": "parse_adda247"})
+# In light mode, only crawl seeds
+if IS_LIGHT:
+    SOURCES = [s for s in SOURCES if s["name"].startswith("hint")]
+
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+}
+
+RULES_PATH = "rules.json"
+REPORTS_PATH = "reports.jsonl"
+PRUNE_DAYS = 14
+MAX_RULES = 200
+
+# ---------------- Utilities ----------------
 def now_iso(): return datetime.now().isoformat()
-def clean_text(x): return re.sub(r'\s+',' ', x or '').strip()
+def clean_text(x): return re.sub(r'\s+', ' ', x or '').strip()
 def normalize_url(base, href): return urljoin(base, href) if href else None
 def slugify(text):
     t=(text or "").lower(); t=re.sub(r'[^a-z0-9]+','-',t).strip('-'); return t[:80] or 'job'
@@ -63,28 +98,7 @@ def make_id(prefix, link):
     p=urlparse(link); key=p.path+("?" + p.query if p.query else "")
     return f"{prefix}_{key.strip('/') or 'root'}"
 
-HEADERS = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'}
-RULES_FILE = {}
-try:
-    RULES_FILE = json.load(open("rules.json","r",encoding="utf-8"))
-except Exception:
-    RULES_FILE = {"captureHints":[]}
-EXTRA_SEEDS = RULES_FILE.get("captureHints", []) if RUN_MODE in ("weekly","light") else []
-
-SOURCES = [
-    {"name":"freejobalert","url":"https://www.freejobalert.com/","parser":"parse_freejobalert"},
-    {"name":"sarkarijobfind","url":"https://sarkarijobfind.com/","parser":"parse_sarkarijobfind"},
-    {"name":"resultbharat","url":"https://www.resultbharat.com/","parser":"parse_resultbharat"},
-    {"name":"adda247","url":"https://www.adda247.com/jobs/","parser":"parse_adda247"}
-]
-# Prepend seeds (generic parser)
-for i,u in enumerate(EXTRA_SEEDS[:25]):
-    SOURCES.insert(0, {"name":f"hint{i+1}","url":u,"parser":"parse_adda247"})
-# Light mode: only seeds
-if IS_LIGHT:
-    SOURCES = [s for s in SOURCES if s["name"].startswith("hint")]
-
-# ---------------- Policies (unchanged) ----------------
+# ---------------- Policies ----------------
 TEACHER_TERMS={"teacher","tgt","pgt","prt","school teacher","faculty","lecturer","assistant professor","professor","b.ed","bed ","d.el.ed","deled","ctet","tet "}
 def education_band_from_text(text):
     t=(text or "").lower()
@@ -108,13 +122,11 @@ def domicile_allow(title):
         if st=="bihar": continue
         if st in t and any(k in t for k in CLOSE_SIGNALS): return False
     return True
-
 def title_hits_excluded(title):
     t=(title or "").lower()
     for k in ["teacher","tgt","pgt","prt","b.ed","ctet","tet"]:
         if k in t: return True, f"Excluded by rule: {k}"
     return False, ""
-
 def site_section_excluded(host, title):
     hint = {
         "www.adda247.com":{"excludeSections":["sarkari result","admit card","answer key"]},
@@ -130,7 +142,8 @@ def site_section_excluded(host, title):
 
 # ---------------- Job builder ----------------
 def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
-    title=clean_text(title); href_abs=normalize_url(base_url, href)
+    title=clean_text(title)
+    href_abs=normalize_url(base_url, href)
     hit,_=title_hits_excluded(title)
     if hit: return None
     if violates_general_policy(title): return None
@@ -151,14 +164,13 @@ def build_job(prefix, source_name, base_url, title, href, deadline="N/A"):
         "meta": {"sourceUrl": base_url, "sourceSite": source_name}
     }
 
-# ---------------- Parsers with tweaks ----------------
+# ---------------- Parsers ----------------
 def parse_freejobalert(content, source_name, base_url):
     soup = BeautifulSoup(content, 'html.parser')
     jobs = []; host = urlparse(base_url).netloc
     def looks_job(t):
         tl=(t or "").lower()
         if any(x in tl for x in ["admit card","result","answer key","syllabus"]): return False
-        # Tweaked: include corrigendum/extension keywords
         return any(x in tl for x in ["recruit","vacancy","notification","apply online","corrigendum","extension","extended"])
     for tbl in soup.select('table'):
         for a in tbl.select('a[href]'):
@@ -212,7 +224,22 @@ def parse_resultbharat(content, source_name, base_url):
 
 def parse_adda247(content, source_name, base_url):
     soup=BeautifulSoup(content,'html.parser'); jobs=[]; host=urlparse(base_url).netloc
-    # Tweaked: include broader anchors under main for layout changes
+    # If this source is a hint (official seed), use a broader generic harvester
+    if source_name.startswith("hint"):
+        anchors = soup.select('main a[href], section a[href], article a[href], a[href]')
+        def looks_seed(t, h):
+            tl = (t or "").lower(); hl = (h or "").lower()
+            kw = ["recruit","vacancy","notific","advert","employment","application","corrigendum","extension","extended"]
+            return any(k in tl for k in kw) or any(k in hl for k in kw)
+        for a in anchors:
+            title = clean_text(a.get_text()); href = a.get('href')
+            if not title or not href: continue
+            if not looks_seed(title, href): continue
+            if site_section_excluded(host, title): continue
+            job = build_job('hint', source_name, base_url, title, href)
+            if job: jobs.append(job)
+        return jobs
+    # Otherwise, normal Adda247 extraction with broader selectors
     for a in soup.select('article a[href], .post-card a[href], .card a[href], main a[href*="recruit"], main a[href*="notific"]'):
         title=clean_text(a.get_text()); href=a.get('href')
         if not title or not href: continue
@@ -249,34 +276,58 @@ def enforce_schema_defaults(jobs):
     return jobs
 
 def save_outputs(jobs, sources_used):
-    jobs=enforce_schema_defaults(jobs)
-    output={"lastUpdated": now_iso(),"totalJobs": len(jobs),"jobListings": jobs,"transparencyInfo":{"notes":"General vacancies (10th/12th/Any graduate). Excludes teacher and technical/management/PG roles. Domicile: All‑India and Bihar‑only allowed; other states allowed only if title signals open to any state.","sourcesTried": sources_used if isinstance(sources_used,list) else [sources_used],"schemaVersion":"1.2","totalListings": len(jobs),"lastUpdated": now_iso(),"runMode": RUN_MODE}}
-    open("data.json","w",encoding="utf-8").write(json.dumps(output,indent=4,ensure_ascii=False))
-    health={"ok": bool(jobs),"lastChecked": now_iso(),"totalActive": len(jobs),"sourceUsed": (sources_used[0] if isinstance(sources_used,list) and sources_used else str(sources_used)),"runMode": RUN_MODE}
-    open("health.json","w",encoding="utf-8").write(json.dumps(health,indent=4))
+    jobs = enforce_schema_defaults(jobs)
+    output_data = {
+        "lastUpdated": now_iso(),
+        "totalJobs": len(jobs),
+        "jobListings": jobs,
+        "transparencyInfo": {
+            "notes": "General vacancies (10th/12th/Any graduate). Excludes teacher and technical/management/PG roles. Domicile: All‑India and Bihar‑only allowed; other states allowed only if title signals open to any state.",
+            "sourcesTried": sources_used if isinstance(sources_used, list) else [sources_used],
+            "schemaVersion": "1.2",
+            "totalListings": len(jobs),
+            "lastUpdated": now_iso(),
+            "runMode": RUN_MODE
+        }
+    }
+    with open("data.json", "w", encoding="utf-8") as f:
+        json.dump(output_data, f, indent=4, ensure_ascii=False)
+    health = {
+        "ok": bool(jobs),
+        "lastChecked": now_iso(),
+        "totalActive": len(jobs),
+        "sourceUsed": (sources_used[0] if isinstance(sources_used, list) and sources_used else str(sources_used)),
+        "runMode": RUN_MODE
+    }
+    with open("health.json", "w", encoding="utf-8") as f:
+        json.dump(health, f, indent=4)
 
-if __name__=="__main__":
-    collected=[]; used=[]
+if __name__ == "__main__":
+    collected = []
+    used = []
     use_first_success = FIRST_SUCCESS_MODE and not IS_LIGHT
     if use_first_success:
         for src in SOURCES:
-            jobs=fetch_and_parse(src)
+            jobs = fetch_and_parse(src)
             if jobs:
-                collected=jobs; used=[src["name"]]; break
+                collected = jobs
+                used = [src["name"]]
+                break
             time.sleep(REQUEST_SLEEP_SECONDS)
     else:
         for src in SOURCES:
-            jobs=fetch_and_parse(src)
+            jobs = fetch_and_parse(src)
             if jobs:
-                collected.extend(jobs); used.append(src["name"])
+                collected.extend(jobs)
+                used.append(src["name"])
             time.sleep(REQUEST_SLEEP_SECONDS)
-
     if not collected and os.path.exists("data.json"):
         try:
-            prev=json.load(open("data.json","r",encoding="utf-8"))
-            prev["transparencyInfo"]["fallback_last_good"]=True
-            prev["transparencyInfo"]["runMode"]=RUN_MODE
-            open("data.json","w",encoding="utf-8").write(json.dumps(prev,indent=2,ensure_ascii=False))
+            prev = json.load(open("data.json","r",encoding="utf-8"))
+            prev["transparencyInfo"]["fallback_last_good"] = True
+            prev["transparencyInfo"]["runMode"] = RUN_MODE
+            with open("data.json","w",encoding="utf-8") as f:
+                json.dump(prev, f, indent=2, ensure_ascii=False)
             logging.warning("No fresh data; served last good snapshot.")
         except Exception:
             save_outputs(collected, used or ["None"])
