@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-09-18T06:55:00.905754",
+  "lastUpdated": "2025-09-18T07:05:03.328091",
   "totalJobs": 3,
   "jobListings": [
     {
@@ -13,7 +13,7 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T06:55:00.904304",
+      "extractedAt": "2025-09-18T07:05:03.326509",
       "meta": {
         "post": "N/A",
         "allowedSkills": [],
@@ -32,7 +32,7 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T06:55:00.904390",
+      "extractedAt": "2025-09-18T07:05:03.326596",
       "meta": {
         "post": "Constable",
         "allowedSkills": [],
@@ -51,7 +51,7 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T06:55:00.904462",
+      "extractedAt": "2025-09-18T07:05:03.326684",
       "meta": {
         "post": "N/A",
         "allowedSkills": [],
@@ -67,6 +67,6 @@
     ],
     "schemaVersion": "1.2",
     "totalListings": 3,
-    "lastUpdated": "2025-09-18T06:55:01.849412Z"
+    "lastUpdated": "2025-09-18T07:05:04.212971Z"
   }
 }
