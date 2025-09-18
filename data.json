@@ -1,73 +1,6 @@
 {
   "jobListings": [],
-  "archivedListings": [
-    {
-      "id": "fja_rsmssb-class-iv-2024/1130629",
-      "title": "RSMSSB Group D Apply Online",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://www.freejobalert.com/rsmssb-class-iv-2024/1130629/",
-      "slug": "rsmssb-group-d-apply-online",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:12:58.204299",
-      "meta": {
-        "sourceUrl": "https://www.freejobalert.com/",
-        "sourceSite": "freejobalert"
-      },
-      "flags": {
-        "removed_reason": "reported_hard",
-        "evidence_url": "https://www.freejobalert.com/rsmssb-class-iv-2024/1130629/",
-        "note": ""
-      }
-    },
-    {
-      "id": "fja_cisf-constable-driver-2025/1138815",
-      "title": "CISF 1124 Constable Apply Online",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://www.freejobalert.com/cisf-constable-driver-2025/1138815/",
-      "slug": "cisf-1124-constable-apply-online",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:12:58.204374",
-      "meta": {
-        "sourceUrl": "https://www.freejobalert.com/",
-        "sourceSite": "freejobalert"
-      },
-      "flags": {
-        "removed_reason": "reported_hard",
-        "evidence_url": null,
-        "note": ""
-      }
-    },
-    {
-      "id": "fja_aiims-data-entry-operator-je-other-2025/1136376",
-      "title": "AIIMS 4597 Various Vacancy Online Form 2025",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://www.freejobalert.com/aiims-data-entry-operator-je-other-2025/1136376/",
-      "slug": "aiims-4597-various-vacancy-online-form-2025",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:12:58.204439",
-      "meta": {
-        "sourceUrl": "https://www.freejobalert.com/",
-        "sourceSite": "freejobalert"
-      },
-      "flags": {
-        "removed_reason": "reported_hard",
-        "evidence_url": null,
-        "note": ""
-      }
-    }
-  ],
+  "archivedListings": [],
   "transparencyInfo": {
     "notes": "General vacancies (10th/12th/Any graduate). Excludes teacher and technical/management/PG roles. Domicile: All‑India and Bihar‑only allowed; other states allowed only if title signals open to any state.",
     "sourcesTried": [
@@ -75,14 +8,15 @@
     ],
     "schemaVersion": "1.2",
     "totalListings": 0,
-    "lastUpdated": "2025-09-18T11:12:58.267857Z",
-    "runMode": "nightly",
-    "removedByHardReports": 3,
+    "lastUpdated": "2025-09-18T11:20:03.629350Z",
+    "runMode": "light",
+    "removedByHardReports": 0,
     "removedByAutoReasons": 0,
     "autoRemoveReasons": [
       "expired"
     ],
     "blacklistedDomains": [],
-    "addedFromMissing": 0
+    "addedFromMissing": 0,
+    "fallback_last_good": true
   }
 }
