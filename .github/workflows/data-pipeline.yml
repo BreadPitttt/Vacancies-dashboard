@@ -4,12 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       run_mode:
-        description: "Mode: nightly or weekly"
+        description: "Mode: nightly | weekly | light"
         required: false
         default: "nightly"
   schedule:
-    - cron: '17 18 * * *'   # nightly (18:17 UTC daily)
-    - cron: '28 20 * * 1'   # weekly (Mon 20:28 UTC)
+    - cron: '0 1 * * *'    # 06:30 IST aggregator
+    - cron: '0 13 * * *'   # 18:30 IST aggregator
+    - cron: '30 17 * * *'  # 23:00 IST light official seeds (cached)
+    - cron: '28 20 * * 1'  # Monday 01:58 IST weekly hard recheck (20:28 UTC)
 
 permissions:
   contents: write
@@ -31,20 +33,30 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install requests beautifulsoup4 lxml dateparser; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install requests beautifulsoup4 lxml dateparser cloudscraper; fi
 
       - name: Determine mode (cron vs manual)
         id: mode
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
+            minute=$(date -u +%M)
+            hour=$(date -u +%H)
             dow=$(date -u +%u)
-            if [ "$dow" = "1" ]; then echo "mode=weekly" >> $GITHUB_OUTPUT; else echo "mode=nightly" >> $GITHUB_OUTPUT; fi
+            if [ "$dow" = "1" ] && [ "$hour" = "20" ]; then
+              echo "mode=weekly" >> $GITHUB_OUTPUT
+            elif [ "$hour" = "17" ] && [ "$minute" = "30" ]; then
+              echo "mode=light" >> $GITHUB_OUTPUT
+            else
+              echo "mode=nightly" >> $GITHUB_OUTPUT
+            fi
           else
             echo "mode=${{ inputs.run_mode }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Scrape
+        env:
+          RUN_MODE: ${{ steps.mode.outputs.mode }}
         run: |
           set -e
           python scraper.py --mode "${{ steps.mode.outputs.mode }}"
