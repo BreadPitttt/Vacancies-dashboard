@@ -1,57 +1,6 @@
 {
   "jobListings": [
     {
-      "id": "hint_www.onlinebssc.com/interleveledit24/imp_715.pdf",
-      "title": "Click Here for Important Notice Regarding Date Extension and Documents Reupload for Advt No- 02/23",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://www.onlinebssc.com/interleveledit24/imp_715.pdf",
-      "slug": "click-here-for-important-notice-regarding-date-extension-and-documents-reupload-",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:40.506892",
-      "meta": {
-        "sourceUrl": "https://www.onlinebssc.com/",
-        "sourceSite": "hint8"
-      }
-    },
-    {
-      "id": "hint_www.onlinebssc.com/2023interlevel/awscdn/notice/4353.pdf",
-      "title": "Notice Regarding Date Extension",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://www.onlinebssc.com/2023interlevel/awscdn/notice/4353.pdf",
-      "slug": "notice-regarding-date-extension",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:40.506989",
-      "meta": {
-        "sourceUrl": "https://www.onlinebssc.com/",
-        "sourceSite": "hint8"
-      }
-    },
-    {
-      "id": "hint_bssc.bihar.gov.in/Advertisement/1859_2023.pdf",
-      "title": "CLOSED for corrigendum",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://bssc.bihar.gov.in/Advertisement/1859_2023.pdf",
-      "slug": "closed-for-corrigendum",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:40.507063",
-      "meta": {
-        "sourceUrl": "https://www.onlinebssc.com/",
-        "sourceSite": "hint8"
-      }
-    },
-    {
       "id": "hint_rrbcdg.gov.in/index.php",
       "title": "रेलवे भर्ती बोर्ड, चंडीगढ़Railway Recruitment Board, Chandigarh",
       "organization": "N/A",
@@ -62,11 +11,18 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.712190",
+      "extractedAt": "2025-09-18T13:32:45.657804",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
+        "sourceSite": "hint_rrb"
+      },
+      "updates": [
+        {
+          "title": "Recruitment Notices",
+          "link": "https://rrbcdg.gov.in/employment-notices.php",
+          "capturedAt": "2025-09-18T13:33:43.184433Z"
+        }
+      ]
     },
     {
       "id": "hint_www.google.com/maps/place/Railway+Recruitment+Board+Chandigarh/@30.6998079,76.8216591,15.75z/data=!4m6!3m5!1s0x390fed164b894d71:0x2201a5d5fe2eee1!8m2!3d30.7019169!4d76.8312717!16s%2Fg%2F11gwmk7jhh?entry=ttu&g_ep=EgoyMDI1MDUwNy4wIKXMDSoASAFQAw%3D%3D",
@@ -79,10 +35,10 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.712299",
+      "extractedAt": "2025-09-18T13:32:45.657914",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -96,27 +52,10 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.712360",
+      "extractedAt": "2025-09-18T13:32:45.657985",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/employment-notices.php",
-      "title": "Recruitment Notices",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/employment-notices.php",
-      "slug": "recruitment-notices",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.712439",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -130,44 +69,27 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.713369",
+      "extractedAt": "2025-09-18T13:32:45.658947",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2025/04-SCTRL/042024-FAQs.pdf",
-      "title": "FAQs regarding application process for the post of Section Controller under CEN 04/2025",
+      "id": "hint_rrbcdg.gov.in/uploads/2025/04-SCTRL/042024-SectionController_IndicativeNotice-Hi.pdf",
+      "title": "सेक्शन कंट्रोलर पद की भर्ती हेतु केन्द्रीकृत रोज़गार सूचना सं. 04/2025 के प्रकाशन हेतु सांकेतिक सूचना",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2025/04-SCTRL/042024-FAQs.pdf",
-      "slug": "faqs-regarding-application-process-for-the-post-of-section-controller-under-cen-",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2025/04-SCTRL/042024-SectionController_IndicativeNotice-Hi.pdf",
+      "slug": "04-2025",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.714093",
+      "extractedAt": "2025-09-18T13:32:45.659857",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2025/04-SCTRL/CEN042024-SectionController.pdf",
-      "title": "Detailed Centralised Employment Notification No. 04/2025 for the post of Section Controller",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2025/04-SCTRL/CEN042024-SectionController.pdf",
-      "slug": "detailed-centralised-employment-notification-no-04-2025-for-the-post-of-section-",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.714181",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -181,27 +103,49 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.714337",
+      "extractedAt": "2025-09-18T13:32:45.660060",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
+        "sourceSite": "hint_rrb"
+      },
+      "updates": [
+        {
+          "title": "Notice regarding viewing of RPF-SI CBT Question-Paper, Responses & keys and Raising of Objections if any",
+          "link": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF SI-Objection Tracker 17-12-2024.pdf",
+          "capturedAt": "2025-09-18T13:33:43.230530Z"
+        },
+        {
+          "title": "Notice regarding status of applications (Provisionally accepted / Conditionally accepted / Rejected)",
+          "link": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/Application Status Notice.pdf",
+          "capturedAt": "2025-09-18T13:33:43.250829Z"
+        },
+        {
+          "title": "Notice for access to upload fresh photograph & Signature for the RPF post applicants who have not uploaded standard photo & Signature",
+          "link": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF  Photo & Sign Re Upload _English.pdf",
+          "capturedAt": "2025-09-18T13:33:43.264622Z"
+        },
+        {
+          "title": "Notice regarding one time opportunity to pay application-fee for the applicants who have submitted their applications unpaid before closing date",
+          "link": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF CEN 01&02 - Notice for unpaid applicants.pdf",
+          "capturedAt": "2025-09-18T13:33:43.267167Z"
+        }
+      ]
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2025/03-PMED/032025PMed-Corrigendum1.pdf",
-      "title": "Corrigendum-1 regarding extention of timelines for online submission of application, modification window and Scribe registration",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF012024SI-Zonal_Preference_Notice.pdf",
+      "title": "Regarding filling of zonal preference form as per available vacancies / उपलब्ध रिक्तियों के अनुसार क्षेत्रीय वरीयता प्रपत्र भरने के संबंध में",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2025/03-PMED/032025PMed-Corrigendum1.pdf",
-      "slug": "corrigendum-1-regarding-extention-of-timelines-for-online-submission-of-applicat",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF012024SI-Zonal_Preference_Notice.pdf",
+      "slug": "regarding-filling-of-zonal-preference-form-as-per-available-vacancies",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.714479",
+      "extractedAt": "2025-09-18T13:32:45.660402",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -215,10 +159,10 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.714695",
+      "extractedAt": "2025-09-18T13:32:45.660475",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -232,130 +176,50 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.715121",
+      "extractedAt": "2025-09-18T13:32:45.660926",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2025/02-TECH/022025-Corrigendum1_Timeline.pdf",
-      "title": "Regarding extension of last dates for online application processes",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/01-ALP/012024-CBAT_notice13-07-2025.pdf",
+      "title": "Regarding date, duration & nos. of questions for CBAT / कंप्यूटर-आधारित योग्यता परीक्षा की तिथि, अवधि व प्रश्नों की संख्या के बारे में सूचना",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2025/02-TECH/022025-Corrigendum1_Timeline.pdf",
-      "slug": "regarding-extension-of-last-dates-for-online-application-processes",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/01-ALP/012024-CBAT_notice13-07-2025.pdf",
+      "slug": "regarding-date-duration-nos-of-questions-for-cbat",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.715411",
+      "extractedAt": "2025-09-18T13:32:45.681615",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2025/02-TECH/022025-Corrigendum1_Timeline-हिन्दी.pdf",
-      "title": "ऑनलाइन आवेदन प्रक्रियाओं की अंतिम तिथि की समयावधि बढ़ाने के संबंध में",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2025/02-TECH/022025-Corrigendum1_Timeline-हिन्दी.pdf",
-      "slug": "022025-corrigendum1-timeline-pdf",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.715482",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/072024-ApplicationStatus.pdf",
-      "title": "Regarding status of application for Ministerial & Isolated posts",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/072024-ApplicationStatus.pdf",
-      "slug": "regarding-status-of-application-for-ministerial-isolated-posts",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.715896",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/072024-ApplicationStatus-hi.pdf",
-      "title": "मिनिस्ट्रियल और आइसोलेटिड कोटियों के विभिन्न पदों की भर्ती पदों हेतु आवेदन की स्थिति देखने के संदर्भ में सूचना",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/072024-ApplicationStatus-hi.pdf",
-      "slug": "072024-applicationstatus-hi-pdf",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.715969",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/062024-ApplicationStatus.pdf",
-      "title": "Regarding status of application for NTPC Undergraduate posts",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/062024-ApplicationStatus.pdf",
-      "slug": "regarding-status-of-application-for-ntpc-undergraduate-posts",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.716075",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/062024-ApplicationStatus_हिन्दी.pdf",
-      "title": "एनटीपीसी (पूर्व स्नातक) पदों हेतु आवेदन की स्थिति देखने के संदर्भ में सूचना",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/062024-ApplicationStatus_हिन्दी.pdf",
-      "slug": "062024-applicationstatus-pdf",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.716147",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2025/02-TECH/022025-FAQs.pdf",
-      "title": "FAQs regarding application process for the post of Technician under CEN 02/2025",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2025/02-TECH/022025-FAQs.pdf",
-      "slug": "faqs-regarding-application-process-for-the-post-of-technician-under-cen-02-2025",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.716542",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
+        "sourceSite": "hint_rrb"
+      },
+      "updates": [
+        {
+          "title": "Notice regarding viewing of ALP CBT-2 Question-Paper, Responses & keys and Raising of Objections if any",
+          "link": "https://rrbcdg.gov.in/uploads/2024/01-ALP/CBT2_Objection-Tracker.pdf",
+          "capturedAt": "2025-09-18T13:33:43.192003Z"
+        },
+        {
+          "title": "Notice regarding viewing of ALP CBT Question-Paper, Responses & keys and Raising of Objections if any",
+          "link": "https://rrbcdg.gov.in/uploads/2024/01-ALP/ALP-Objection Tracker 05.12.2024.pdf",
+          "capturedAt": "2025-09-18T13:33:43.239604Z"
+        },
+        {
+          "title": "Notice regarding exam city intimation slip & helpdesk link",
+          "link": "https://rrbcdg.gov.in/uploads/2024/01-ALP/City intimation slip notice.pdf",
+          "capturedAt": "2025-09-18T13:33:43.246425Z"
+        },
+        {
+          "title": "Important Notice for Application status and option facility for change of RRB and Railway(s) zones preference for provisionally eligible candidates",
+          "link": "https://rrbcdg.gov.in/uploads/2024/01-ALP/Important Notice 22-07-2024.pdf",
+          "capturedAt": "2025-09-18T13:33:43.262178Z"
+        }
+      ]
     },
     {
       "id": "hint_rrbcdg.gov.in/uploads/2025/02-TECH/022025-CEN_updated.pdf",
@@ -368,129 +232,70 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.716640",
+      "extractedAt": "2025-09-18T13:32:45.682371",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/052024-Application_Status.pdf",
-      "title": "Notice on application status for NTPC-Graduate categories under CEN 05/2024",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/04-PMED/CBT_Objection-Tracker_Reopening.pdf",
+      "title": "Notice regarding viewing of CBT Question-Paper, Responses & keys and Raising of Objections if any for candidates of 08 categories",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/052024-Application_Status.pdf",
-      "slug": "notice-on-application-status-for-ntpc-graduate-categories-under-cen-05-2024",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.717337",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/052024-Application_Status-Hi.pdf",
-      "title": "सीईएन 05/2024 के अन्तर्गत एनटीपीसी स्नातक श्रेणियों के आवेदन की स्तिथि के संबंध में सूचना",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/052024-Application_Status-Hi.pdf",
-      "slug": "05-2024",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/04-PMED/CBT_Objection-Tracker_Reopening.pdf",
+      "slug": "notice-regarding-viewing-of-cbt-question-paper-responses-keys-and-raising-of-obj",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.717403",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T13:32:45.683190",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
+      },
+      "flags": {
+        "no_parent_found": true
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2025/01-ALP/012025-Corrigendum-1.pdf",
-      "title": "Corrigendum-1 to CEN 01/2025-ALP regarding the extension of application & modification window dates",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/04-PMED/CBT_Objection-Tracker.pdf",
+      "title": "Notice regarding viewing of ALP CBT-2 Question-Paper, Responses & keys and Raising of Objections if any",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2025/01-ALP/012025-Corrigendum-1.pdf",
-      "slug": "corrigendum-1-to-cen-01-2025-alp-regarding-the-extension-of-application-modifica",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/04-PMED/CBT_Objection-Tracker.pdf",
+      "slug": "notice-regarding-viewing-of-alp-cbt-2-question-paper-responses-keys-and-raising-",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.717568",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T13:32:45.683665",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
+      },
+      "flags": {
+        "no_parent_found": true
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2025/01-ALP/012025-Corrigendum-1-Hi.pdf",
-      "title": "सीईएन 01/2025 के सहायक लोको पायलट पद हेतु आवेदन एवं संशोधन-विंडो की अंतिम तिथियों को बढ़ाने के संबंध में शुद्धिपत्र-1",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/04-PMED/Aadhaar_Notice.pdf",
+      "title": "Important notice regarding Aadhaar-Verification of candidates",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2025/01-ALP/012025-Corrigendum-1-Hi.pdf",
-      "slug": "01-2025-1",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/04-PMED/Aadhaar_Notice.pdf",
+      "slug": "important-notice-regarding-aadhaar-verification-of-candidates",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.717637",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T13:32:45.684303",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/CEN_05_2024_Graduate.pdf",
-      "title": "Notice for submission of latest Community & Caste Certificate via Email by all \"Application Accepted\" candidates of CEN 05/2024 (NTPC-Graduate) who belong to specific castes but mentioned their community as SC in the online submitted application",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/CEN_05_2024_Graduate.pdf",
-      "slug": "notice-for-submission-of-latest-community-caste-certificate-via-email-by-all-app",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.717841",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/CEN_06_2024_Under Graduate.pdf",
-      "title": "Notice for submission of latest Community & Caste Certificate via Email by all \"Application Accepted\" candidates of CEN 06/2024 (NTPC-Undergraduate) who belong to specific castes but mentioned their community as SC in the online submitted application",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/CEN_06_2024_Under Graduate.pdf",
-      "slug": "notice-for-submission-of-latest-community-caste-certificate-via-email-by-all-app",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.717923",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2025/01-ALP/FAQs CEN 01-2025 (ALP).pdf",
-      "title": "FAQs regarding application process for the post of ALP under CEN 01/2025",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2025/01-ALP/FAQs CEN 01-2025 (ALP).pdf",
-      "slug": "faqs-regarding-application-process-for-the-post-of-alp-under-cen-01-2025",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.718422",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
+      },
+      "flags": {
+        "no_parent_found": true
       }
     },
     {
@@ -503,300 +308,161 @@
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.718504",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T13:32:45.684615",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
+      },
+      "flags": {
+        "no_parent_found": true
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF_012024_SI_CBT_RESULT-Corrigendum_Female.pdf",
-      "title": "Corrigendum-1 to the CBT result & cut-off marks of Female candidates for the post of Sub-Inspector under CEN RPF 01/2024",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/RRBCDG_ Technician-DV_Notice.pdf",
+      "title": "Document Verification schedule for the post of Technician-I Signal & Technician-III",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF_012024_SI_CBT_RESULT-Corrigendum_Female.pdf",
-      "slug": "corrigendum-1-to-the-cbt-result-cut-off-marks-of-female-candidates-for-the-post-",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/RRBCDG_ Technician-DV_Notice.pdf",
+      "slug": "document-verification-schedule-for-the-post-of-technician-i-signal-technician-ii",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.719458",
+      "extractedAt": "2025-09-18T13:32:45.684902",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
+        "sourceSite": "hint_rrb"
+      },
+      "updates": [
+        {
+          "title": "Notice regarding viewing of CBT Question-Paper, Responses & keys and Raising of Objections if any",
+          "link": "https://rrbcdg.gov.in/uploads/2024/02-TECH/02-2024 Tech3 Objection Tracker.pdf",
+          "capturedAt": "2025-09-18T13:33:43.219882Z"
+        },
+        {
+          "title": "Notice regarding viewing of CBT Question-Paper, Responses & keys and Raising of Objections if any",
+          "link": "https://rrbcdg.gov.in/uploads/2024/02-TECH/02-2024 Tech1 Objection Tracker.pdf",
+          "capturedAt": "2025-09-18T13:33:43.225751Z"
+        },
+        {
+          "title": "Notice regarding exam city intimation slip & helpdesk link for Tech-III",
+          "link": "https://rrbcdg.gov.in/uploads/2024/02-TECH/City Intimation Tech3.pdf",
+          "capturedAt": "2025-09-18T13:33:43.232720Z"
+        },
+        {
+          "title": "Notice regarding exam city intimation slip & helpdesk link for Tech-I",
+          "link": "https://rrbcdg.gov.in/uploads/2024/02-TECH/City Intimation Tech1.pdf",
+          "capturedAt": "2025-09-18T13:33:43.234916Z"
+        },
+        {
+          "title": "Notice regarding status of applications (Provisionally accepted / Conditionally accepted / Rejected)",
+          "link": "https://rrbcdg.gov.in/uploads/2024/02-TECH/CEN 02-2024_Tech-III Status.pdf",
+          "capturedAt": "2025-09-18T13:33:43.244229Z"
+        },
+        {
+          "title": "Corrigendum & addendum no. 2 regarding enhancement of notified vacancies for the post of technician grade III",
+          "link": "https://rrbcdg.gov.in/uploads/2024/02-TECH/Corrigendum2.pdf",
+          "capturedAt": "2025-09-18T13:33:43.252976Z"
+        },
+        {
+          "title": "Important notice in continuation to Corrigendum & Addendum No.2",
+          "link": "https://rrbcdg.gov.in/uploads/2024/02-TECH/Corrigendum2 continuation notice.pdf",
+          "capturedAt": "2025-09-18T13:33:43.255141Z"
+        },
+        {
+          "title": "Advance notice regarding Centralised Employment Notification (CEN) for recruitment of Technicians in Indian Railways",
+          "link": "https://rrbcdg.gov.in/uploads/2024/02-TECH/Advance Notice Technicians dt 290124.pdf",
+          "capturedAt": "2025-09-18T13:33:43.271797Z"
+        }
+      ]
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF02-CONS/RPF022024-Tanti-Tatwa caste_SC to OBC_Bihar_candidates25.02.2025.pdf",
-      "title": "Notice for submission of latest Community & Caste Certificate via Email by all \"Application Accepted\" candidates of CEN RPF 02/2024 (Constable) who belong to specific castes but mentioned their community as SC in the online submitted application",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/RRBCDG_ Technician-DV_Notice Hi.pdf",
+      "title": "तकनीशियन-I (सिगनल) व तकनीशियन-III के पद हेतु दस्तावेज सत्यापन की अधिसूचना",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF02-CONS/RPF022024-Tanti-Tatwa caste_SC to OBC_Bihar_candidates25.02.2025.pdf",
-      "slug": "notice-for-submission-of-latest-community-caste-certificate-via-email-by-all-app",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/RRBCDG_ Technician-DV_Notice Hi.pdf",
+      "slug": "i-iii",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.719922",
+      "extractedAt": "2025-09-18T13:32:45.684972",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum4.pdf",
-      "title": "Corrigendum-4 regarding timelines for submission of application / modification window and eligibility for the post of librarian",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF02-CONS/RPFConstable-ObjectionTracker_24-03-2025.pdf",
+      "title": "Notice regarding viewing of RPF-Constable CBT Question-Paper, Responses & keys and Raising of Objections, if any",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum4.pdf",
-      "slug": "corrigendum-4-regarding-timelines-for-submission-of-application-modification-win",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF02-CONS/RPFConstable-ObjectionTracker_24-03-2025.pdf",
+      "slug": "notice-regarding-viewing-of-rpf-constable-cbt-question-paper-responses-keys-and-",
+      "qualificationLevel": "N/A",
+      "domicile": "All India",
+      "source": "aggregator",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T13:32:45.685265",
+      "meta": {
+        "sourceUrl": "https://rrbcdg.gov.in/",
+        "sourceSite": "hint_rrb"
+      },
+      "flags": {
+        "no_parent_found": true
+      }
+    },
+    {
+      "id": "hint_rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Notice to CCAAs Hi.pdf",
+      "title": "रेलवे प्रतिष्ठानों में प्रशिक्षित कोर्स पूर्ण कर चुके एक्ट अप्रेंटिस (सीसीएए) के लिए आवेदन की पात्रता के संबंध में सूचना",
+      "organization": "N/A",
+      "deadline": "N/A",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Notice to CCAAs Hi.pdf",
+      "slug": "2024-08-notice-to-ccaas-hi-pdf",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720042",
+      "extractedAt": "2025-09-18T13:32:45.687001",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
+        "sourceSite": "hint_rrb"
+      },
+      "updates": [
+        {
+          "title": "Notice for Course Completed Act Apprentices (CCAAs) trained in Railway establishments regarding eligibility for application",
+          "link": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Notice to CCAAs.pdf",
+          "capturedAt": "2025-09-18T13:33:43.208168Z"
+        },
+        {
+          "title": "Indicative notice regarding recruitment for various posts of Pay Level-1",
+          "link": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Indicative Notice.pdf",
+          "capturedAt": "2025-09-18T13:33:43.210450Z"
+        },
+        {
+          "title": "Corrigendum to Notice published in Employment News regarding recruitment for various posts of Pay Level-1",
+          "link": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/Corrigendum to Employment Notice.pdf",
+          "capturedAt": "2025-09-18T13:33:43.212810Z"
+        }
+      ]
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum4 Hi.pdf",
-      "title": "आवेदन जमा करने / संशोधन विंडो की समयसीमा तथा लाइब्रेरियन के पद की शैक्षिक-पात्रता के संबंध में शुद्धिपत्र-4",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Indicative Notice Hi.pdf",
+      "title": "वेतन स्तर-1 के विभिन्न पदों की भर्ती के संबंध में सांकेतिक सूचना",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum4 Hi.pdf",
-      "slug": "4",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720113",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Corrigendum1.pdf",
-      "title": "Corrigendum-1 regarding extension of closing dates for submission of online applications & modification window",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Corrigendum1.pdf",
-      "slug": "corrigendum-1-regarding-extension-of-closing-dates-for-submission-of-online-appl",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720249",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Corrigendum1 Hi.pdf",
-      "title": "सीईएन 08/2024 के पदों हेतु ऑन-लाइन आवेदन जमा करने व संशोधन-विंडो की समयरेखा बढ़ाने के संदर्भ में शुद्धिपत्र-1",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Corrigendum1 Hi.pdf",
-      "slug": "08-2024-1",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720317",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum3.pdf",
-      "title": "Corrigendum-3 regarding timelines for submission of application & modification window",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum3.pdf",
-      "slug": "corrigendum-3-regarding-timelines-for-submission-of-application-modification-win",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720421",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum3 Hi.pdf",
-      "title": "सीईएन 07/2024 के पदों हेतु ऑन-लाइन आवेदन जमा करने व संशोधन-विंडो की समयरेखा के संदर्भ में शुद्धिपत्र-3",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum3 Hi.pdf",
-      "slug": "07-2024-3",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720485",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum2.pdf",
-      "title": "Corrigendum-2 regarding eligibilty criteria for category no.59,60,61,62,64,65 & 66 of CEN 07/2024",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum2.pdf",
-      "slug": "corrigendum-2-regarding-eligibilty-criteria-for-category-no-59-60-61-62-64-65-66",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720589",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum2 Hi.pdf",
-      "title": "सीईएन 07/2024 की कोटी सं. 59,60,61,62,64,65 और 66 हेतु शैक्षिक योग्यता के संदर्भ में शुद्धिपत्र-2",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum2 Hi.pdf",
-      "slug": "07-2024-59-60-61-62-64-65-66-2",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720655",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Notice to CCAAs.pdf",
-      "title": "Notice for Course Completed Act Apprentices (CCAAs) trained in Railway establishments regarding eligibility for application",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Notice to CCAAs.pdf",
-      "slug": "notice-for-course-completed-act-apprentices-ccaas-trained-in-railway-establishme",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720719",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum1.pdf",
-      "title": "Corrigendum-1 to the CEN 07/2024 regarding Important-Dates & Suitability of PwD Candidates for various posts of ministerial & isolated categories",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum1.pdf",
-      "slug": "corrigendum-1-to-the-cen-07-2024-regarding-important-dates-suitability-of-pwd-ca",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720814",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum1 Hi.pdf",
-      "title": "मिनिस्ट्रियल और आइसोलेटिड कोटियों के विभिन्न पदों की भर्ती हेतु आवेदन-तिथियों व बेंचमार्क दिव्यंगता वाले अभ्यर्थियों की उपयुक्तता के संबंध में शुद्धिपत्र-1",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Corrigendum1 Hi.pdf",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Indicative Notice Hi.pdf",
       "slug": "1",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.720886",
+      "extractedAt": "2025-09-18T13:32:45.687401",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 FAQs.pdf",
-      "title": "FAQs regarding application process for various posts in Pay Level-1 of 7th CPC",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 FAQs.pdf",
-      "slug": "faqs-regarding-application-process-for-various-posts-in-pay-level-1-of-7th-cpc",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721004",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/08-LVL1/CEN 2024-08 Level-1.pdf",
-      "title": "Centralised Employment Notice No. 08/2024 for recruitment of various posts in Pay Level-1 of 7th CPC",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/CEN 2024-08 Level-1.pdf",
-      "slug": "centralised-employment-notice-no-08-2024-for-recruitment-of-various-posts-in-pay",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721091",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Indicative Notice.pdf",
-      "title": "Indicative notice regarding recruitment for various posts of Pay Level-1",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/2024-08 Indicative Notice.pdf",
-      "slug": "indicative-notice-regarding-recruitment-for-various-posts-of-pay-level-1",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721192",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/08-LVL1/Corrigendum to Employment Notice.pdf",
-      "title": "Corrigendum to Notice published in Employment News regarding recruitment for various posts of Pay Level-1",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/08-LVL1/Corrigendum to Employment Notice.pdf",
-      "slug": "corrigendum-to-notice-published-in-employment-news-regarding-recruitment-for-var",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721275",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -810,10 +476,10 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721339",
+      "extractedAt": "2025-09-18T13:32:45.687542",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -826,402 +492,184 @@
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721401",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T13:32:45.687605",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
+      },
+      "flags": {
+        "no_parent_found": true
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF02-CONS/Application Status Hi.pdf",
-      "title": "आवेदनों की स्थिति के संबंध में सूचना (अनंतिम रूप से स्वीकृत / सशर्त रूप से स्वीकृत / अस्वीकृत)",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Indicative Notice Hi.pdf",
+      "title": "मिनिस्ट्रियल और आइसोलेटिड पदों की भर्ती के संबंध में सांकेतिक सूचना",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF02-CONS/Application Status Hi.pdf",
-      "slug": "application-status-hi-pdf",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Indicative Notice Hi.pdf",
+      "slug": "2024-07-indicative-notice-hi-pdf",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721469",
+      "extractedAt": "2025-09-18T13:32:45.687880",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
+        "sourceSite": "hint_rrb"
+      },
+      "updates": [
+        {
+          "title": "Indicative notice regarding recruitment for various posts of Ministerial & Isolated Categories",
+          "link": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Indicative Notice.pdf",
+          "capturedAt": "2025-09-18T13:33:43.217368Z"
+        }
+      ]
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - FAQs.pdf",
-      "title": "FAQs regarding application process for various posts of Ministerial & Isolated categories",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/03-JE/03-2024 City intimation slip notice Hi.pdf",
+      "title": "परीक्षा शहर सूचना पर्ची और हेल्पडेस्क लिंक के बारे में सूचना",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - FAQs.pdf",
-      "slug": "faqs-regarding-application-process-for-various-posts-of-ministerial-isolated-cat",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/03-JE/03-2024 City intimation slip notice Hi.pdf",
+      "slug": "03-2024-city-intimation-slip-notice-hi-pdf",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721526",
+      "extractedAt": "2025-09-18T13:32:45.689029",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
+        "sourceSite": "hint_rrb"
+      },
+      "updates": [
+        {
+          "title": "Notice regarding viewing of CBT-2 Question-Paper, Responses & keys and Raising of Objections if any",
+          "link": "https://rrbcdg.gov.in/uploads/2024/03-JE/CBT-2_ObjectionTracker.pdf",
+          "capturedAt": "2025-09-18T13:33:43.196712Z"
+        },
+        {
+          "title": "Notice on Schedule of 2nd Stage Computer Based Test (CBT-II)",
+          "link": "https://rrbcdg.gov.in/uploads/2024/03-JE/CBT-2_ExamSchedule.pdf",
+          "capturedAt": "2025-09-18T13:33:43.203412Z"
+        },
+        {
+          "title": "Notice regarding viewing of CBT Question-Paper, Responses & keys and Raising of Objections if any",
+          "link": "https://rrbcdg.gov.in/uploads/2024/03-JE/Objection Tracker CEN 03 2024 JEs.pdf",
+          "capturedAt": "2025-09-18T13:33:43.228125Z"
+        },
+        {
+          "title": "Notice regarding exam city intimation slip & helpdesk link",
+          "link": "https://rrbcdg.gov.in/uploads/2024/03-JE/03-2024 City intimation slip notice.pdf",
+          "capturedAt": "2025-09-18T13:33:43.237198Z"
+        },
+        {
+          "title": "Notice regarding status of applications (Provisionally accepted / Conditionally accepted / Rejected)",
+          "link": "https://rrbcdg.gov.in/uploads/2024/03-JE/Application Status.pdf",
+          "capturedAt": "2025-09-18T13:33:43.248610Z"
+        }
+      ]
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - CEN Min & Iso.pdf",
-      "title": "Centralised Employment Notice No.07/2024 for recruitment of various posts of Ministerial & Isolated categories",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/Notice for Aadhaar Biometrics Unlock 30-11-2024.pdf",
+      "title": "परीक्षा में बैठने से पहले उम्मीदवारों के हित में आधार बायोमेट्रिक्स अनलॉक करने के लिए एडवाइजरी नोटिस",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - CEN Min & Iso.pdf",
-      "slug": "centralised-employment-notice-no-07-2024-for-recruitment-of-various-posts-of-min",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/Notice for Aadhaar Biometrics Unlock 30-11-2024.pdf",
+      "slug": "notice-for-aadhaar-biometrics-unlock-30-11-2024-pdf",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721607",
+      "extractedAt": "2025-09-18T13:32:45.689379",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
+        "sourceSite": "hint_rrb"
+      },
+      "updates": [
+        {
+          "title": "Notice for Submission of Updated Community & Caste Certificates via Email by all candidates whose applications have been marked as “Application Accepted” and who belong to specific castes (PAN, SAWASI, PANR, TANTI-TATWA) but have selected “SC” as their community in the submitted online application are required to send their latest community and caste certificates via email",
+          "link": "https://rrbcdg.gov.in/uploads/2024/Caste Certificate of Bihar State.pdf",
+          "capturedAt": "2025-09-18T13:33:43.223359Z"
+        },
+        {
+          "title": "Important notice regarding malpractices in examinations conducted by the RRBs",
+          "link": "https://rrbcdg.gov.in/uploads/2024/Notice regarding malpractice.pdf",
+          "capturedAt": "2025-09-18T13:33:43.241889Z"
+        },
+        {
+          "title": "Advisory Notice for the applicants who have not done Aadhaar verification till now",
+          "link": "https://rrbcdg.gov.in/uploads/2024/Notice_Aadhaar verification_English_29.08.2024.pdf",
+          "capturedAt": "2025-09-18T13:33:43.257604Z"
+        }
+      ]
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Indicative Notice.pdf",
-      "title": "Indicative notice regarding recruitment for various posts of Ministerial & Isolated Categories",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF01-SI/Notice regarding free travel authority.pdf",
+      "title": "Important instructions for SC/ST candidates for availing Free Travel Authority Pass for exam",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/07-M&I/2024-07 - Indicative Notice.pdf",
-      "slug": "indicative-notice-regarding-recruitment-for-various-posts-of-ministerial-isolate",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/Notice regarding free travel authority.pdf",
+      "slug": "important-instructions-for-sc-st-candidates-for-availing-free-travel-authority-p",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721703",
+      "extractedAt": "2025-09-18T13:32:45.689529",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/Caste Certificate of Bihar State.pdf",
-      "title": "Notice for Submission of Updated Community & Caste Certificates via Email by all candidates whose applications have been marked as “Application Accepted” and who belong to specific castes (PAN, SAWASI, PANR, TANTI-TATWA) but have selected “SC” as their community in the submitted online application are required to send their latest community and caste certificates via email",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF01-SI/Notice regarding free travel authority Hi.pdf",
+      "title": "परीक्षा के लिए निःशुल्क यात्रा पास प्राप्त करने हेतु अनुसूचित जाति/अनुसूचित जनजाति के उम्मीदवारों के लिए महत्वपूर्ण निर्देश",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/Caste Certificate of Bihar State.pdf",
-      "slug": "notice-for-submission-of-updated-community-caste-certificates-via-email-by-all-c",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/Notice regarding free travel authority Hi.pdf",
+      "slug": "notice-regarding-free-travel-authority-hi-pdf",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.721933",
+      "extractedAt": "2025-09-18T13:32:45.689613",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/Caste Certificate of Bihar State Hi.pdf",
-      "title": "वे सभी अभ्यर्थी जिनका आवेदन “Application Accepted” की स्थिति में है और जो PAN, SAWASI, PANR, TANTI-TATWA जैसी विशेष जातियों से संबंधित हैं, लेकिन जिन्होंने ऑनलाइन आवेदन में अपने समुदाय को “SC” के रूप में दर्शाया है, उन्हें निर्देश दिया जाता है कि वे अपने नवीनतम जाति एवं समुदाय प्रमाण पत्र ईमेल के माध्यम से भेजें",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/Notice regarding malpractice Hi.pdf",
+      "title": "आरआरबी द्वारा आयोजित परीक्षाओं में कदाचार के संबंध में महत्वपूर्ण सूचना",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/Caste Certificate of Bihar State Hi.pdf",
-      "slug": "application-accepted-pan-sawasi-panr-tanti-tatwa-sc",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/Notice regarding malpractice Hi.pdf",
+      "slug": "notice-regarding-malpractice-hi-pdf",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.722064",
+      "extractedAt": "2025-09-18T13:32:45.689742",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/CEN 02-2024_Tech-III Status.pdf",
-      "title": "Notice regarding status of applications (Provisionally accepted / Conditionally accepted / Rejected)",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/01-ALP/City intimation slip notice Hi.pdf",
+      "title": "परीक्षा शहर सूचना पर्ची और हेल्पडेस्क लिंक के बारे में सूचना",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/CEN 02-2024_Tech-III Status.pdf",
-      "slug": "notice-regarding-status-of-applications-provisionally-accepted-conditionally-acc",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/01-ALP/City intimation slip notice Hi.pdf",
+      "slug": "city-intimation-slip-notice-hi-pdf",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.722915",
+      "extractedAt": "2025-09-18T13:32:45.690053",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/03-JE/Application Status.pdf",
-      "title": "Notice regarding status of applications (Provisionally accepted / Conditionally accepted / Rejected)",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/03-JE/Application Status.pdf",
-      "slug": "notice-regarding-status-of-applications-provisionally-accepted-conditionally-acc",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.723453",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/03-JE/Application Status Hi.pdf",
-      "title": "आवेदनों की स्थिति के संबंध में सूचना (अनंतिम रूप से स्वीकृत / सशर्त रूप से स्वीकृत / अस्वीकृत)",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/03-JE/Application Status Hi.pdf",
-      "slug": "application-status-hi-pdf",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.723525",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-3.pdf",
-      "title": "Corrigendum-3 regarding revision in PwBD (LD) posts with inclusion of Spinal Deformity (SD) and Spinal Injury (SI) cases",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-3.pdf",
-      "slug": "corrigendum-3-regarding-revision-in-pwbd-ld-posts-with-inclusion-of-spinal-defor",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.723594",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-3 Hi.pdf",
-      "title": "स्पाइनल डिफॉर्मिटी (एसडी) और स्पाइनल इंजरी (एसआई) को शामिल करते हुए पीडब्ल्यूबीडी (एलडी) पदों में संशोधन के संबंध में शुद्धिपत्र-३",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-3 Hi.pdf",
-      "slug": "corrigendum-3-hi-pdf",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.723671",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-4.pdf",
-      "title": "Corrigendum-4 regarding revision in PwBD (LD) posts with inclusion of Spinal Deformity (SD) and Spinal Injury (SI) cases",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-4.pdf",
-      "slug": "corrigendum-4-regarding-revision-in-pwbd-ld-posts-with-inclusion-of-spinal-defor",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.723732",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-4 Hi.pdf",
-      "title": "स्पाइनल डिफॉर्मिटी (एसडी) और स्पाइनल इंजरी (एसआई) को शामिल करते हुए पीडब्ल्यूबीडी (एलडी) पदों में संशोधन के संबंध में शुद्धिपत्र-४",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-4 Hi.pdf",
-      "slug": "corrigendum-4-hi-pdf",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.723806",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-3.pdf",
-      "title": "Corrigendum-3 regarding last date for Registration/Submission of application",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-3.pdf",
-      "slug": "corrigendum-3-regarding-last-date-for-registration-submission-of-application",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.723860",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-3 Hi.pdf",
-      "title": "पंजीकरण/आवेदन जमा करने की अंतिम तिथि के संबंध में शुद्धिपत्र-३",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-3 Hi.pdf",
-      "slug": "corrigendum-3-hi-pdf",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.723922",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-2.pdf",
-      "title": "Corrigendum-2 regarding last date for Registration/Submission of application",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-2.pdf",
-      "slug": "corrigendum-2-regarding-last-date-for-registration-submission-of-application",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.723973",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-2 Hi.pdf",
-      "title": "पंजीकरण/आवेदन जमा करने की अंतिम तिथि के संबंध में शुद्धिपत्र-२",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-2 Hi.pdf",
-      "slug": "corrigendum-2-hi-pdf",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724050",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
-      "title": "Corrigendum-1 regarding revision of notified vacancies for CEN 06-2024 NTPC-Undergraduate posts",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
-      "slug": "corrigendum-1-regarding-revision-of-notified-vacancies-for-cen-06-2024-ntpc-unde",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724109",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1 Hi.pdf",
-      "title": "सीईएन 06-2024 एनटीपीसी-स्नातक पदों के लिए अधिसूचित रिक्तियों के संशोधन के संबंध में शुद्धिपत्र-1",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1 Hi.pdf",
-      "slug": "06-2024-1",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724173",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
-      "title": "Corrigendum-2 regarding revision of notified vacancies of CEN 05-2024 NTPC-Graduate posts",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
-      "slug": "corrigendum-2-regarding-revision-of-notified-vacancies-of-cen-05-2024-ntpc-gradu",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724284",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2 Hi.pdf",
-      "title": "सीईएन 05-2024 एनटीपीसी-स्नातक पदों की अधिसूचित रिक्तियों के संशोधन के संबंध में शुद्धिपत्र-२",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2 Hi.pdf",
-      "slug": "05-2024",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724348",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/FAQ2 CEN 02-2024 Tech.pdf",
-      "title": "FAQs for Corrigendum/Addendum No.2 and Important Notice published on 27-09-2024",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/FAQ2 CEN 02-2024 Tech.pdf",
-      "slug": "faqs-for-corrigendum-addendum-no-2-and-important-notice-published-on-27-09-2024",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724405",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF01-SI/Application Status Notice.pdf",
-      "title": "Notice regarding status of applications (Provisionally accepted / Conditionally accepted / Rejected)",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/Application Status Notice.pdf",
-      "slug": "notice-regarding-status-of-applications-provisionally-accepted-conditionally-acc",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724529",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -1235,61 +683,10 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724602",
+      "extractedAt": "2025-09-18T13:32:45.691120",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/Corrigendum2.pdf",
-      "title": "Corrigendum & addendum no. 2 regarding enhancement of notified vacancies for the post of technician grade III",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/Corrigendum2.pdf",
-      "slug": "corrigendum-addendum-no-2-regarding-enhancement-of-notified-vacancies-for-the-po",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724666",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/Corrigendum2 Hi.pdf",
-      "title": "तकनीशियन ग्रेड III के पद के लिए अधिसूचित रिक्तियों में वृद्धि के संबंध में शुद्धिपत्र और परिशिष्ट संख्या-2",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/Corrigendum2 Hi.pdf",
-      "slug": "iii-2",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724732",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/Corrigendum2 continuation notice.pdf",
-      "title": "Important notice in continuation to Corrigendum & Addendum No.2",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/Corrigendum2 continuation notice.pdf",
-      "slug": "important-notice-in-continuation-to-corrigendum-addendum-no-2",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724785",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -1303,129 +700,27 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724844",
+      "extractedAt": "2025-09-18T13:32:45.691343",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/06-2024 FAQs.pdf",
-      "title": "FAQs regarding application process for various undergraduate posts of CEN 06/2024",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/Notice_Aadhaar verification_Hindi_29.08.2024.pdf",
+      "title": "जिन आवेदकों ने अब तक आधार सत्यापन नहीं कराया है उनके लिए एडवाइजरी सूचना",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/06-2024 FAQs.pdf",
-      "slug": "faqs-regarding-application-process-for-various-undergraduate-posts-of-cen-06-202",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.724943",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
-      "title": "Centralised Employment Notice No. 06/2024 for recruitment of various undergraduate posts of Non-Technical Popular Categories",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
-      "slug": "centralised-employment-notice-no-06-2024-for-recruitment-of-various-undergraduat",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.725049",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/05-2024 FAQs.pdf",
-      "title": "FAQs regarding application process for various Graduate posts of CEN 05/2024",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/05-2024 FAQs.pdf",
-      "slug": "faqs-regarding-application-process-for-various-graduate-posts-of-cen-05-2024",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.725165",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-1.pdf",
-      "title": "Corrigendum-1 for CEN 05-2024 NTPC-Graduate posts",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-1.pdf",
-      "slug": "corrigendum-1-for-cen-05-2024-ntpc-graduate-posts",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.725243",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
-      "title": "Centralised Employment Notice No. 05/2024 for recruitment of various graduate posts of Non-Technical Popular Categories",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
-      "slug": "centralised-employment-notice-no-05-2024-for-recruitment-of-various-graduate-pos",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.725307",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/04-PMED/2024-4 Corrigendum-2.pdf",
-      "title": "Corrigendum-2 regarding lasik surgery (medical standard) for paramedical posts",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/04-PMED/2024-4 Corrigendum-2.pdf",
-      "slug": "corrigendum-2-regarding-lasik-surgery-medical-standard-for-paramedical-posts",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/Notice_Aadhaar verification_Hindi_29.08.2024.pdf",
+      "slug": "notice-aadhaar-verification-hindi-29-08-2024-pdf",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.725443",
+      "extractedAt": "2025-09-18T13:32:45.691845",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/Corrigendum1.pdf",
-      "title": "Corrigendum & addendum no. 1 regarding enhancement of notified vacancies for the post of technicians of CEN 02/2024",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/Corrigendum1.pdf",
-      "slug": "corrigendum-addendum-no-1-regarding-enhancement-of-notified-vacancies-for-the-po",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.725551",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -1438,45 +733,14 @@
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.725607",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T13:32:45.691935",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/04-PMED/FAQ paramedical 02-2024.pdf",
-      "title": "FAQs regarding application process for various posts of Paramedical categories in CEN 04/2024",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/04-PMED/FAQ paramedical 02-2024.pdf",
-      "slug": "faqs-regarding-application-process-for-various-posts-of-paramedical-categories-i",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.725696",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/04-PMED/Detailed CEN 04-2024 Paramedical.pdf",
-      "title": "Centralised Employment Notice No. 04/2024 for recruitment of various posts of Paramedical Categories",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/04-PMED/Detailed CEN 04-2024 Paramedical.pdf",
-      "slug": "centralised-employment-notice-no-04-2024-for-recruitment-of-various-posts-of-par",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.725754",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
+      },
+      "flags": {
+        "no_parent_found": true
       }
     },
     {
@@ -1490,78 +754,27 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.725852",
+      "extractedAt": "2025-09-18T13:32:45.692133",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/01-ALP/Important Notice 22-07-2024.pdf",
-      "title": "Important Notice for Application status and option facility for change of RRB and Railway(s) zones preference for provisionally eligible candidates",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/01-ALP/Important Notice 22-07-2024 Hi.pdf",
+      "title": "अनंतिम रूप से पात्र उम्मीदवारों के लिए आवेदन की स्थिति और आरआरबी और रेलवे जोन की प्राथमिकता में बदलाव के लिए विकल्प सुविधा के लिए महत्वपूर्ण सूचना",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/01-ALP/Important Notice 22-07-2024.pdf",
-      "slug": "important-notice-for-application-status-and-option-facility-for-change-of-rrb-an",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/01-ALP/Important Notice 22-07-2024 Hi.pdf",
+      "slug": "important-notice-22-07-2024-hi-pdf",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.726073",
+      "extractedAt": "2025-09-18T13:32:45.692419",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/01-ALP/Corrigendum1",
-      "title": "Corrigendum No.1 regarding enhancement of notified vacancies for the post of ALP of CEN 01/2024",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/01-ALP/Corrigendum1",
-      "slug": "corrigendum-no-1-regarding-enhancement-of-notified-vacancies-for-the-post-of-alp",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.726199",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/01-ALP/Corrigendum1 Hi.pdf",
-      "title": "एएलपी पद के लिए अधिसूचित रिक्तियों में वृद्धि हेतु शुद्धिपत्र सं. 1",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/01-ALP/Corrigendum1 Hi.pdf",
-      "slug": "1",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.726258",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/01-ALP/CEN012024 Vacancy Enhancement.pdf",
-      "title": "Notice regarding enhancement in the number of vacancies for the post of ALP in CEN 01/2024",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/01-ALP/CEN012024 Vacancy Enhancement.pdf",
-      "slug": "notice-regarding-enhancement-in-the-number-of-vacancies-for-the-post-of-alp-in-c",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.726318",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
@@ -1575,197 +788,47 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.726384",
+      "extractedAt": "2025-09-18T13:32:45.692601",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF CEN 01&02 - Notice for unpaid applicants.pdf",
-      "title": "Notice regarding one time opportunity to pay application-fee for the applicants who have submitted their applications unpaid before closing date",
+      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF CEN 01&02-Notice for unpaid applicants-Hindi.pdf",
+      "title": "उन आवेदकों के लिए आवेदन-शुल्क का भुगतान करने के लिए एक बार अवसर के संबंध में सूचना, जिन्होंने अंतिम तिथि से पहले बिना भुगतान के अपने आवेदन जमा कर दिए हैं",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF CEN 01&02 - Notice for unpaid applicants.pdf",
-      "slug": "notice-regarding-one-time-opportunity-to-pay-application-fee-for-the-applicants-",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/RPF CEN 01&02-Notice for unpaid applicants-Hindi.pdf",
+      "slug": "rpf-cen-01-02-notice-for-unpaid-applicants-hindi-pdf",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.726617",
+      "extractedAt": "2025-09-18T13:32:45.693007",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     },
     {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF02-CONS/FAQ RPF 02-2024 Const.pdf",
-      "title": "FAQs regarding application process for the post of Constable (Executive)",
+      "id": "hint_rrbcdg.gov.in/uploads/2019/RRC01-LVL1/RRC012019-Refund.pdf",
+      "title": "Notice on refund of Exam-Fees & re-updation of Bank Account details",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF02-CONS/FAQ RPF 02-2024 Const.pdf",
-      "slug": "faqs-regarding-application-process-for-the-post-of-constable-executive",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2019/RRC01-LVL1/RRC012019-Refund.pdf",
+      "slug": "notice-on-refund-of-exam-fees-re-updation-of-bank-account-details",
       "qualificationLevel": "N/A",
       "domicile": "All India",
       "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.726831",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-18T13:32:45.693105",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/RPF01-SI/FAQ RPF 01-2024 SI.pdf",
-      "title": "FAQs regarding application process for the post of Sub-Inspector (Executive)",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/RPF01-SI/FAQ RPF 01-2024 SI.pdf",
-      "slug": "faqs-regarding-application-process-for-the-post-of-sub-inspector-executive",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.726884",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/FAQ CEN 02-2024 Tech.pdf",
-      "title": "FAQs regarding application process for the post of Technicians",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/FAQ CEN 02-2024 Tech.pdf",
-      "slug": "faqs-regarding-application-process-for-the-post-of-technicians",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.727113",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/Detailed CEN 02-2024 (English).pdf",
-      "title": "Centralised Employment Notice No. 02/2024 for the posts of Technicians",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/Detailed CEN 02-2024 (English).pdf",
-      "slug": "centralised-employment-notice-no-02-2024-for-the-posts-of-technicians",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.727194",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/2024 - Calendar.pdf",
-      "title": "Annual Calender for RRB recruitments in 2024",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/2024 - Calendar.pdf",
-      "slug": "annual-calender-for-rrb-recruitments-in-2024",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.727288",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/2024-02 Tech - Timeline.pdf",
-      "title": "Tentative Timeline of CEN-02/2024 for recruitment of Technicians",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/2024-02 Tech - Timeline.pdf",
-      "slug": "tentative-timeline-of-cen-02-2024-for-recruitment-of-technicians",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.727340",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/01-ALP/Corrigendum CEN 01-2024 dt 29012024.pdf",
-      "title": "Corrigendum to para 5.0 and 5.2 of the detailed CEN-01/2024 for the post of ALP",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/01-ALP/Corrigendum CEN 01-2024 dt 29012024.pdf",
-      "slug": "corrigendum-to-para-5-0-and-5-2-of-the-detailed-cen-01-2024-for-the-post-of-alp",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.727417",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/02-TECH/Advance Notice Technicians dt 290124.pdf",
-      "title": "Advance notice regarding Centralised Employment Notification (CEN) for recruitment of Technicians in Indian Railways",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/02-TECH/Advance Notice Technicians dt 290124.pdf",
-      "slug": "advance-notice-regarding-centralised-employment-notification-cen-for-recruitment",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.727476",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/01-ALP/FAQ CEN 01-2024 ALP.pdf",
-      "title": "FAQs regarding application process for the post of Assistant Loco Pilot",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/01-ALP/FAQ CEN 01-2024 ALP.pdf",
-      "slug": "faqs-regarding-application-process-for-the-post-of-assistant-loco-pilot",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.727528",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      }
-    },
-    {
-      "id": "hint_rrbcdg.gov.in/uploads/2024/01-ALP/Detailed CEN 01-2024 (English).pdf",
-      "title": "Centralised Employment Notice No. 01/2024 for pay level-2 post of Assistant Loco Pilot",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/01-ALP/Detailed CEN 01-2024 (English).pdf",
-      "slug": "centralised-employment-notice-no-01-2024-for-pay-level-2-post-of-assistant-loco-",
-      "qualificationLevel": "N/A",
-      "domicile": "All India",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.727597",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
+      },
+      "flags": {
+        "no_parent_found": true
       }
     },
     {
@@ -1779,30 +842,53 @@
       "domicile": "All India",
       "source": "aggregator",
       "type": "VACANCY",
-      "extractedAt": "2025-09-18T11:35:55.727725",
+      "extractedAt": "2025-09-18T13:32:45.693901",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
+        "sourceSite": "hint_rrb"
       }
     }
   ],
-  "archivedListings": [],
+  "archivedListings": [
+    {
+      "id": "hint_rrbcdg.gov.in/uploads/2025/04-SCTRL/CEN042024-SectionController.pdf",
+      "title": "Detailed Centralised Employment Notification No. 04/2025 for the post of Section Controller",
+      "organization": "N/A",
+      "deadline": "N/A",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2025/04-SCTRL/CEN042024-SectionController.pdf",
+      "slug": "detailed-centralised-employment-notification-no-04-2025-for-the-post-of-section-",
+      "qualificationLevel": "N/A",
+      "domicile": "All India",
+      "source": "aggregator",
+      "type": "VACANCY",
+      "extractedAt": "2025-09-18T13:32:45.659756",
+      "meta": {
+        "sourceUrl": "https://rrbcdg.gov.in/",
+        "sourceSite": "hint_rrb"
+      },
+      "updates": [
+        {
+          "title": "Indicative notice regarding publishing of CEN No. 04/2025 for the post of Section Controller",
+          "link": "https://rrbcdg.gov.in/uploads/2025/04-SCTRL/042024-SectionController_IndicativeNotice.pdf",
+          "capturedAt": "2025-09-18T13:33:43.187154Z"
+        }
+      ],
+      "flags": {
+        "removed_reason": "reported_hard",
+        "evidence_url": "https://rrbcdg.gov.in/uploads/2025/04-SCTRL/CEN042024-SectionController.pdf",
+        "note": ""
+      }
+    }
+  ],
   "transparencyInfo": {
     "notes": "General vacancies (10th/12th/Any graduate). Excludes teacher and technical/management/PG roles. Domicile: All‑India and Bihar‑only allowed; other states allowed only if title signals open to any state.",
     "sourcesTried": [
-      "hint8",
       "hint4"
     ],
     "schemaVersion": "1.2",
-    "totalListings": 105,
-    "lastUpdated": "2025-09-18T11:36:43.487246Z",
+    "totalListings": 39,
+    "lastUpdated": "2025-09-18T13:33:43.272600Z",
     "runMode": "light",
-    "removedByHardReports": 0,
-    "removedByAutoReasons": 0,
-    "autoRemoveReasons": [
-      "expired"
-    ],
-    "blacklistedDomains": [],
-    "addedFromMissing": 0
+    "mergedUpdates": 30
   }
 }
