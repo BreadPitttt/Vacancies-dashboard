@@ -45,7 +45,7 @@ def get_html(url, headers, timeout, allow_cache):
 
 # ---------------- Configuration ----------------
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
-REQUEST_TIMEOUT = 15 if IS_LIGHT else 20
+REQUEST_TIMEOUT = 18 if IS_LIGHT else 20  # slightly higher for seeds
 REQUEST_SLEEP_SECONDS = 1.2
 FIRST_SUCCESS_MODE = True
 
@@ -158,36 +158,51 @@ def host_of(u):
     except: return ""
 
 def parse_seed_rrb(soup, base_url):
-    jobs=[]
+    jobs=[]; seen=set()
     for a in soup.select('a[href]'):
         t=clean_text(a.get_text()); h=a.get('href','')
         if not t or not h: continue
-        if not re.search(r'(recruit|vacanc|employment|notice)', t, re.I) and not re.search(r'(vacanc|recruit)', h, re.I):
+        abs_url = normalize_url(base_url, h)
+        if not abs_url or abs_url in seen: continue
+        if not re.search(r'(recruit|vacanc|employment|notice|advert)', t, re.I) and not re.search(r'(vacanc|recruit|notice)', h, re.I):
             continue
-        j=build_job('hint','hint_rrb',base_url,t,h)
-        if j: jobs.append(j)
+        # coarse old-year filter to cut noise
+        if re.search(r'\b(2019|2020|2021|2022|2023)\b', t): 
+            continue
+        j=build_job('hint','hint_rrb',base_url,t,abs_url)
+        if j:
+            jobs.append(j); seen.add(abs_url)
     return jobs
 
 def parse_seed_bssc(soup, base_url):
-    jobs=[]
-    for a in soup.select('#NoticeBoard a[href], .notice a[href], a[href*="Notice"], a[href*="Advt"], a[href*="Advertisement"]'):
+    jobs=[]; seen=set()
+    sel = '#NoticeBoard a[href], .notice a[href], ul li a[href], a[href*="Advt"], a[href*="Advertisement"], a[href*="Notice"]'
+    for a in soup.select(sel):
         t=clean_text(a.get_text()); h=a.get('href','')
         if not t or not h: continue
-        if not re.search(r'(advt|advertisement|notice|recruit|vacanc)', t, re.I): continue
-        j=build_job('hint','hint_bssc',base_url,t,h)
-        if j: jobs.append(j)
+        abs_url = normalize_url(base_url, h)
+        if not abs_url or abs_url in seen: continue
+        if not re.search(r'(advt|advertisement|notice|recruit|vacanc|cgl|graduate level|inter level|office attendant)', t, re.I):
+            continue
+        j=build_job('hint','hint_bssc',base_url,t,abs_url)
+        if j:
+            jobs.append(j); seen.add(abs_url)
     return jobs
 
 def parse_seed_rbi(soup, base_url):
-    jobs=[]
-    for tr in soup.select('table tr'):
+    jobs=[]; seen=set()
+    rows = soup.select('table tr') or soup.select('div table tr')
+    for tr in rows:
         a=tr.find('a', href=True)
         if not a: continue
         t=clean_text(a.get_text()); h=a['href']
         if not t or not h: continue
-        if not re.search(r'(recruit|vacanc|advert|grade)', t, re.I): continue
-        j=build_job('hint','hint_rbi',base_url,t,h)
-        if j: jobs.append(j)
+        abs_url = normalize_url(base_url, h)
+        if not abs_url or abs_url in seen: continue
+        if not re.search(r'(recruit|vacanc|advert|grade|officer)', t, re.I): continue
+        j=build_job('hint','hint_rbi',base_url,t,abs_url)
+        if j:
+            jobs.append(j); seen.add(abs_url)
     return jobs
 
 # ---------------- Parsers ----------------
@@ -248,7 +263,8 @@ def parse_resultbharat(content, source_name, base_url):
     return jobs
 
 def parse_adda247(content, source_name, base_url):
-    soup=BeautifulSoup(content,'html.parser'); jobs=[]; host=urlparse(base_url).netloc
+    soup=BeautifulSoup(content,'html.parser'); host=urlparse(base_url).netloc
+    # Seed dispatch
     if source_name.startswith("hint"):
         hostn = host_of(base_url)
         if 'rrbcdg.gov.in' in hostn or 'rrbapply.gov.in' in hostn:
@@ -259,10 +275,10 @@ def parse_adda247(content, source_name, base_url):
             return parse_seed_rbi(soup, base_url)
         # fallback broad seed harvesting with keyword filter + de-dup
         anchors = soup.select('main a[href], section a[href], article a[href], a[href]')
-        seen=set()
+        seen=set(); jobs=[]
         def looks_seed(t, h):
             tl=(t or "").lower(); hl=(h or "").lower()
-            kw=["recruit","vacancy","notific","advert","employment","application","corrigendum","extension","extended"]
+            kw=["recruit","vacancy","notific","advert","employment","application","corrigendum","extension","extended","grade","officer"]
             return any(k in tl for k in kw) or any(k in hl for k in kw)
         for a in anchors:
             title=clean_text(a.get_text()); href=a.get('href')
@@ -275,6 +291,7 @@ def parse_adda247(content, source_name, base_url):
             if j: jobs.append(j); seen.add(abs_url)
         return jobs
     # Regular Adda with broadened selectors
+    jobs=[]
     for a in soup.select('article a[href], .post-card a[href], .card a[href], main a[href*="recruit"], main a[href*="notific"]'):
         title=clean_text(a.get_text()); href=a.get('href')
         if not title or not href: continue
