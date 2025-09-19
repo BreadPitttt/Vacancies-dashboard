@@ -1,131 +1,17 @@
 {
-  "jobListings": [
-    {
-      "id": "src_f61bb6c955a40af5",
-      "title": "Corrigendum-1 regarding revision of notified vacancies for CEN 06-2024 NTPC-Undergraduate posts",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
-      "slug": "corrigendum-1-regarding-revision-of-notified-vacancies-for-cen-06-2024-ntpc-unde",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-19T03:24:12.310632Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
-      "flags": {
-        "no_parent_found": true
-      }
-    },
-    {
-      "id": "src_857de82dd19ac693",
-      "title": "Corrigendum-2 regarding revision of notified vacancies of CEN 05-2024 NTPC-Graduate posts",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
-      "slug": "corrigendum-2-regarding-revision-of-notified-vacancies-of-cen-05-2024-ntpc-gradu",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-19T03:24:12.310788Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
-      "flags": {
-        "no_parent_found": true
-      }
-    },
-    {
-      "id": "src_a7e10b91ed5a646f",
-      "title": "Centralised Employment Notice No. 06/2024 for recruitment of various undergraduate posts of Non-Technical Popular Categories",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
-      "slug": "centralised-employment-notice-no-06-2024-for-recruitment-of-various-undergraduat",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-19T03:24:12.311241Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
-      "flags": {
-        "no_parent_found": true
-      }
-    },
-    {
-      "id": "src_ab48ec3436e06f17",
-      "title": "Corrigendum-1 for CEN 05-2024 NTPC-Graduate posts",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-1.pdf",
-      "slug": "corrigendum-1-for-cen-05-2024-ntpc-graduate-posts",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-19T03:24:12.311377Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-1.pdf",
-      "flags": {
-        "no_parent_found": true
-      }
-    },
-    {
-      "id": "src_8cdeeddcddefdd2e",
-      "title": "Centralised Employment Notice No. 05/2024 for recruitment of various graduate posts of Non-Technical Popular Categories",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
-      "slug": "centralised-employment-notice-no-05-2024-for-recruitment-of-various-graduate-pos",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-19T03:24:12.311455Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
-      "flags": {
-        "no_parent_found": true
-      }
-    }
-  ],
+  "jobListings": [],
   "archivedListings": [],
   "sections": {
     "applied": [],
     "other": [],
-    "primary": [
-      "src_f61bb6c955a40af5",
-      "src_857de82dd19ac693",
-      "src_a7e10b91ed5a646f",
-      "src_ab48ec3436e06f17",
-      "src_8cdeeddcddefdd2e"
-    ]
+    "primary": []
   },
   "transparencyInfo": {
     "schemaVersion": "1.4",
     "runMode": "nightly",
-    "totalListings": 5,
-    "sourcesTried": [
-      "hint4"
-    ],
-    "lastUpdated": "2025-09-19T03:24:47.752110Z",
+    "totalListings": 0,
+    "sourcesTried": [],
+    "lastUpdated": "2025-09-19T13:42:36.994520Z",
     "mergedUpdates": 0
   }
 }
