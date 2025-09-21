@@ -40,7 +40,7 @@
 
   <script>
     (function(){
-      var ENDPOINT = "https://649b07cd.vacancies-dashboard.pages.dev/api";
+      var ENDPOINT = "https://649b07cd.vacancies-dashboard.pages.dev/";
       var bust = function(){ return "?t=" + Date.now(); };
       function qs(s, r){ return (r||document).querySelector(s); }
       function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":''}[c]; }); }
@@ -96,3 +96,4 @@
   </script>
 </body>
 </html>
+
