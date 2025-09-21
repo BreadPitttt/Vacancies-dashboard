@@ -11,7 +11,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T17:37:16.926939Z",
+      "extractedAt": "2025-09-21T19:37:23.727393Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -32,33 +32,12 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T17:37:16.927107Z",
+      "extractedAt": "2025-09-21T19:37:23.727560Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
       },
       "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
-      "flags": {
-        "no_parent_found": true
-      }
-    },
-    {
-      "id": "src_a7e10b91ed5a646f",
-      "title": "Centralised Employment Notice No. 06/2024 for recruitment of various undergraduate posts of Non-Technical Popular Categories",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
-      "slug": "centralised-employment-notice-no-06-2024-for-recruitment-of-various-undergraduat",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-21T17:37:16.927605Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
       "flags": {
         "no_parent_found": true
       }
@@ -74,7 +53,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T17:37:16.927746Z",
+      "extractedAt": "2025-09-21T19:37:23.728163Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -95,7 +74,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T17:37:16.927812Z",
+      "extractedAt": "2025-09-21T19:37:23.728227Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -104,28 +83,68 @@
       "flags": {
         "no_parent_found": true
       }
+    },
+    {
+      "id": "user_670113868",
+      "title": "IBPS RRB 14th Recruitment 2025",
+      "organization": "",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "deadline": "28/09/2025",
+      "applyLink": "https://www.ibps.in/wp-content/uploads/CRP-RRBs-XIV_Final_AD_31.08.25.pdf",
+      "detailLink": "https://www.ibps.in/wp-content/uploads/CRP-RRBs-XIV_Final_AD_31.08.25.pdf",
+      "source": "official",
+      "type": "VACANCY",
+      "flags": {
+        "added_from_missing": true,
+        "trusted": true
+      },
+      "daysLeft": 7
     }
   ],
-  "archivedListings": [],
+  "archivedListings": [
+    {
+      "id": "src_a7e10b91ed5a646f",
+      "title": "Centralised Employment Notice No. 06/2024 for recruitment of various undergraduate posts of Non-Technical Popular Categories",
+      "organization": "N/A",
+      "deadline": "N/A",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
+      "slug": "centralised-employment-notice-no-06-2024-for-recruitment-of-various-undergraduat",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "source": "official",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-21T19:37:23.728027Z",
+      "meta": {
+        "sourceUrl": "https://rrbcdg.gov.in/",
+        "sourceSite": "hint4"
+      },
+      "detailLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
+      "flags": {
+        "no_parent_found": true,
+        "removed_reason": "reported_hard"
+      }
+    }
+  ],
   "sections": {
     "applied": [],
     "other": [],
     "primary": [
       "src_f61bb6c955a40af5",
       "src_857de82dd19ac693",
-      "src_a7e10b91ed5a646f",
       "src_ab48ec3436e06f17",
-      "src_8cdeeddcddefdd2e"
+      "src_8cdeeddcddefdd2e",
+      "user_670113868"
     ]
   },
   "transparencyInfo": {
     "schemaVersion": "1.4",
-    "runMode": "nightly",
+    "runMode": "light",
     "totalListings": 5,
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-21T17:37:48.636707Z",
+    "lastUpdated": "2025-09-21T19:38:00.017912Z",
     "mergedUpdates": 0
   }
 }

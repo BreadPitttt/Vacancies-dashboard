@@ -1,11 +1,11 @@
 {
   "ok": true,
   "schemaVersion": "1.4",
-  "runMode": "nightly",
+  "runMode": "light",
   "totalListings": 5,
   "sourcesTried": [
     "hint4"
   ],
-  "lastUpdated": "2025-09-21T17:37:48.636707Z",
+  "lastUpdated": "2025-09-21T19:38:00.017912Z",
   "mergedUpdates": 0
 }
