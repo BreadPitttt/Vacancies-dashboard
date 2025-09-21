@@ -1,4 +1,4 @@
-// functions/index.js — Guaranteed route at "/"
+// functions/index.js — route "/"
 const ALLOW_ORIGIN = "https://breadpitttt.github.io";
 
 export async function onRequest(context) {
@@ -21,33 +21,35 @@ export async function onRequest(context) {
     return new Response(null, { status: 403 });
   }
 
-  // Only accept POST for actual work
+  // Only POST for the test
   if (req.method !== "POST") {
-    return new Response("Method Not Allowed", { status: 405, headers: { "Access-Control-Allow-Origin": ALLOW_ORIGIN } });
+    return withCORS(new Response("Method Not Allowed", { status: 405 }));
   }
 
   const origin = req.headers.get("Origin") || "";
   if (origin !== ALLOW_ORIGIN) {
-    return new Response(JSON.stringify({ error: "Origin not allowed" }), {
+    return withCORS(new Response(JSON.stringify({ error: "Origin not allowed" }), {
       status: 403,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": ALLOW_ORIGIN }
-    });
+      headers: { "Content-Type": "application/json" }
+    }));
   }
 
   let body;
-  try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
+  try { body = await req.json(); }
+  catch { return withCORS(json({ error: "Invalid JSON" }, 400)); }
 
-  // Echo-only smoke test to confirm end-to-end works.
-  // Replace with your GitHub write once this returns 200 from the page.
-  return json({ ok: true, echo: body }, 200);
+  // Echo back so you can see 200 OK
+  return withCORS(json({ ok: true, echo: body }, 200));
 }
 
 function json(obj, status=200){
   return new Response(JSON.stringify(obj), {
     status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Access-Control-Allow-Origin": "https://breadpitttt.github.io"
-    }
+    headers: { "Content-Type": "application/json; charset=utf-8" }
   });
+}
+function withCORS(res){
+  const h = new Headers(res.headers);
+  h.set("Access-Control-Allow-Origin", ALLOW_ORIGIN);
+  return new Response(res.body, { status: res.status, headers: h });
 }
