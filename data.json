@@ -11,7 +11,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T19:37:23.727393Z",
+      "extractedAt": "2025-09-21T19:41:13.775052Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -32,7 +32,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T19:37:23.727560Z",
+      "extractedAt": "2025-09-21T19:41:13.775206Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -53,7 +53,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T19:37:23.728163Z",
+      "extractedAt": "2025-09-21T19:41:13.775804Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -74,7 +74,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T19:37:23.728227Z",
+      "extractedAt": "2025-09-21T19:41:13.775868Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -85,7 +85,7 @@
       }
     },
     {
-      "id": "user_670113868",
+      "id": "user_424788680",
       "title": "IBPS RRB 14th Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -114,7 +114,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T19:37:23.728027Z",
+      "extractedAt": "2025-09-21T19:41:13.775652Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -134,17 +134,17 @@
       "src_857de82dd19ac693",
       "src_ab48ec3436e06f17",
       "src_8cdeeddcddefdd2e",
-      "user_670113868"
+      "user_424788680"
     ]
   },
   "transparencyInfo": {
     "schemaVersion": "1.4",
-    "runMode": "light",
+    "runMode": "nightly",
     "totalListings": 5,
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-21T19:38:00.017912Z",
+    "lastUpdated": "2025-09-21T19:41:48.238795Z",
     "mergedUpdates": 0
   }
 }
