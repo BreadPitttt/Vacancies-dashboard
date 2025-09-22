@@ -8,8 +8,7 @@ PG = {"mba","pg ","post graduate","postgraduate","phd","m.phil","mcom","m.com","
 OPEN = {"all india","any state","open to all","pan india","indian citizens","across india","from any state","other state candidates","outside state"}
 CLOSE = {"domicile","resident","locals only","local candidates","state quota","only for domicile"}
 
-def clean(s): 
-    import re
+def clean(s):
     return re.sub(r"\s+"," ", (s or "").strip())
 
 def education_band(text):
@@ -21,7 +20,6 @@ def education_band(text):
 
 def allow_skills(text):
     t=(text or "").lower()
-    # allow none or simple skills; disallow complex trades/certs
     bad = any(x in t for x in ["steno","shorthand","trade test","cad","sap","oracle","aws","azure","docker","kubernetes","tally erp"])
     return not bad
 
