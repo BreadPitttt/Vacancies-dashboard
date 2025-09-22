@@ -8,10 +8,10 @@ on:
         required: false
         default: "nightly"
   schedule:
-    - cron: '0 1 * * *'    # 06:30 IST aggregator
-    - cron: '0 13 * * *'   # 18:30 IST aggregator
-    - cron: '30 17 * * *'  # 23:00 IST light official seeds (cached)
-    - cron: '28 20 * * 1'  # Monday 01:58 IST weekly hard recheck (20:28 UTC)
+    - cron: '0 1 * * *'
+    - cron: '0 13 * * *'
+    - cron: '30 17 * * *'
+    - cron: '28 20 * * 1'
 
 permissions:
   contents: write
@@ -54,12 +54,23 @@ jobs:
             echo "mode=${{ inputs.run_mode }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Scrape
+      - name: Scrape (existing)
         env:
           RUN_MODE: ${{ steps.mode.outputs.mode }}
         run: |
           set -e
           python scraper.py --mode "${{ steps.mode.outputs.mode }}"
+
+      - name: Official sources booster
+        run: |
+          set -e
+          mkdir -p tmp tools sources
+          python sources/official_collect.py tmp/official.jsonl || true
+
+      - name: Merge into data.json (non-destructive)
+        run: |
+          set -e
+          python tools/schema_merge.py data.json tmp/official.jsonl data.json > tmp/merge_stats.json
 
       - name: QC + Learn + Generate
         run: |
@@ -84,3 +95,6 @@ jobs:
           else
             echo "No changes."
           fi
+
+      - name: Print merge stats
+        run: cat tmp/merge_stats.json || true
