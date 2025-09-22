@@ -7,17 +7,8 @@
   <meta http-equiv="Cache-Control" content="no-store" />
   <link rel="stylesheet" href="style.css" />
   <style>
-    .tabs{ display:flex; gap:10px; border-bottom:1px solid #1f2740; margin:10px 0 16px; }
-    .tab{ padding:8px 12px; border-radius:8px 8px 0 0; cursor:pointer; color:#bcd2ff; }
-    .tab.active{ background:#131a31; border:1px solid #1f2740; border-bottom-color:transparent; }
-    .panel{ display:none; }
-    .panel.active{ display:block; }
     .card-actions{ flex-wrap: wrap; row-gap: 6px; }
     .btn[data-act="report"]{ min-width: 68px; }
-    .applied .card-actions .btn:not([data-act="exam_done"]){ display:none; }
-    .badge-done{ padding:2px 8px; border-radius:12px; border:1px solid #2a334f; background:#17203c; color:#99b3ff; margin-left:8px; font-size:12px; }
-    .controls{ display:flex; gap:10px; align-items:center; margin:6px 0 14px; }
-    .select{ padding:8px 10px; border-radius:8px; border:1px solid #1f2740; background:#0f172d; color:#e9eef9; }
   </style>
 </head>
 <body>
@@ -40,14 +31,6 @@
       <div class="tab active" data-tab="open">Open</div>
       <div class="tab" data-tab="applied">Applied</div>
       <div class="tab" data-tab="other">Other</div>
-    </div>
-
-    <div class="controls">
-      <select id="sort-by" class="select">
-        <option value="deadline">Sort: Deadline</option>
-        <option value="title">Sort: Title A–Z</option>
-        <option value="trusted">Sort: Trusted first</option>
-      </select>
     </div>
 
     <div id="panel-open" class="panel active">
@@ -171,7 +154,6 @@
         try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{}
       }
 
-      // Network
       async function postJSON(payload){
         try{
           var res = await fetch(ENDPOINT, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
@@ -179,7 +161,6 @@
         }catch(e){ return false; }
       }
 
-      // Status
       async function renderStatus(){
         var pill=qs("#health-pill"), last=qs("#last-updated"), total=qs("#total-listings");
         try{
@@ -192,20 +173,6 @@
           last.textContent="Last updated: —"; total.textContent="Listings: —";
         }
       }
-
-      // Sorting
-      function sortItems(items){
-        const mode = qs("#sort-by")?.value || "deadline";
-        const byDeadline = (a,b)=>{
-          const da=(a.deadline||"").split("/").reverse().join("-");
-          const db=(b.deadline||"").split("/").reverse().join("-");
-          return (da>db?1:da<db?-1:0);
-        };
-        if(mode==="title") return items.sort((a,b)=> (a.title||"").localeCompare(b.title||""));
-        if(mode==="trusted") return items.sort((a,b)=> ((b.flags&&b.flags.trusted?1:0)-(a.flags&&a.flags.trusted?1:0)) || byDeadline(a,b));
-        return items.sort(byDeadline);
-      }
-      document.addEventListener("change", async (e)=>{ if(e.target && e.target.id==="sort-by"){ await render(); }});
 
       function setLocked(btn, label){
         btn.textContent = label; btn.classList.add("disabled"); btn.setAttribute("aria-disabled","true");
@@ -224,6 +191,7 @@
         var srcRibbon = (j.source||"").toLowerCase()==="official"
           ? '<span class="chip" title="Official source">Official</span>'
           : '<span class="chip" title="From aggregator">Agg</span>';
+
         return '<article class="card'+(applied?' applied':'')+'" data-id="'+esc(j.id||"")+'">'+
           '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+srcRibbon+chip+appliedBadge+'</header>'+
           '<div class="card-body">'+
@@ -242,13 +210,31 @@
         '</article>';
       }
 
+      function byDeadlineSoonest(list){
+        // always sort: earliest valid deadline first; N/A at the end
+        const parse = (s)=>{
+          if(!s||s.toUpperCase()==="N/A") return null;
+          const t=s.replaceAll("-","/"); // support DD-MM-YYYY
+          const a=t.split("/"); // expect DD/MM/YYYY
+          if(a.length!==3) return null;
+          return new Date(+a[2], +a[1]-1, +a[0]).getTime() || null;
+        };
+        return list.slice().sort((a,b)=>{
+          const da=parse(a.deadline), db=parse(b.deadline);
+          if(da===null && db===null) return (a.title||"").localeCompare(b.title||"");
+          if(da===null) return 1;
+          if(db===null) return -1;
+          return da - db;
+        });
+      }
+
       async function render(){
         var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
         rootOpen.innerHTML=rootApp.innerHTML=rootOther.innerHTML="";
 
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
         var list = Array.isArray(data.jobListings)? data.jobListings : [];
-        list = sortItems(list.slice());
+        list = byDeadlineSoonest(list); // enforce deadline-first
         var sections = data.sections || {};
         qs("#total-listings").textContent = "Listings: " + list.length;
 
@@ -281,7 +267,7 @@
               payload={ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() };
               labelAfter= act==="right"?"Marked ✓":"Marked ✖";
             }else if(act==="report"){
-              qs("#reportListingId").value=id; openModal("#report-modal"); return;
+              qs("#reportListingId").value=id; document.getElementById("report-modal").classList.remove("hidden"); document.getElementById("report-modal").setAttribute("aria-hidden","false"); return;
             }else if(act==="applied"||act==="not_interested"){
               payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } };
               labelAfter= act==="applied"?"Saved":"Hidden";
@@ -292,14 +278,20 @@
             const ok=await postJSON(payload);
             if(ok){
               setLocked(b,labelAfter);
-              if(act==="applied"||act==="not_interested"){ setUserState(id, act); await render(); return; }
+              if(act==="applied"||act==="not_interested"){
+                setUserState(id, act);
+                await render();
+                return;
+              }
               addUndo(this.querySelector(".card-actions"), async ()=>{
                 const undo=(act==="applied"||act==="not_interested")?{type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}:{type:"vote",vote:"undo_"+act,jobId:id,title:title,url:detailsUrl,ts:new Date().toISOString()};
                 await postJSON(undo);
                 setUserState(id, "undo");
                 await render();
               });
-            } else { alert("Network problem. Please try again."); }
+            } else {
+              alert("Network problem. Please try again.");
+            }
           });
 
           if(isApplied) fApp.appendChild(card);
