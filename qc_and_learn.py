@@ -1,4 +1,4 @@
-# qc_and_learn.py — pin by votes, handle missing(title,url,lastDate), update deadlines from corrigendum
+# qc_and_learn.py — QC, learn, sectioning, and aggregator score updates
 import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
 
@@ -47,7 +47,6 @@ def parse_deadline(s):
         except: pass
     return None
 
-# --- Update merge and deadline refresh ---
 UPD_TOK = ["corrigendum","extension","extended","addendum","amendment","revised","rectified","notice","last date"]
 def is_update_title(t): return any(k in (t or "").lower() for k in UPD_TOK)
 def pdf_base(u):
@@ -88,7 +87,7 @@ for j in jobs:
         j["type"]="UPDATE"; j.setdefault("flags",{})["no_parent_found"]=True; kept.append(j)
 jobs=kept
 
-# --- Hard reports -> archive ---
+# Hard reports -> archive
 hard_ids=set(); hard_urls=set(); hard_titles=set()
 for r in reports:
     if r.get("type")=="report":
@@ -97,7 +96,6 @@ for r in reports:
         if r.get("url"): hard_urls.add(norm_url(r["url"]))
         if r.get("evidenceUrl"): hard_urls.add(norm_url(r["evidenceUrl"]))
         if r.get("title"): hard_titles.add((r["title"] or "").strip().lower())
-jobs=[(archived.append(j) or None) and j for j in jobs if False]
 tmp=[]
 for j in raw.get("jobListings", []):
     jid=j.get("id",""); url=norm_url(j.get("applyLink")); title=(j.get("title") or "").strip().lower()
@@ -107,7 +105,7 @@ for j in raw.get("jobListings", []):
         tmp.append(j)
 jobs=tmp
 
-# --- Missing submissions -> add card + learn hints (url + officialSite if present) ---
+# Missing submissions -> add card + learn hints (url + officialSite if present)
 seen={norm_url(j.get("applyLink")) for j in jobs}
 for s in subs:
     if s.get("type")=="missing":
@@ -116,8 +114,7 @@ for s in subs:
         site=(s.get("officialSite") or "").strip()
         last=(s.get("lastDate") or s.get("deadline") or "").strip()
         if not title or not url: continue
-        if norm_url(url) in seen: 
-            # still learn new site
+        if norm_url(url) in seen:
             if site and site not in rules["captureHints"]: rules["captureHints"].append(site)
             continue
         card={
@@ -137,8 +134,7 @@ for s in subs:
         if url not in rules["captureHints"]: rules["captureHints"].append(url)
         if site and site not in rules["captureHints"]: rules["captureHints"].append(site)
 
-# --- Votes and demotions ---
-from datetime import timedelta
+# Votes pin/demote
 pin=set(); demote=set()
 for v in votes:
     if v.get("type")=="vote":
@@ -152,7 +148,7 @@ for j in jobs:
     if j["id"] in demote:
         j.setdefault("flags",{})["demoted"]=True
 
-# --- User state and sectioning ---
+# User state and sectioning
 APPLIED=set(); NOTI={}
 for jid, st in (user_state or {}).items():
     a=(st or {}).get("action"); ts=(st or {}).get("ts")
@@ -174,8 +170,7 @@ primary=[]; applied_list=[]; other=[]; to_delete=set()
 for j in jobs:
     jid=j["id"]
     last=keep_date(j)
-    if last:
-        j["daysLeft"]=(last - date.today()).days
+    if last: j["daysLeft"]=(last - date.today()).days
     if jid in APPLIED:
         j.setdefault("flags",{})["applied"]=True
         applied_list.append(j); 
@@ -188,17 +183,15 @@ for j in jobs:
         primary.append(j)
 
 jobs_out=[j for j in primary+other+applied_list if j["id"] not in to_delete]
-
 for j in jobs_out:
-    if not j.get("detailLink"):
-        j["detailLink"]= j.get("applyLink")
+    if not j.get("detailLink"): j["detailLink"]= j.get("applyLink")
 
 transp = raw.get("transparencyInfo") or {}
 transp.update({
     "schemaVersion":"1.4",
     "runMode": RUN_MODE,
     "lastUpdated": datetime.utcnow().isoformat()+"Z",
-    "mergedUpdates": 0,
+    "mergedUpdates": merged,
     "totalListings": len(jobs_out)
 })
 out = {
@@ -212,8 +205,32 @@ out = {
     "transparencyInfo": transp
 }
 JWRITE("data.json", out)
-JWRITE("learn.json", {"generatedAt": datetime.utcnow().isoformat()+"Z","runMode": RUN_MODE})
+JWRITE("learn.json", {"mergedUpdates": merged,"generatedAt": datetime.utcnow().isoformat()+"Z","runMode": RUN_MODE})
 rules["blacklistedDomains"] = rules.get("blacklistedDomains", [])
 rules["autoRemoveReasons"] = rules.get("autoRemoveReasons", ["expired"])
+
+# ---- Aggregator score learner (new) ----
+def domain_of(u):
+    try: return urllib.parse.urlparse(u or "").netloc.lower()
+    except: return ""
+def is_official_host(h):
+    return h.endswith(".gov.in") or h.endswith(".nic.in") or h.endswith(".gov") or h.endswith(".go.in") or "rbi.org.in" in h
+
+scores = rules.get("aggregatorScores", {})
+def bump(h, delta):
+    if not h or is_official_host(h): return
+    v = float(scores.get(h, 0.5)) + delta
+    v = max(0.0, min(1.0, v))
+    scores[h] = round(v, 3)
+
+for v in votes:
+    if v.get("type")!="vote": continue
+    link = v.get("url") or ""
+    h = domain_of(link)
+    if not h: continue
+    if v.get("vote")=="right": bump(h, +0.05)
+    elif v.get("vote")=="wrong": bump(h, -0.05)
+
+rules["aggregatorScores"] = scores
 JWRITE("rules.json", rules)
 JWRITE("health.json", {"ok": True, **transp})
