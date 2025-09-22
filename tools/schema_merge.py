@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Adds daysLeft and preserves posts flag; no other changes.
 import json, sys, re, hashlib
 from datetime import datetime
 
@@ -10,7 +11,7 @@ def norm_date(s):
             return datetime.strptime(s, fmt).strftime("%d/%m/%Y")
         except Exception:
             pass
-    return s
+    return s if s else "N/A"
 
 def make_key(item):
     title = norm(item.get("title","")).lower()
@@ -22,8 +23,7 @@ def make_key(item):
 def compute_days_left(deadline_ddmmyyyy):
     try:
         d = datetime.strptime(deadline_ddmmyyyy, "%d/%m/%Y")
-        left = (d.date() - datetime.utcnow().date()).days
-        return max(left, 0)
+        return max((d.date() - datetime.utcnow().date()).days, 0)
     except Exception:
         return None
 
@@ -61,11 +61,9 @@ def merge(existing, candidates):
             if v.get("daysLeft") is not None:
                 ex["daysLeft"] = v["daysLeft"]
         else:
-            existing.append(v)
-            idx[k] = v
-            added += 1
+            existing.append(v); idx[k]=v; added += 1
     def sort_key(it):
-        dd = it.get("deadline","")
+        dd = it.get("deadline","N/A")
         try:
             dt = datetime.strptime(dd,"%d/%m/%Y")
             return (0, dt, it.get("title",""))
@@ -76,7 +74,7 @@ def merge(existing, candidates):
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
-        print("Usage: python tools/schema_merge.py data.json tmp/official.jsonl data.json")
+        print("Usage: python tools/schema_merge.py data.json tmp/candidates.jsonl data.json")
         sys.exit(2)
     data_path, cand_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
     data = json.load(open(data_path,"r",encoding="utf-8"))
