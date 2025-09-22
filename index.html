@@ -6,6 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Ensure actions wrap and Report remains visible */
+    .card-actions{ flex-wrap: wrap; row-gap: 6px; }
+    .btn[data-act="report"]{ min-width: 68px; }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -71,7 +76,7 @@
     </div>
   </div>
 
-  <!-- Report modal (compact, guaranteed present) -->
+  <!-- Report modal -->
   <div id="report-modal" class="modal hidden" aria-hidden="true">
     <div class="modal-body">
       <div class="modal-head">
@@ -119,6 +124,27 @@
       function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]; }); }
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
 
+      // Client-side mirror of user_state.json so Applied/Not interested is instant and persistent
+      var USER_STATE = {};
+      async function loadUserState(){
+        try{
+          var res = await fetch("user_state.json"+bust(), { cache:"no-store" });
+          if(res.ok) USER_STATE = await res.json();
+        }catch{}
+      }
+      function setUserState(jobId, action){
+        if(!jobId) return;
+        if(action==="undo") delete USER_STATE[jobId];
+        else USER_STATE[jobId] = { action: action, ts: new Date().toISOString() };
+        try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{}
+      }
+      function loadUserStateLocal(){
+        try{
+          var j = JSON.parse(localStorage.getItem("vac_user_state")||"{}");
+          if(j && typeof j==="object") USER_STATE = Object.assign({}, j, USER_STATE);
+        }catch{}
+      }
+
       function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
       function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
 
@@ -136,7 +162,10 @@
           pill.textContent=h.ok?"Health: OK":"Health: Not OK"; pill.className="pill "+(h.ok?"ok":"bad");
           var ts=h.lastUpdated||""; last.textContent="Last updated: "+(ts?new Date(ts).toLocaleString():"—");
           total.textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
-        }catch(e){ pill.textContent="Health: Unknown"; pill.className="pill"; last.textContent="Last updated: —"; total.textContent="Listings: —"; }
+        }catch(e){
+          pill.textContent="Health: Unknown"; pill.className="pill";
+          last.textContent="Last updated: —"; total.textContent="Listings: —";
+        }
       }
 
       function setLocked(btn, label){
@@ -161,13 +190,13 @@
             '<div class="rowline"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
           '</div>'+
           '<footer class="card-actions">'+
-            '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
+            <a class="btn danger" data-act="report">Report</a>
+            <a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
             '<span class="spacer"></span>'+
             '<button class="btn ok" data-act="right">Right</button>'+
             '<button class="btn warn" data-act="wrong">Wrong</button>'+
             '<button class="btn" data-act="applied">Applied</button>'+
             '<button class="btn" data-act="not_interested">Not interested</button>'+
-            '<button class="btn danger" data-act="report">Report</button>'+
           '</footer>'+
         '</article>';
       }
@@ -175,17 +204,29 @@
       async function render(){
         var root=qs("#jobs-root"), appRoot=qs("#applied-root"), otherRoot=qs("#other-root");
         root.innerHTML=appRoot.innerHTML=otherRoot.innerHTML="";
+
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
         var list = Array.isArray(data.jobListings)? data.jobListings : [];
         var sections = data.sections || {};
         qs("#total-listings").textContent = "Listings: " + list.length;
-        var idsApplied = new Set(sections.applied||[]), idsOther = new Set(sections.other||[]);
+
+        // Build effective sections by combining data.json sections with local USER_STATE
+        var idsApplied = new Set(sections.applied||[]);
+        var idsOther = new Set(sections.other||[]);
+        Object.entries(USER_STATE).forEach(([jid, s])=>{
+          if(!s || !s.action) return;
+          if(s.action==="applied"){ idsApplied.add(jid); idsOther.delete(jid); }
+          if(s.action==="not_interested"){ idsOther.add(jid); idsApplied.delete(jid); }
+          if(s.action==="undo"){ idsApplied.delete(jid); idsOther.delete(jid); }
+        });
+
         var fP=document.createDocumentFragment(), fA=document.createDocumentFragment(), fO=document.createDocumentFragment();
         if(list.length===0){ root.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
 
         for(var i=0;i<list.length;i++){
           var job=list[i], wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job); var card=wrap.firstElementChild;
-          var jid=job.id;
+          var jid = job.id;
+
           card.addEventListener("click", async function(e){
             var b=e.target.closest("[data-act]"); if(!b) return;
             if(b.classList.contains("disabled")) return;
@@ -198,8 +239,19 @@
             else if(act==="applied"||act==="not_interested"){ payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }; labelAfter= act==="applied"?"Saved":"Hidden"; }
             if(!confirm("Confirm: "+act.replace("_"," ")+"?")) return;
             var ok=await postJSON(payload);
-            if(ok){ setLocked(b,labelAfter); addUndo(this.querySelector(".card-actions"), async ()=>{ let undo=(act==="applied"||act==="not_interested")?{type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}:{type:"vote",vote:"undo_"+act,jobId:id,title:title,url:detailsUrl,ts:new Date().toISOString()}; await postJSON(undo); b.classList.remove("disabled"); b.textContent=act==="right"?"Right":act==="wrong"?"Wrong":act==="applied"?"Applied":"Not interested"; }); }
-            else alert("Network problem. Please try again.");
+            if(ok){
+              setLocked(b,labelAfter);
+              setUserState(id, act); // persist instantly
+              addUndo(this.querySelector(".card-actions"), async ()=>{
+                let undo=(act==="applied"||act==="not_interested")?{type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}:{type:"vote",vote:"undo_"+act,jobId:id,title:title,url:detailsUrl,ts:new Date().toISOString()};
+                await postJSON(undo);
+                setUserState(id, "undo");
+                b.classList.remove("disabled");
+                b.textContent=act==="right"?"Right":act==="wrong"?"Wrong":act==="applied"?"Applied":"Not interested";
+              });
+            } else {
+              alert("Network problem. Please try again.");
+            }
           });
 
           if(idsApplied.has(jid)) fA.appendChild(card);
@@ -209,8 +261,12 @@
         root.appendChild(fP); appRoot.appendChild(fA); otherRoot.appendChild(fO);
       }
 
-      document.addEventListener("DOMContentLoaded", function(){
-        (async function(){ await renderStatus(); await render(); })();
+      document.addEventListener("DOMContentLoaded", async function(){
+        await loadUserState(); // server copy
+        loadUserStateLocal();  // local mirror
+        await renderStatus();
+        await render();
+
         document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ var m=e.target.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } } });
         qs("#btn-missing")?.addEventListener("click", function(){ openModal("#missing-modal"); });
 
@@ -229,12 +285,12 @@
         qs("#reportForm")?.addEventListener("submit", async function(e){
           e.preventDefault();
           var id=qs("#reportListingId").value.trim();
-          var rc=document.getElementById("reportReason").value||"";
-          var rtxt=rc.replace(/_/g," ");
-          var ev=document.getElementById("reportEvidenceUrl").value.trim();
-          var note=document.getElementById("reportNote").value.trim();
-          if(!id||!rc) return alert("Please select a reason.");
-          var ok=await postJSON({ type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() });
+          var rc = document.getElementById("reportReason").value || "";
+          var rtxt = rc.replace(/_/g," ");
+          var ev = document.getElementById("reportEvidenceUrl").value.trim();
+          var note = document.getElementById("reportNote").value.trim();
+          if(!id || !rc) return alert("Please select a reason.");
+          var ok = await postJSON({ type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() });
           if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Reported."); }
         });
       });
