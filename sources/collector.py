@@ -13,6 +13,8 @@ OFFICIAL_SITES = [
     ("https://www.ibps.in/", "a[href]", "IBPS", "All India"),
     ("https://opportunities.rbi.org.in/Scripts/Vacancies.aspx", "a[href]", "RBI", "All India"),
     ("https://www.rrbapply.gov.in/#/auth/landing/", "a[href]", "RRB", "All India"),
+    ("https://nests.tribal.gov.in/show_content.php?lang=1&level=1&ls_id=949&lid=550", "a[href]", "EMRS/NESTS", "All India"),
+    ("https://examinationservices.nic.in/recSys2025/root/Home.aspx?enc=Ei4cajBkK1gZSfgr53ImFZ5JDNNIP7I8JbNwGOl976uPeIvr9X7G7iVESmo7y1L6", "a[href]", "EMRS/NESTS", "All India"),
 ]
 
 AGGREGATORS = [
