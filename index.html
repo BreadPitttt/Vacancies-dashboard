@@ -9,6 +9,10 @@
   <style>
     .card-actions{ flex-wrap: wrap; row-gap: 6px; }
     .btn[data-act="report"]{ min-width: 68px; }
+    details.applied { margin-top: 24px; }
+    details.applied summary { cursor: pointer; user-select: none; padding: 6px 0; color:#bcd2ff; }
+    .badge-done{ padding:2px 8px; border-radius:12px; border:1px solid #2a334f; background:#17203c; color:#99b3ff; margin-left:8px; font-size:12px; }
+    .applied .card-actions .btn:not([data-act="exam_done"]){ display:none; } /* hide actions on applied */
   </style>
 </head>
 <body>
@@ -32,10 +36,10 @@
       <div id="jobs-root" class="cards-grid"></div>
     </section>
 
-    <section>
-      <h2 class="section-title">Applied (always visible)</h2>
+    <details class="applied" open>
+      <summary>Applied (kept separate)<span id="applied-count" class="badge-done"></span></summary>
       <div id="applied-root" class="cards-grid"></div>
-    </section>
+    </details>
 
     <section>
       <h2 class="section-title">Other (past date / not interested)</h2>
@@ -175,13 +179,13 @@
         container.appendChild(u);
       }
 
-      function cardHTML(j){
+      function cardHTML(j, applied=false){
         var b=j.flags&&j.flags.trusted, chip=b?'<span class="chip ok">✓ trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
         var det=esc(j.detailLink||j.applyLink||"#");
-        // FIX: Report button anchor needs proper quotes and plus concatenation
-        return '<article class="card" data-id="'+esc(j.id||"")+'">'+
-          '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+chip+'</header>'+
+        var appliedBadge = applied ? '<span class="badge-done">Applied</span>' : '';
+        return '<article class="card'+(applied?' applied':'')+'" data-id="'+esc(j.id||"")+'">'+
+          '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+chip+appliedBadge+'</header>'+
           '<div class="card-body">'+
             '<div class="rowline"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
             '<div class="rowline"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
@@ -192,12 +196,14 @@
             '<button class="btn danger" data-act="report">Report</button>'+
             '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
             '<span class="spacer"></span>'+
-            '<button class="btn ok" data-act="right">Right</button>'+
-            '<button class="btn warn" data-act="wrong">Wrong</button>'+
-            '<button class="btn" data-act="applied">Applied</button>'+
-            '<button class="btn" data-act="not_interested">Not interested</button>'+
+            (applied ? '<button class="btn" data-act="exam_done">Exam done</button>'
+                     : '<button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button><button class="btn" data-act="applied">Applied</button><button class="btn" data-act="not_interested">Not interested</button>')+
           '</footer>'+
         '</article>';
+      }
+
+      function placeCounts(appliedSet){
+        qs("#applied-count").textContent = "("+appliedSet.size+")";
       }
 
       async function render(){
@@ -222,8 +228,11 @@
         if(list.length===0){ root.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
 
         for(var i=0;i<list.length;i++){
-          var job=list[i], wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job); var card=wrap.firstElementChild;
-          var jid = job.id;
+          var job=list[i];
+          var wrap=document.createElement("div");
+          var isApplied = idsApplied.has(job.id);
+          wrap.innerHTML=cardHTML(job, isApplied);
+          var card=wrap.firstElementChild;
 
           card.addEventListener("click", async function(e){
             var b=e.target.closest("[data-act]"); if(!b) return;
@@ -232,31 +241,42 @@
                 title=(this.querySelector(".title")?.textContent||"").trim().slice(0,240),
                 detailsUrl=(this.querySelector("a.primary")?.href||"");
             var payload=null, labelAfter="";
-            if(act==="right"||act==="wrong"){ payload={ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }; labelAfter= act==="right"?"Marked ✓":"Marked ✖"; }
-            else if(act==="report"){ qs("#reportListingId").value=id; openModal("#report-modal"); return; }
-            else if(act==="applied"||act==="not_interested"){ payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }; labelAfter= act==="applied"?"Saved":"Hidden"; }
+            if(act==="right"||act==="wrong"){
+              payload={ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() };
+              labelAfter= act==="right"?"Marked ✓":"Marked ✖";
+            }else if(act==="report"){
+              qs("#reportListingId").value=id; openModal("#report-modal"); return;
+            }else if(act==="applied"||act==="not_interested"){
+              payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } };
+              labelAfter= act==="applied"?"Saved":"Hidden";
+            }else if(act==="exam_done"){
+              // local 7-day badge; can be extended to POST in the future
+              setLocked(b,"Done ✓");
+              return;
+            }
             if(!confirm("Confirm: "+act.replace("_"," ")+"?")) return;
             var ok=await postJSON(payload);
             if(ok){
               setLocked(b,labelAfter);
-              setUserState(id, act);
+              if(act==="applied"||act==="not_interested"){ setUserState(id, act); await render(); return; }
               addUndo(this.querySelector(".card-actions"), async ()=>{
                 let undo=(act==="applied"||act==="not_interested")?{type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}:{type:"vote",vote:"undo_"+act,jobId:id,title:title,url:detailsUrl,ts:new Date().toISOString()};
                 await postJSON(undo);
                 setUserState(id, "undo");
-                b.classList.remove("disabled");
-                b.textContent=act==="right"?"Right":act==="wrong"?"Wrong":act==="applied"?"Applied":"Not interested";
+                await render();
               });
             } else {
               alert("Network problem. Please try again.");
             }
           });
 
-        if(idsApplied.has(jid)) fA.appendChild(card);
-        else if(idsOther.has(jid)) fO.appendChild(card);
-        else fP.appendChild(card);
+          if(isApplied) fA.appendChild(card);
+          else if(idsOther.has(job.id)) fO.appendChild(card);
+          else fP.appendChild(card);
         }
+
         root.appendChild(fP); appRoot.appendChild(fA); otherRoot.appendChild(fO);
+        placeCounts(idsApplied);
       }
 
       document.addEventListener("DOMContentLoaded", async function(){
