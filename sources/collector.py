@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Hybrid collector v3: official + scored aggregators + cross-verification.
+# Hybrid collector v3: official + scored aggregators + cross-verification. (Hardened official filters)
 import requests, json, sys, re, time, os, hashlib, pathlib
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
@@ -62,12 +62,40 @@ def host(u):
     try: return urlparse(u or "").netloc.lower()
     except: return ""
 
+# STRICT official host list (suffixes) + allowlist domains
+OFFICIAL_SUFFIXES = (".gov.in",".nic.in",".gov",".go.in")
+ALLOW_HOSTS = set([
+    "rbi.org.in","ibps.in","bpsc.bihar.gov.in","bssc.bihar.gov.in","ssc.gov.in",
+    "rrbapply.gov.in","nests.tribal.gov.in","examinationservices.nic.in"
+])
+
 def is_official(url):
     try:
         h = host(url)
-        return any(h.endswith(x) for x in (".gov.in",".nic.in",".gov",".go.in")) or "rbi.org.in" in h
+        if not h: return False
+        if h in ALLOW_HOSTS: return True
+        if any(h.endswith(sfx) for sfx in OFFICIAL_SUFFIXES): return True
+        return False
     except:
         return False
+
+# Extra guard: reject likely aggregator/self-hosted pages as "official"
+BAD_OFFICIAL_HINTS = re.compile(r"(sarkari|adda247|careerpower|testbook|rojgar|freejobalert|shiksha|blog|news)", re.I)
+
+def is_strict_official_link(base_site, url):
+    """
+    Accept only if:
+    - is_official(url) AND
+    - host(url) is the same as base host or a trusted government host, AND
+    - url does not contain aggregator/news hints.
+    """
+    h = host(url)
+    if not is_official(url): return False
+    if BAD_OFFICIAL_HINTS.search(url): return False
+    base_h = host(base_site)
+    if base_h and (h==base_h or h in ALLOW_HOSTS or any(h.endswith(s) for s in OFFICIAL_SUFFIXES)):
+        return True
+    return False
 
 def eligible_title(title):
     t = clean(title)
@@ -133,6 +161,9 @@ def fetch(base, selector):
             if not re.search(r"(advert|recruit|vacanc|notice|notification|exam|cgl|chsl|mts|rrb|officer|grade|constable|clerk|po|so|assistant)", t, re.I):
                 continue
             url = h if h.startswith("http") else urljoin(base, h)
+            # HARDEN: only keep links that are strictly official relative to the base
+            if not is_strict_official_link(base, url):
+                continue
             out.append((t, url))
         return out
     except:
@@ -163,9 +194,9 @@ def run(out_jsonl):
         group.setdefault(k, []).append((t,u))
 
     # Keep aggregator record if:
-    # - any official link, or
+    # - any strict official link, or
     # - 2+ aggregators agree on same title+url, or
-    # - score(host)>=0.75 AND link seems officialish (pdf or gov-ish path)
+    # - score(host)>=0.75 AND link seems like an official PDF/notice path
     def score_domain(u):
         return AGG_SCORES.get(host(u), 0.0)
 
@@ -175,13 +206,12 @@ def run(out_jsonl):
         kept=None
         for t,u in items:
             if is_official(u): kept=(t,u); break
-        if kept:
+        if kept and is_official(kept[1]):
             agg_kept.append(mk(kept[0], kept[1], "N/A", "All India", "aggregator")); continue
         if len(items) >= 2:
             t,u = items[0]; agg_kept.append(mk(t,u,"N/A","All India","aggregator")); continue
-        # score + heuristic
         t,u = items[0]
-        if score_domain(u) >= 0.75 and (u.lower().endswith(".pdf") or "/notice" in u.lower() or "/advert" in u.lower()):
+        if score_domain(u) >= 0.75 and (u.lower().endswith(".pdf") or "/notice" in u.lower() or "/advert" in u.lower()) and is_official(u):
             agg_kept.append(mk(t,u,"N/A","All India","aggregator"))
 
     # Deduplicate; prefer official
