@@ -7,12 +7,15 @@
   <meta http-equiv="Cache-Control" content="no-store" />
   <link rel="stylesheet" href="style.css" />
   <style>
+    .tabs{ display:flex; gap:10px; border-bottom:1px solid #1f2740; margin:10px 0 16px; }
+    .tab{ padding:8px 12px; border-radius:8px 8px 0 0; cursor:pointer; color:#bcd2ff; }
+    .tab.active{ background:#131a31; border:1px solid #1f2740; border-bottom-color:transparent; }
+    .panel{ display:none; }
+    .panel.active{ display:block; }
     .card-actions{ flex-wrap: wrap; row-gap: 6px; }
     .btn[data-act="report"]{ min-width: 68px; }
-    details.applied { margin-top: 24px; }
-    details.applied summary { cursor: pointer; user-select: none; padding: 6px 0; color:#bcd2ff; }
+    .applied .card-actions .btn:not([data-act="exam_done"]){ display:none; }
     .badge-done{ padding:2px 8px; border-radius:12px; border:1px solid #2a334f; background:#17203c; color:#99b3ff; margin-left:8px; font-size:12px; }
-    .applied .card-actions .btn:not([data-act="exam_done"]){ display:none; } /* hide actions on applied */
   </style>
 </head>
 <body>
@@ -31,20 +34,21 @@
   </header>
 
   <main class="container">
-    <section>
-      <h2 class="section-title">Open vacancies</h2>
-      <div id="jobs-root" class="cards-grid"></div>
-    </section>
+    <div class="tabs">
+      <div class="tab active" data-tab="open">Open</div>
+      <div class="tab" data-tab="applied">Applied</div>
+      <div class="tab" data-tab="other">Other</div>
+    </div>
 
-    <details class="applied" open>
-      <summary>Applied (kept separate)<span id="applied-count" class="badge-done"></span></summary>
+    <div id="panel-open" class="panel active">
+      <div id="open-root" class="cards-grid"></div>
+    </div>
+    <div id="panel-applied" class="panel">
       <div id="applied-root" class="cards-grid"></div>
-    </details>
-
-    <section>
-      <h2 class="section-title">Other (past date / not interested)</h2>
+    </div>
+    <div id="panel-other" class="panel">
       <div id="other-root" class="cards-grid"></div>
-    </section>
+    </div>
   </main>
 
   <!-- Missing modal -->
@@ -124,14 +128,30 @@
       var bust = function(){ return "?t=" + Date.now(); };
 
       function qs(s, r){ return (r||document).querySelector(s); }
+      function qsa(s, r){ return Array.from((r||document).querySelectorAll(s)); }
       function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]; }); }
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
 
+      // Tabs
+      function activate(tab){
+        qsa(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===tab));
+        qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+tab));
+      }
+      document.addEventListener("click", function(e){
+        var t=e.target.closest(".tab"); if(!t) return;
+        activate(t.dataset.tab);
+      });
+
+      // User state
       var USER_STATE = {};
       async function loadUserState(){
         try{
           var res = await fetch("user_state.json"+bust(), { cache:"no-store" });
           if(res.ok) USER_STATE = await res.json();
+        }catch{}
+        try{
+          var local = JSON.parse(localStorage.getItem("vac_user_state")||"{}");
+          if(local && typeof local==="object") USER_STATE = Object.assign({}, USER_STATE, local);
         }catch{}
       }
       function setUserState(jobId, action){
@@ -140,16 +160,8 @@
         else USER_STATE[jobId] = { action: action, ts: new Date().toISOString() };
         try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{}
       }
-      function loadUserStateLocal(){
-        try{
-          var j = JSON.parse(localStorage.getItem("vac_user_state")||"{}");
-          if(j && typeof j==="object") USER_STATE = Object.assign({}, j, USER_STATE);
-        }catch{}
-      }
 
-      function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
-      function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
-
+      // Network
       async function postJSON(payload){
         try{
           var res = await fetch(ENDPOINT, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
@@ -157,6 +169,7 @@
         }catch(e){ return false; }
       }
 
+      // Status
       async function renderStatus(){
         var pill=qs("#health-pill"), last=qs("#last-updated"), total=qs("#total-listings");
         try{
@@ -202,21 +215,21 @@
         '</article>';
       }
 
-      function placeCounts(appliedSet){
-        qs("#applied-count").textContent = "("+appliedSet.size+")";
-      }
-
       async function render(){
-        var root=qs("#jobs-root"), appRoot=qs("#applied-root"), otherRoot=qs("#other-root");
-        root.innerHTML=appRoot.innerHTML=otherRoot.innerHTML="";
+        var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
+        rootOpen.innerHTML=rootApp.innerHTML=rootOther.innerHTML="";
 
+        // 1) Load data.json
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
         var list = Array.isArray(data.jobListings)? data.jobListings : [];
         var sections = data.sections || {};
         qs("#total-listings").textContent = "Listings: " + list.length;
 
+        // 2) Build sets from server sections
         var idsApplied = new Set(sections.applied||[]);
         var idsOther = new Set(sections.other||[]);
+
+        // 3) Merge with client USER_STATE so clicks persist immediately
         Object.entries(USER_STATE).forEach(([jid, s])=>{
           if(!s || !s.action) return;
           if(s.action==="applied"){ idsApplied.add(jid); idsOther.delete(jid); }
@@ -224,23 +237,23 @@
           if(s.action==="undo"){ idsApplied.delete(jid); idsOther.delete(jid); }
         });
 
-        var fP=document.createDocumentFragment(), fA=document.createDocumentFragment(), fO=document.createDocumentFragment();
-        if(list.length===0){ root.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
+        // 4) Render
+        var fOpen=document.createDocumentFragment(), fApp=document.createDocumentFragment(), fOther=document.createDocumentFragment();
+        if(list.length===0){ rootOpen.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
 
-        for(var i=0;i<list.length;i++){
-          var job=list[i];
-          var wrap=document.createElement("div");
-          var isApplied = idsApplied.has(job.id);
-          wrap.innerHTML=cardHTML(job, isApplied);
-          var card=wrap.firstElementChild;
-
+        for(const job of list){
+          const isApplied = idsApplied.has(job.id);
+          const container = isApplied ? fApp : (idsOther.has(job.id) ? fOther : fOpen);
+          const wrap=document.createElement("div");
+          wrap.innerHTML = cardHTML(job, isApplied);
+          const card=wrap.firstElementChild;
           card.addEventListener("click", async function(e){
-            var b=e.target.closest("[data-act]"); if(!b) return;
+            const b=e.target.closest("[data-act]"); if(!b) return;
             if(b.classList.contains("disabled")) return;
-            var act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
-                title=(this.querySelector(".title")?.textContent||"").trim().slice(0,240),
-                detailsUrl=(this.querySelector("a.primary")?.href||"");
-            var payload=null, labelAfter="";
+            const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
+                  title=(this.querySelector(".title")?.textContent||"").trim().slice(0,240),
+                  detailsUrl=(this.querySelector("a.primary")?.href||"");
+            let payload=null, labelAfter="";
             if(act==="right"||act==="wrong"){
               payload={ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() };
               labelAfter= act==="right"?"Marked ✓":"Marked ✖";
@@ -250,55 +263,46 @@
               payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } };
               labelAfter= act==="applied"?"Saved":"Hidden";
             }else if(act==="exam_done"){
-              // local 7-day badge; can be extended to POST in the future
               setLocked(b,"Done ✓");
               return;
             }
             if(!confirm("Confirm: "+act.replace("_"," ")+"?")) return;
-            var ok=await postJSON(payload);
+            const ok=await postJSON(payload);
             if(ok){
               setLocked(b,labelAfter);
-              if(act==="applied"||act==="not_interested"){ setUserState(id, act); await render(); return; }
+              if(act==="applied"||act==="not_interested"){
+                setUserState(id, act); // write local mirror immediately
+                await render(); // re-render into tabs
+                return;
+              }
               addUndo(this.querySelector(".card-actions"), async ()=>{
-                let undo=(act==="applied"||act==="not_interested")?{type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}:{type:"vote",vote:"undo_"+act,jobId:id,title:title,url:detailsUrl,ts:new Date().toISOString()};
+                const undo=(act==="applied"||act==="not_interested")?{type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}:{type:"vote",vote:"undo_"+act,jobId:id,title:title,url:detailsUrl,ts:new Date().toISOString()};
                 await postJSON(undo);
                 setUserState(id, "undo");
                 await render();
               });
-            } else {
+            }else{
               alert("Network problem. Please try again.");
             }
           });
-
-          if(isApplied) fA.appendChild(card);
-          else if(idsOther.has(job.id)) fO.appendChild(card);
-          else fP.appendChild(card);
+          container.appendChild(card);
         }
 
-        root.appendChild(fP); appRoot.appendChild(fA); otherRoot.appendChild(fO);
-        placeCounts(idsApplied);
+        rootOpen.appendChild(fOpen);
+        rootApp.appendChild(fApp);
+        rootOther.appendChild(fOther);
       }
 
+      function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
+      function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
+
       document.addEventListener("DOMContentLoaded", async function(){
-        await loadUserState();
-        loadUserStateLocal();
+        await loadUserState();           // ensure state is present before first render
         await renderStatus();
         await render();
 
         document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ var m=e.target.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } } });
         qs("#btn-missing")?.addEventListener("click", function(){ openModal("#missing-modal"); });
-
-        qs("#missingForm")?.addEventListener("submit", async function(e){
-          e.preventDefault();
-          var title=qs("#missingTitle").value.trim();
-          var url=qs("#missingUrl").value.trim();
-          var site=qs("#missingSite").value.trim();
-          var last=qs("#missingLastDate").value.trim();
-          var note=document.getElementById("missingNote").value.trim();
-          if(!title||!url) return alert("Post name and notification link are required.");
-          var ok = await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, note:note, ts:new Date().toISOString() });
-          if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Saved."); }
-        });
 
         qs("#reportForm")?.addEventListener("submit", async function(e){
           e.preventDefault();
@@ -310,6 +314,18 @@
           if(!id || !rc) return alert("Please select a reason.");
           var ok = await postJSON({ type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() });
           if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Reported."); }
+        });
+
+        qs("#missingForm")?.addEventListener("submit", async function(e){
+          e.preventDefault();
+          var title=qs("#missingTitle").value.trim();
+          var url=qs("#missingUrl").value.trim();
+          var site=qs("#missingSite").value.trim();
+          var last=qs("#missingLastDate").value.trim();
+          var note=document.getElementById("missingNote").value.trim();
+          if(!title||!url) return alert("Post name and notification link are required.");
+          var ok = await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, note:note, ts:new Date().toISOString() });
+          if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Saved."); }
         });
       });
     })();
