@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
-# Adds daysLeft and preserves posts flag; no other changes.
+# Merge with fuzzy title normalization and stable sorting
 import json, sys, re, hashlib
 from datetime import datetime
 
-def norm(s): return re.sub(r"\s+"," ", (s or "").strip())
+def norm_spaces(s): return re.sub(r"\s+"," ", (s or "").strip())
+
+def fuzzy_title(s):
+    s = (s or "").lower()
+    s = re.sub(r"[\(\)\[\]\{\}]", " ", s)
+    s = re.sub(r"[^\w\s/:-]", " ", s)  # keep slashes and hyphens for advt no
+    s = re.sub(r"\b(notice|notification|advertisement|advt|recruitment|online\s*form|apply\s*online)\b", " ", s)
+    s = re.sub(r"\b(corrigendum|extension|extended|addendum|amendment|revised|rectified)\b", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
 def norm_date(s):
     s = (s or "").strip()
     for fmt in ("%d/%m/%Y","%d-%m-%Y","%Y-%m-%d"):
@@ -14,8 +24,9 @@ def norm_date(s):
     return s if s else "N/A"
 
 def make_key(item):
-    title = norm(item.get("title","")).lower()
+    title = fuzzy_title(item.get("title",""))
     link  = (item.get("detailLink") or item.get("applyLink") or "").lower()
+    link  = re.sub(r"[?#].*$", "", link)
     date  = norm_date(item.get("deadline","")).lower()
     raw = f"{title}|{link}|{date}"
     return hashlib.sha1(raw.encode()).hexdigest()[:16]
@@ -30,10 +41,10 @@ def compute_days_left(deadline_ddmmyyyy):
 def validate(i):
     out = {
         "id": i.get("id") or ("src_" + make_key(i)),
-        "title": norm(i.get("title")),
-        "organization": norm(i.get("organization") or ""),
-        "qualificationLevel": norm(i.get("qualificationLevel") or ""),
-        "domicile": norm(i.get("domicile") or ""),
+        "title": norm_spaces(i.get("title")),
+        "organization": norm_spaces(i.get("organization") or ""),
+        "qualificationLevel": norm_spaces(i.get("qualificationLevel") or ""),
+        "domicile": norm_spaces(i.get("domicile") or ""),
         "deadline": norm_date(i.get("deadline") or ""),
         "applyLink": (i.get("applyLink") or "").strip(),
         "detailLink": (i.get("detailLink") or "").strip(),
