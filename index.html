@@ -7,8 +7,17 @@
   <meta http-equiv="Cache-Control" content="no-store" />
   <link rel="stylesheet" href="style.css" />
   <style>
+    .tabs{ display:flex; gap:10px; border-bottom:1px solid #1f2740; margin:10px 0 16px; }
+    .tab{ padding:8px 12px; border-radius:8px 8px 0 0; cursor:pointer; color:#bcd2ff; }
+    .tab.active{ background:#131a31; border:1px solid #1f2740; border-bottom-color:transparent; }
+    .panel{ display:none; }
+    .panel.active{ display:block; }
     .card-actions{ flex-wrap: wrap; row-gap: 6px; }
     .btn[data-act="report"]{ min-width: 68px; }
+    .applied .card-actions .btn:not([data-act="exam_done"]){ display:none; }
+    .badge-done{ padding:2px 8px; border-radius:12px; border:1px solid #2a334f; background:#17203c; color:#99b3ff; margin-left:8px; font-size:12px; }
+    /* Toast */
+    #toast{ position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#141b33;color:#e9eef9;border:1px solid #1f2740;border-radius:10px;padding:8px 12px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s ease; z-index: 20; }
   </style>
 </head>
 <body>
@@ -115,6 +124,8 @@
     </div>
   </div>
 
+  <div id="toast"></div>
+
   <script>
     (function(){
       var ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
@@ -124,6 +135,7 @@
       function qsa(s, r){ return Array.from((r||document).querySelectorAll(s)); }
       function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]; }); }
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
+      function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1800); }
 
       // Tabs
       function activate(tab){
@@ -135,7 +147,7 @@
         activate(t.dataset.tab);
       });
 
-      // User state
+      // User state (server + local)
       var USER_STATE = {};
       async function loadUserState(){
         try{
@@ -183,6 +195,7 @@
         container.appendChild(u);
       }
 
+      // Source ribbon + card renderer
       function cardHTML(j, applied=false){
         var b=j.flags&&j.flags.trusted, chip=b?'<span class="chip ok">✓ trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
@@ -210,14 +223,15 @@
         '</article>';
       }
 
-      function byDeadlineSoonest(list){
-        // always sort: earliest valid deadline first; N/A at the end
+      // Always sort by deadline (soonest first; N/A last)
+      function sortByDeadline(list){
         const parse = (s)=>{
           if(!s||s.toUpperCase()==="N/A") return null;
           const t=s.replaceAll("-","/"); // support DD-MM-YYYY
-          const a=t.split("/"); // expect DD/MM/YYYY
+          const a=t.split("/"); // DD/MM/YYYY
           if(a.length!==3) return null;
-          return new Date(+a[2], +a[1]-1, +a[0]).getTime() || null;
+          const ms = Date.UTC(+a[2], +a[1]-1, +a[0]);
+          return isNaN(ms) ? null : ms;
         };
         return list.slice().sort((a,b)=>{
           const da=parse(a.deadline), db=parse(b.deadline);
@@ -234,7 +248,7 @@
 
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
         var list = Array.isArray(data.jobListings)? data.jobListings : [];
-        list = byDeadlineSoonest(list); // enforce deadline-first
+        list = sortByDeadline(list);
         var sections = data.sections || {};
         qs("#total-listings").textContent = "Listings: " + list.length;
 
@@ -290,7 +304,7 @@
                 await render();
               });
             } else {
-              alert("Network problem. Please try again.");
+              toast("Network problem. Please try again.");
             }
           });
 
@@ -307,12 +321,13 @@
       function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
       function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
 
+      document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
+
       document.addEventListener("DOMContentLoaded", async function(){
-        await loadUserState();
+        await loadUserState();           // ensure state is present before first render
         await renderStatus();
         await render();
 
-        document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ var m=e.target.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } } });
         qs("#btn-missing")?.addEventListener("click", function(){ openModal("#missing-modal"); });
 
         qs("#reportForm")?.addEventListener("submit", async function(e){
@@ -322,11 +337,13 @@
           var rtxt = rc.replace(/_/g," ");
           var ev = document.getElementById("reportEvidenceUrl").value.trim();
           var note = document.getElementById("reportNote").value.trim();
-          if(!id || !rc) return alert("Please select a reason.");
+          if(!id || !rc) return toast("Please select a reason.");
           var ok = await postJSON({ type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() });
-          if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Reported."); }
+          if(ok){ closeModal(e.target); e.target.reset(); toast("Reported."); }
         });
 
+        // Missing with client-side duplicate guard
+        var SUBMIT_LOCK = new Set();
         qs("#missingForm")?.addEventListener("submit", async function(e){
           e.preventDefault();
           var title=qs("#missingTitle").value.trim();
@@ -334,9 +351,13 @@
           var site=qs("#missingSite").value.trim();
           var last=qs("#missingLastDate").value.trim();
           var note=document.getElementById("missingNote").value.trim();
-          if(!title||!url) return alert("Post name and notification link are required.");
+          if(!title||!url) return toast("Post name and notification link are required.");
+          var key = url.replace(/[?#].*$/,"").toLowerCase();
+          if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
+          SUBMIT_LOCK.add(key);
           var ok = await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, note:note, ts:new Date().toISOString() });
-          if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Saved."); }
+          if(ok){ closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh."); }
+          else { toast("Network problem. Please try again."); SUBMIT_LOCK.delete(key); }
         });
       });
     })();
