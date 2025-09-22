@@ -1,7 +1,7 @@
 {
   "jobListings": [
     {
-      "id": "user_634484277",
+      "id": "user_105550256",
       "title": "IBPS RRB 14th Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -18,7 +18,7 @@
       "daysLeft": 6
     },
     {
-      "id": "user_274544399",
+      "id": "user_436543523",
       "title": "BSSC Office Attendant Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -35,7 +35,7 @@
       "daysLeft": 2
     },
     {
-      "id": "user_497158165",
+      "id": "user_608090891",
       "title": "RBI Officers Grade B Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -52,7 +52,7 @@
       "daysLeft": 4
     },
     {
-      "id": "user_813441236",
+      "id": "user_316119531",
       "title": "RRB Section Controller Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -69,7 +69,7 @@
       "daysLeft": 22
     },
     {
-      "id": "user_130909080",
+      "id": "user_163992944",
       "title": "BSSC CGL Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -86,7 +86,7 @@
       "daysLeft": 4
     },
     {
-      "id": "user_885921335",
+      "id": "user_32121593",
       "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -101,6 +101,23 @@
         "trusted": true
       },
       "daysLeft": 4
+    },
+    {
+      "id": "user_923213824",
+      "title": "SSC Delhi Police Recruitment 2025",
+      "organization": "",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "deadline": "21-10-2025",
+      "applyLink": "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Notice_of_DPCE_2025.pdf",
+      "detailLink": "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Notice_of_DPCE_2025.pdf",
+      "source": "official",
+      "type": "VACANCY",
+      "flags": {
+        "added_from_missing": true,
+        "trusted": true
+      },
+      "daysLeft": 29
     }
   ],
   "archivedListings": [
@@ -115,7 +132,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T17:47:18.407477Z",
+      "extractedAt": "2025-09-22T19:32:52.921600Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -137,7 +154,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T17:47:18.407277Z",
+      "extractedAt": "2025-09-22T19:32:52.921397Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -159,7 +176,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T17:47:18.407413Z",
+      "extractedAt": "2025-09-22T19:32:52.921536Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -181,7 +198,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T17:47:18.406637Z",
+      "extractedAt": "2025-09-22T19:32:52.920746Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -203,7 +220,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T17:47:18.406797Z",
+      "extractedAt": "2025-09-22T19:32:52.920906Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -219,22 +236,23 @@
     "applied": [],
     "other": [],
     "primary": [
-      "user_634484277",
-      "user_274544399",
-      "user_497158165",
-      "user_813441236",
-      "user_130909080",
-      "user_885921335"
+      "user_105550256",
+      "user_436543523",
+      "user_608090891",
+      "user_316119531",
+      "user_163992944",
+      "user_32121593",
+      "user_923213824"
     ]
   },
   "transparencyInfo": {
     "schemaVersion": "1.4",
     "runMode": "nightly",
-    "totalListings": 6,
+    "totalListings": 7,
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-22T17:48:35.060554Z",
+    "lastUpdated": "2025-09-22T19:34:56.475947Z",
     "mergedUpdates": 0
   }
 }
