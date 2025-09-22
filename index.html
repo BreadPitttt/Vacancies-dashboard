@@ -1,66 +1,237 @@
-<!-- Report modal -->
-<div id="report-modal" class="modal hidden" aria-hidden="true">
-  <div class="modal-body">
-    <div class="modal-head">
-      <h3>Report Listing</h3>
-      <button type="button" class="icon-btn" data-close>&times;</button>
-    </div>
-    <form id="reportForm" class="form">
-      <input type="hidden" id="reportListingId" />
-      <label>Reason</label>
-      <select id="reportReasonCode" required>
-        <option value="">Select a reason</option>
-        <option value="expired">Last date over</option>
-        <option value="wrong_deadline">Wrong last date</option>
-        <option value="not_vacancy">Not a vacancy (result/exam date/admit card/syllabus)</option>
-        <option value="ineligible_education">Wrong education eligibility</option>
-        <option value="ineligible_domicile">Wrong domicile rule</option>
-        <option value="technical_pg">Technical/PG/management role (exclude)</option>
-        <option value="spam_duplicate">Duplicate/spam</option>
-        <option value="broken_link">Broken/invalid link</option>
-        <option value="other">Other</option>
-      </select>
-      <label>Official evidence URL (optional)</label>
-      <input id="reportEvidenceUrl" placeholder="https://...gov.in/... (optional)" />
-      <label>Note (optional)</label>
-      <textarea id="reportNote" rows="3" placeholder="Any extra context"></textarea>
-      <div class="row end">
-        <button type="button" class="btn ghost" data-close>Close</button>
-        <button type="submit" class="btn danger">Report</button>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>General Vacancy Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>General Vacancy Dashboard</h1>
+      <div class="meta">
+        <span id="health-pill" class="pill">Health: Unknown</span>
+        <span id="last-updated" class="muted">Last updated: —</span>
+        <span id="total-listings" class="muted">Listings: —</span>
       </div>
-    </form>
+    </div>
+    <div class="actions">
+      <button id="btn-missing" class="btn ghost" type="button">Submit missing</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section>
+      <h2 class="section-title">Open vacancies</h2>
+      <div id="jobs-root" class="cards-grid"></div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Applied</h2>
+      <div id="applied-root" class="cards-grid"></div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Other</h2>
+      <div id="other-root" class="cards-grid"></div>
+    </section>
+  </main>
+
+  <!-- Missing modal -->
+  <div id="missing-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-body">
+      <div class="modal-head">
+        <h3>Submit Missing Vacancy</h3>
+        <button type="button" class="icon-btn" data-close>&times;</button>
+      </div>
+      <form id="missingForm" class="form">
+        <label>Post name</label>
+        <input id="missingTitle" placeholder="e.g., BSSC 4th Graduate Level 2025" required />
+        <label>Notification link (official)</label>
+        <input id="missingUrl" placeholder="https://...gov.in/..." required />
+        <label>Last date (DD-MM-YYYY or N/A)</label>
+        <input id="missingLastDate" placeholder="27-10-2025 or N/A" />
+        <label>Note (optional)</label>
+        <textarea id="missingNote" rows="3" placeholder="Any extra info"></textarea>
+        <div class="row end">
+          <button type="button" class="btn ghost" data-close>Close</button>
+          <button type="submit" class="btn primary">Submit</button>
+        </div>
+      </form>
+    </div>
   </div>
-</div>
-<script>
-  // ... existing script remains; replace only the Report handler inside DOMContentLoaded:
-  document.addEventListener("DOMContentLoaded", function(){
-    // existing init...
 
-    // Submit report (structured)
-    document.querySelector("#reportForm")?.addEventListener("submit", async function(e){
-      e.preventDefault();
-      const id = document.querySelector("#reportListingId").value.trim();
-      const reasonCode = document.querySelector("#reportReasonCode").value.trim();
-      const evidence = document.querySelector("#reportEvidenceUrl").value.trim();
-      const note = document.querySelector("#reportNote").value.trim();
-      if(!reasonCode) return alert("Please select a reason.");
-      const ok = await postJSON({
-        type:"report",
-        jobId:id,
-        reasonCode,
-        url:evidence,     // Worker already logs 'url' into reports.jsonl
-        title: reasonCode, // keep backward-compat with qc_and_learn parsing
-        note,
-        ts:new Date().toISOString()
-      });
-      if(ok){
-        closeModal(e.target);
-        e.target.reset();
-        alert("Reported.");
+  <!-- Report modal (structured) -->
+  <div id="report-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-body">
+      <div class="modal-head">
+        <h3>Report Listing</h3>
+        <button type="button" class="icon-btn" data-close>&times;</button>
+      </div>
+      <form id="reportForm" class="form">
+        <input type="hidden" id="reportListingId" />
+        <fieldset>
+          <legend>Reason</legend>
+          <label><input type="radio" name="reason" value="not_vacancy" required /> Not a vacancy (result/admit card/exam date)</label>
+          <label><input type="radio" name="reason" value="last_date_over" /> Last date over</label>
+          <label><input type="radio" name="reason" value="wrong_last_date" /> Wrong last date</label>
+          <label><input type="radio" name="reason" value="wrong_eligibility" /> Wrong eligibility</label>
+          <label><input type="radio" name="reason" value="wrong_domicile" /> Wrong domicile</label>
+          <label><input type="radio" name="reason" value="duplicate" /> Duplicate / Already listed</label>
+          <label><input type="radio" name="reason" value="bad_link" /> Broken / Unofficial link</label>
+          <label><input type="radio" name="reason" value="other" /> Other</label>
+        </fieldset>
+        <label>Evidence URL (official, optional)</label>
+        <input id="reportEvidenceUrl" placeholder="https://...gov.in/..." />
+        <label>Note (optional)</label>
+        <textarea id="reportNote" rows="3" placeholder="Tell more if needed"></textarea>
+        <div class="row end">
+          <button type="button" class="btn ghost" data-close>Close</button>
+          <button type="submit" class="btn danger">Report</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      // Worker endpoint (unchanged)
+      var ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
+      var bust = function(){ return "?t=" + Date.now(); };
+
+      function qs(s, r){ return (r||document).querySelector(s); }
+      function qsa(s, r){ return Array.from((r||document).querySelectorAll(s)); }
+      function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]; }); }
+      function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
+
+      function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
+      function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
+
+      async function postJSON(payload){
+        try{
+          var res = await fetch(ENDPOINT, { method: "POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+          if(!res.ok){
+            var txt=""; try{ txt=await res.text(); }catch(_){}
+            alert("Request failed (HTTP "+res.status+"). "+(txt||""));
+            return false;
+          }
+          return true;
+        }catch(e){ alert("Network issue, please retry."); return false; }
       }
-    });
 
-    // When clicking card "Report" button, pre-fill listing id (existing)
-    // already handled where the card opens the modal and sets #reportListingId.
-  });
-</script>
+      async function renderStatus(){
+        var pill=qs("#health-pill"), last=qs("#last-updated"), total=qs("#total-listings");
+        try{
+          var h=await (await fetch("health.json"+bust(),{cache:"no-store"})).json();
+          pill.textContent=h.ok?"Health: OK":"Health: Not OK";
+          pill.className="pill "+(h.ok?"ok":"bad");
+          var ts=h.lastUpdated||"";
+          last.textContent="Last updated: "+(ts?new Date(ts).toLocaleString():"—");
+          total.textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
+        }catch(e){
+          pill.textContent="Health: Unknown"; pill.className="pill";
+          last.textContent="Last updated: —"; total.textContent="Listings: —";
+        }
+      }
+
+      function cardHTML(j){
+        var b=j.flags&&j.flags.trusted, chip=b?'<span class="chip ok">✓ trusted</span>':"";
+        var d=j.daysLeft!=null?j.daysLeft:"—";
+        var apply=esc(j.applyLink||"#"), det=esc(j.detailLink||j.applyLink||"#");
+        return '<article class="card" data-id="'+esc(j.id||"")+'">'+
+          '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+chip+'</header>'+
+          '<div class="card-body">'+
+            '<div class="rowline"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
+            '<div class="rowline"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
+            '<div class="rowline"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
+            '<div class="rowline"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
+          '</div>'+
+          '<footer class="card-actions">'+
+            '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
+            '<span class="spacer"></span>'+
+            '<button class="btn ok" data-act="right">Right</button>'+
+            '<button class="btn warn" data-act="wrong">Wrong</button>'+
+            '<button class="btn" data-act="applied">Applied</button>'+
+            '<button class="btn" data-act="not_interested">Not interested</button>'+
+            '<button class="btn danger" data-act="report">Report</button>'+
+          '</footer>'+
+        '</article>';
+      }
+
+      async function render(){
+        var root=qs("#jobs-root"), appRoot=qs("#applied-root"), otherRoot=qs("#other-root");
+        root.innerHTML=appRoot.innerHTML=otherRoot.innerHTML="";
+        var data;
+        try{ data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json(); }
+        catch(e){ root.innerHTML='<div class="empty">Could not load data.json</div>'; return; }
+        var list = Array.isArray(data.jobListings)? data.jobListings : [];
+        var sections = data.sections || {};
+        qs("#total-listings").textContent = "Listings: " + list.length;
+        var idsApplied = new Set(sections.applied||[]), idsOther = new Set(sections.other||[]);
+        if(list.length===0){ root.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
+
+        var fP=document.createDocumentFragment(), fA=document.createDocumentFragment(), fO=document.createDocumentFragment();
+        for(var i=0;i<list.length;i++){
+          var job=list[i], wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job); var card=wrap.firstElementChild;
+          card.addEventListener("click", async function(e){
+            var b=e.target.closest("[data-act]"); if(!b) return;
+            var act=b.getAttribute("data-act"),
+                id=this.getAttribute("data-id"),
+                title=(this.querySelector(".title")?.textContent||"").trim().slice(0,240),
+                detailsUrl=(this.querySelector("a.primary")?.href||"");
+
+            var payload=null;
+            if(act==="right"||act==="wrong"){
+              payload={ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() };
+            }else if(act==="report"){
+              qs("#reportListingId").value=id;
+              openModal("#report-modal");
+              return;
+            }else if(act==="applied"||act==="not_interested"){
+              payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } };
+            }
+            if(payload){ var ok = await postJSON(payload); if(ok) alert("Saved."); }
+          });
+
+          if(idsApplied.has(job.id)) fA.appendChild(card);
+          else if(idsOther.has(job.id)) fO.appendChild(card);
+          else fP.appendChild(card);
+        }
+        root.appendChild(fP); appRoot.appendChild(fA); otherRoot.appendChild(fO);
+      }
+
+      document.addEventListener("DOMContentLoaded", function(){
+        (async function(){ await renderStatus(); await render(); })();
+
+        // Missing
+        qs("#btn-missing")?.addEventListener("click", function(){ var m=document.getElementById("missing-modal"); m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); });
+        document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ var m=e.target.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } } });
+
+        qs("#missingForm")?.addEventListener("submit", async function(e){
+          e.preventDefault();
+          var a=qs("#missingTitle").value.trim(), b=qs("#missingUrl").value.trim(), c=qs("#missingLastDate").value.trim(), d=qs("#missingNote").value.trim();
+          if(!a||!b) return alert("Post name and official link are required.");
+          var ok = await postJSON({ type:"missing", title:a, url:b, lastDate:c, note:d, ts:new Date().toISOString() });
+          if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Saved."); }
+        });
+
+        // Structured reports
+        qs("#reportForm")?.addEventListener("submit", async function(e){
+          e.preventDefault();
+          var id=qs("#reportListingId").value.trim();
+          var rc = (document.querySelector('input[name="reason"]:checked')||{}).value || "";
+          var rtxt = rc.replace(/_/g," ");
+          var ev = qs("#reportEvidenceUrl").value.trim();
+          var note = qs("#reportNote").value.trim();
+          if(!id || !rc) return alert("Please select a reason.");
+          var payload = { type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() };
+          var ok = await postJSON(payload);
+          if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Reported."); }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
