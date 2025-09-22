@@ -16,6 +16,7 @@
     .btn[data-act="report"]{ min-width: 68px; }
     .applied .card-actions .btn:not([data-act="exam_done"]){ display:none; }
     .badge-done{ padding:2px 8px; border-radius:12px; border:1px solid #2a334f; background:#17203c; color:#99b3ff; margin-left:8px; font-size:12px; }
+    .filters{ display:flex; gap:10px; margin:6px 0 14px; }
   </style>
 </head>
 <body>
@@ -38,6 +39,24 @@
       <div class="tab active" data-tab="open">Open</div>
       <div class="tab" data-tab="applied">Applied</div>
       <div class="tab" data-tab="other">Other</div>
+    </div>
+
+    <div id="filters" class="filters">
+      <select id="flt-edu" class="select">
+        <option value="all">All education</option>
+        <option value="10th">10th pass</option>
+        <option value="12th">12th pass</option>
+        <option value="grad">Any graduate</option>
+      </select>
+      <select id="flt-scope" class="select">
+        <option value="all">All regions</option>
+        <option value="bihar">Bihar</option>
+        <option value="allindia">All India</option>
+      </select>
+      <select id="flt-skill" class="select">
+        <option value="simple">Simple skills only</option>
+        <option value="all">Any</option>
+      </select>
     </div>
 
     <div id="panel-open" class="panel active">
@@ -129,13 +148,14 @@
 
       function qs(s, r){ return (r||document).querySelector(s); }
       function qsa(s, r){ return Array.from((r||document).querySelectorAll(s)); }
-      function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]; }); }
+      function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]); }
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
 
       // Tabs
       function activate(tab){
         qsa(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===tab));
         qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+tab));
+        qs("#filters").style.display = (tab==="open") ? "flex" : "none";
       }
       document.addEventListener("click", function(e){
         var t=e.target.closest(".tab"); if(!t) return;
@@ -183,6 +203,30 @@
         }
       }
 
+      // Filter helpers
+      function isSimpleSkill(title){
+        const t=(title||"").toLowerCase();
+        const bad=["steno","shorthand","cad","sap","oracle","aws","azure","docker","kubernetes","tally erp","iti","polytechnic","diploma"];
+        return !bad.some(k=>t.includes(k));
+      }
+      function passFilters(job){
+        const e=qs("#flt-edu")?.value||"all";
+        const s=qs("#flt-scope")?.value||"all";
+        const k=qs("#flt-skill")?.value||"simple";
+        const q=(job.qualificationLevel||"").toLowerCase();
+        const d=(job.domicile||"").toLowerCase();
+        if(e==="10th" && !q.includes("10th")) return false;
+        if(e==="12th" && !q.includes("12th")) return false;
+        if(e==="grad" && !(q.includes("any graduate")||q.includes("graduate"))) return false;
+        if(s==="bihar" && !d.includes("bihar")) return false;
+        if(s==="allindia" && !d.includes("all india")) return false;
+        if(k==="simple" && !isSimpleSkill(job.title)) return false;
+        return true;
+      }
+      ["flt-edu","flt-scope","flt-skill"].forEach(id=>{
+        document.addEventListener("change", async (e)=>{ if(e.target && e.target.id===id){ await render(); }});
+      });
+
       function setLocked(btn, label){
         btn.textContent = label; btn.classList.add("disabled"); btn.setAttribute("aria-disabled","true");
       }
@@ -219,17 +263,14 @@
         var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
         rootOpen.innerHTML=rootApp.innerHTML=rootOther.innerHTML="";
 
-        // 1) Load data.json
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
         var list = Array.isArray(data.jobListings)? data.jobListings : [];
         var sections = data.sections || {};
         qs("#total-listings").textContent = "Listings: " + list.length;
 
-        // 2) Build sets from server sections
         var idsApplied = new Set(sections.applied||[]);
         var idsOther = new Set(sections.other||[]);
 
-        // 3) Merge with client USER_STATE so clicks persist immediately
         Object.entries(USER_STATE).forEach(([jid, s])=>{
           if(!s || !s.action) return;
           if(s.action==="applied"){ idsApplied.add(jid); idsOther.delete(jid); }
@@ -237,16 +278,18 @@
           if(s.action==="undo"){ idsApplied.delete(jid); idsOther.delete(jid); }
         });
 
-        // 4) Render
         var fOpen=document.createDocumentFragment(), fApp=document.createDocumentFragment(), fOther=document.createDocumentFragment();
         if(list.length===0){ rootOpen.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
 
         for(const job of list){
           const isApplied = idsApplied.has(job.id);
-          const container = isApplied ? fApp : (idsOther.has(job.id) ? fOther : fOpen);
+          const inOther = idsOther.has(job.id);
+          if(!isApplied && !inOther && !passFilters(job)) continue;
+
           const wrap=document.createElement("div");
           wrap.innerHTML = cardHTML(job, isApplied);
           const card=wrap.firstElementChild;
+
           card.addEventListener("click", async function(e){
             const b=e.target.closest("[data-act]"); if(!b) return;
             if(b.classList.contains("disabled")) return;
@@ -258,34 +301,39 @@
               payload={ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() };
               labelAfter= act==="right"?"Marked ✓":"Marked ✖";
             }else if(act==="report"){
-              qs("#reportListingId").value=id; openModal("#report-modal"); return;
+              qs("#reportListingId").value=id; const m=qs("#report-modal"); m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); return;
             }else if(act==="applied"||act==="not_interested"){
               payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } };
               labelAfter= act==="applied"?"Saved":"Hidden";
             }else if(act==="exam_done"){
-              setLocked(b,"Done ✓");
-              return;
+              b.textContent="Done ✓"; b.classList.add("disabled"); b.setAttribute("aria-disabled","true"); return;
             }
             if(!confirm("Confirm: "+act.replace("_"," ")+"?")) return;
             const ok=await postJSON(payload);
             if(ok){
-              setLocked(b,labelAfter);
+              b.textContent = labelAfter; b.classList.add("disabled"); b.setAttribute("aria-disabled","true");
               if(act==="applied"||act==="not_interested"){
-                setUserState(id, act); // write local mirror immediately
-                await render(); // re-render into tabs
+                setUserState(id, act);
+                await render();
                 return;
               }
-              addUndo(this.querySelector(".card-actions"), async ()=>{
-                const undo=(act==="applied"||act==="not_interested")?{type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}:{type:"vote",vote:"undo_"+act,jobId:id,title:title,url:detailsUrl,ts:new Date().toISOString()};
-                await postJSON(undo);
-                setUserState(id, "undo");
-                await render();
+              const actions=this.querySelector(".card-actions");
+              const undoBtn=document.createElement("button");
+              undoBtn.className="btn ghost tiny"; undoBtn.textContent="Undo";
+              undoBtn.addEventListener("click", async (ev)=>{
+                ev.preventDefault(); ev.stopPropagation();
+                const u=(act==="applied"||act==="not_interested")?{type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}:{type:"vote",vote:"undo_"+act,jobId:id,title:title,url:detailsUrl,ts:new Date().toISOString()};
+                await postJSON(u); setUserState(id,"undo"); await render();
               });
+              actions.appendChild(undoBtn);
             }else{
               alert("Network problem. Please try again.");
             }
           });
-          container.appendChild(card);
+
+          if(isApplied) fApp.appendChild(card);
+          else if(inOther) fOther.appendChild(card);
+          else fOpen.appendChild(card);
         }
 
         rootOpen.appendChild(fOpen);
@@ -293,16 +341,17 @@
         rootOther.appendChild(fOther);
       }
 
-      function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
       function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
 
+      document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
+
+      // Missing & Report submit
       document.addEventListener("DOMContentLoaded", async function(){
-        await loadUserState();           // ensure state is present before first render
+        await loadUserState();
         await renderStatus();
         await render();
 
-        document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ var m=e.target.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } } });
-        qs("#btn-missing")?.addEventListener("click", function(){ openModal("#missing-modal"); });
+        qs("#btn-missing")?.addEventListener("click", function(){ var m=qs("#missing-modal"); m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); });
 
         qs("#reportForm")?.addEventListener("submit", async function(e){
           e.preventDefault();
@@ -313,7 +362,7 @@
           var note = document.getElementById("reportNote").value.trim();
           if(!id || !rc) return alert("Please select a reason.");
           var ok = await postJSON({ type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() });
-          if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Reported."); }
+          if(ok){ var m=qs("#report-modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Reported."); }
         });
 
         qs("#missingForm")?.addEventListener("submit", async function(e){
@@ -325,7 +374,7 @@
           var note=document.getElementById("missingNote").value.trim();
           if(!title||!url) return alert("Post name and notification link are required.");
           var ok = await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, note:note, ts:new Date().toISOString() });
-          if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Saved."); }
+          if(ok){ var m=qs("#missing-modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Saved."); }
         });
       });
     })();
