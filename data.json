@@ -11,7 +11,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T19:41:13.775052Z",
+      "extractedAt": "2025-09-22T03:30:51.738798Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -32,7 +32,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T19:41:13.775206Z",
+      "extractedAt": "2025-09-22T03:30:51.738953Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -53,7 +53,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T19:41:13.775804Z",
+      "extractedAt": "2025-09-22T03:30:51.739555Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -74,7 +74,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T19:41:13.775868Z",
+      "extractedAt": "2025-09-22T03:30:51.739616Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -85,7 +85,7 @@
       }
     },
     {
-      "id": "user_424788680",
+      "id": "user_203952141",
       "title": "IBPS RRB 14th Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -99,7 +99,7 @@
         "added_from_missing": true,
         "trusted": true
       },
-      "daysLeft": 7
+      "daysLeft": 6
     }
   ],
   "archivedListings": [
@@ -114,7 +114,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-21T19:41:13.775652Z",
+      "extractedAt": "2025-09-22T03:30:51.739422Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -134,7 +134,7 @@
       "src_857de82dd19ac693",
       "src_ab48ec3436e06f17",
       "src_8cdeeddcddefdd2e",
-      "user_424788680"
+      "user_203952141"
     ]
   },
   "transparencyInfo": {
@@ -144,7 +144,7 @@
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-21T19:41:48.238795Z",
+    "lastUpdated": "2025-09-22T03:31:27.069773Z",
     "mergedUpdates": 0
   }
 }
