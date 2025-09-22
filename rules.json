@@ -22,11 +22,12 @@
     "https://www.rrbapply.gov.in/assets/forms/CEN_04_2025_Section_Controller_CEN_08_09_2025.pdf",
     "https://bssc.bihar.gov.in/Advertisement/0525_ADVT.pdf",
     "https://bpsc.bihar.gov.in/wp-content/uploads/BPSC_content/Notices/22-8-25-4-Advertisement-872025-Assistant-Education-Development-OfficerAEDO-Education-Dept_BPSC-20250823-u3j8zm.pdf",
-    "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Notice_of_DPCE_2025.pdf"
+    "https://ssc.gov.in/api/attachment/uploads/masterData/NoticeBoards/Notice_of_DPCE_2025.pdf",
+    "https://nests.tribal.gov.in/WriteReadData/RTF1984/1758273371.pdf"
   ],
   "aggregatorScores": {
-    "example.com": 0.55,
-    "www.ibps.in": 0.6,
-    "sarkarijobfind.com": 0.3
+    "example.com": 0.6,
+    "www.ibps.in": 0.7,
+    "sarkarijobfind.com": 0.1
   }
 }
