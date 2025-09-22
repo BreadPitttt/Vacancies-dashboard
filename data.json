@@ -1,7 +1,7 @@
 {
   "jobListings": [
     {
-      "id": "user_341438009",
+      "id": "user_266544051",
       "title": "IBPS RRB 14th Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -18,7 +18,7 @@
       "daysLeft": 6
     },
     {
-      "id": "user_962887405",
+      "id": "user_76379024",
       "title": "BSSC Office Attendant Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -35,7 +35,7 @@
       "daysLeft": 2
     },
     {
-      "id": "user_5476228",
+      "id": "user_556275101",
       "title": "RBI Officers Grade B Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -52,7 +52,7 @@
       "daysLeft": 4
     },
     {
-      "id": "user_393364702",
+      "id": "user_770228204",
       "title": "RRB Section Controller Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -69,7 +69,7 @@
       "daysLeft": 22
     },
     {
-      "id": "user_347080275",
+      "id": "user_628204335",
       "title": "BSSC CGL Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -86,7 +86,7 @@
       "daysLeft": 4
     },
     {
-      "id": "user_110697276",
+      "id": "user_531344369",
       "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -115,7 +115,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T13:41:34.195288Z",
+      "extractedAt": "2025-09-22T13:44:07.581531Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -137,7 +137,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T13:41:34.195446Z",
+      "extractedAt": "2025-09-22T13:44:07.581698Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -159,7 +159,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T13:41:34.195904Z",
+      "extractedAt": "2025-09-22T13:44:07.582196Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -181,7 +181,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T13:41:34.196054Z",
+      "extractedAt": "2025-09-22T13:44:07.582337Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -203,7 +203,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T13:41:34.196119Z",
+      "extractedAt": "2025-09-22T13:44:07.582403Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -219,22 +219,22 @@
     "applied": [],
     "other": [],
     "primary": [
-      "user_341438009",
-      "user_962887405",
-      "user_5476228",
-      "user_393364702",
-      "user_347080275",
-      "user_110697276"
+      "user_266544051",
+      "user_76379024",
+      "user_556275101",
+      "user_770228204",
+      "user_628204335",
+      "user_531344369"
     ]
   },
   "transparencyInfo": {
     "schemaVersion": "1.4",
-    "runMode": "light",
+    "runMode": "nightly",
     "totalListings": 6,
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-22T13:42:32.446953Z",
+    "lastUpdated": "2025-09-22T13:44:43.065692Z",
     "mergedUpdates": 0
   }
 }
