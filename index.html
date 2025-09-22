@@ -29,12 +29,12 @@
     </section>
 
     <section>
-      <h2 class="section-title">Applied</h2>
+      <h2 class="section-title">Applied (always visible)</h2>
       <div id="applied-root" class="cards-grid"></div>
     </section>
 
     <section>
-      <h2 class="section-title">Other</h2>
+      <h2 class="section-title">Other (past date / not interested)</h2>
       <div id="other-root" class="cards-grid"></div>
     </section>
   </main>
@@ -130,7 +130,10 @@
           pill.textContent=h.ok?"Health: OK":"Health: Not OK"; pill.className="pill "+(h.ok?"ok":"bad");
           var ts=h.lastUpdated||""; last.textContent="Last updated: "+(ts?new Date(ts).toLocaleString():"—");
           total.textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
-        }catch(e){ pill.textContent="Health: Unknown"; pill.className="pill"; last.textContent="Last updated: —"; total.textContent="Listings: —"; }
+        }catch(e){
+          pill.textContent="Health: Unknown"; pill.className="pill";
+          last.textContent="Last updated: —"; total.textContent="Listings: —";
+        }
       }
 
       function cardHTML(j){
@@ -164,13 +167,16 @@
         var list = Array.isArray(data.jobListings)? data.jobListings : [];
         var sections = data.sections || {};
         qs("#total-listings").textContent = "Listings: " + list.length;
-        var idsApplied = new Set(sections.applied||[]), idsOther = new Set(sections.other||[]);
-        var fP=document.createDocumentFragment(), fA=document.createDocumentFragment(), fO=document.createDocumentFragment();
 
+        var idsApplied = new Set(sections.applied||[]);
+        var idsOther = new Set(sections.other||[]);
+
+        var fP=document.createDocumentFragment(), fA=document.createDocumentFragment(), fO=document.createDocumentFragment();
         if(list.length===0){ root.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
 
         for(var i=0;i<list.length;i++){
           var job=list[i], wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job); var card=wrap.firstElementChild;
+
           card.addEventListener("click", async function(e){
             var b=e.target.closest("[data-act]"); if(!b) return;
             var act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
@@ -182,10 +188,12 @@
             else if(act==="applied"||act==="not_interested"){ payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }; }
             if(payload){ var ok=await postJSON(payload); if(ok) alert("Saved."); }
           });
+
           if(idsApplied.has(job.id)) fA.appendChild(card);
           else if(idsOther.has(job.id)) fO.appendChild(card);
           else fP.appendChild(card);
         }
+
         root.appendChild(fP); appRoot.appendChild(fA); otherRoot.appendChild(fO);
       }
 
