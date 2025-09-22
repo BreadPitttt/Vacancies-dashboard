@@ -3,13 +3,13 @@ import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
 
 P = pathlib.Path
-def JLOAD(p, d): 
+def JLOAD(p, d):
     try:
         if P(p).exists(): return json.loads(P(p).read_text(encoding="utf-8"))
     except: pass
     return d
 def JLOADL(p):
-    out=[]; 
+    out=[]
     if P(p).exists():
         for line in P(p).read_text(encoding="utf-8").splitlines():
             line=line.strip()
@@ -48,7 +48,7 @@ def parse_deadline(s):
     return None
 
 # --- Update merge and deadline refresh ---
-UPD_TOK = ["corrigendum","extension","extended","addendum","amendment","revised","rectified","notice"]
+UPD_TOK = ["corrigendum","extension","extended","addendum","amendment","revised","rectified","notice","last date"]
 def is_update_title(t): return any(k in (t or "").lower() for k in UPD_TOK)
 def pdf_base(u):
     try:
@@ -95,10 +95,10 @@ for r in reports:
         jid=(r.get("jobId") or r.get("listingId") or "").strip()
         if jid: hard_ids.add(jid)
         if r.get("url"): hard_urls.add(norm_url(r["url"]))
+        if r.get("evidenceUrl"): hard_urls.add(norm_url(r["evidenceUrl"]))
         if r.get("title"): hard_titles.add((r["title"] or "").strip().lower())
-jobs=[(archived.append(j) or None) and j for j in jobs if False]  # placeholder to satisfy linter
-# filter while preserving original order
-tmp=[] 
+jobs=[(archived.append(j) or None) and j for j in jobs if False]
+tmp=[]
 for j in raw.get("jobListings", []):
     jid=j.get("id",""); url=norm_url(j.get("applyLink")); title=(j.get("title") or "").strip().lower()
     if jid in hard_ids or url in hard_urls or title in hard_titles:
@@ -107,15 +107,19 @@ for j in raw.get("jobListings", []):
         tmp.append(j)
 jobs=tmp
 
-# --- Missing submissions -> require title,url,lastDate; add hint; pin until lastDate ---
+# --- Missing submissions -> add card + learn hints (url + officialSite if present) ---
 seen={norm_url(j.get("applyLink")) for j in jobs}
 for s in subs:
     if s.get("type")=="missing":
         title=(s.get("title") or "").strip()
         url=(s.get("url") or "").strip()
+        site=(s.get("officialSite") or "").strip()
         last=(s.get("lastDate") or s.get("deadline") or "").strip()
         if not title or not url: continue
-        if norm_url(url) in seen: continue
+        if norm_url(url) in seen: 
+            # still learn new site
+            if site and site not in rules["captureHints"]: rules["captureHints"].append(site)
+            continue
         card={
             "id": f"user_{abs(hash(url))%10**9}",
             "title": title,
@@ -131,8 +135,10 @@ for s in subs:
         }
         jobs.append(card)
         if url not in rules["captureHints"]: rules["captureHints"].append(url)
+        if site and site not in rules["captureHints"]: rules["captureHints"].append(site)
 
-# --- Green tick learning: pin till deadline or 21 days ---
+# --- Votes and demotions ---
+from datetime import timedelta
 pin=set(); demote=set()
 for v in votes:
     if v.get("type")=="vote":
@@ -168,7 +174,6 @@ primary=[]; applied_list=[]; other=[]; to_delete=set()
 for j in jobs:
     jid=j["id"]
     last=keep_date(j)
-    # daysLeft for UI
     if last:
         j["daysLeft"]=(last - date.today()).days
     if jid in APPLIED:
@@ -184,7 +189,6 @@ for j in jobs:
 
 jobs_out=[j for j in primary+other+applied_list if j["id"] not in to_delete]
 
-# ensure detailLink exists
 for j in jobs_out:
     if not j.get("detailLink"):
         j["detailLink"]= j.get("applyLink")
@@ -194,7 +198,7 @@ transp.update({
     "schemaVersion":"1.4",
     "runMode": RUN_MODE,
     "lastUpdated": datetime.utcnow().isoformat()+"Z",
-    "mergedUpdates": merged,
+    "mergedUpdates": 0,
     "totalListings": len(jobs_out)
 })
 out = {
@@ -208,7 +212,7 @@ out = {
     "transparencyInfo": transp
 }
 JWRITE("data.json", out)
-JWRITE("learn.json", {"mergedUpdates": merged,"generatedAt": datetime.utcnow().isoformat()+"Z","runMode": RUN_MODE})
+JWRITE("learn.json", {"generatedAt": datetime.utcnow().isoformat()+"Z","runMode": RUN_MODE})
 rules["blacklistedDomains"] = rules.get("blacklistedDomains", [])
 rules["autoRemoveReasons"] = rules.get("autoRemoveReasons", ["expired"])
 JWRITE("rules.json", rules)
