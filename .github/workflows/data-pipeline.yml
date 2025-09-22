@@ -61,16 +61,18 @@ jobs:
           set -e
           python scraper.py --mode "${{ steps.mode.outputs.mode }}"
 
-      - name: Official sources booster
+      - name: Hybrid collector (official + verified aggregators)
         run: |
           set -e
-          mkdir -p tmp tools sources
-          python sources/official_collect.py tmp/official.jsonl || true
+          mkdir -p tmp sources tools
+          # Always produce a file, even on failure
+          python sources/collector.py tmp/candidates.jsonl || true
+          [ -f tmp/candidates.jsonl ] || touch tmp/candidates.jsonl
 
       - name: Merge into data.json (non-destructive)
         run: |
           set -e
-          python tools/schema_merge.py data.json tmp/official.jsonl data.json > tmp/merge_stats.json
+          python tools/schema_merge.py data.json tmp/candidates.jsonl data.json > tmp/merge_stats.json || echo '{"added":0}' > tmp/merge_stats.json
 
       - name: QC + Learn + Generate
         run: |
@@ -89,7 +91,7 @@ jobs:
           git config user.email "actions-bot@users.noreply.github.com"
           if ! git diff --quiet -- data.json health.json learn.json rules.json rules.jsonl; then
             git add data.json health.json learn.json rules.json rules.jsonl
-            git commit -m "chore: ${{ steps.mode.outputs.mode }} QC+learn update"
+            git commit -m "chore: ${{ steps.mode.outputs.mode }} ingest+QC update"
             git pull --rebase
             git push
           else
