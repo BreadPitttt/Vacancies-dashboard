@@ -48,9 +48,17 @@
       </div>
       <form id="missingForm" class="form">
         <label>Post name</label>
-        <input id="missingTitle" placeholder="e.g., BSSC 4th Graduate Level 2025" required />
-        <label>Notification link (official)</label>
-        <input id="missingUrl" placeholder="https://...gov.in/..." required />
+        <input id="missingTitle" placeholder="e.g., EMRS Non‑teaching 2025" required />
+        <div class="grid2">
+          <div>
+            <label>Notification link (required)</label>
+            <input id="missingUrl" placeholder="PDF or notice URL" required />
+          </div>
+          <div>
+            <label>Official website (optional)</label>
+            <input id="missingSite" placeholder="https://...gov.in/ or portal home" />
+          </div>
+        </div>
         <label>Last date (DD-MM-YYYY or N/A)</label>
         <input id="missingLastDate" placeholder="27-10-2025 or N/A" />
         <label>Note (optional)</label>
@@ -63,7 +71,7 @@
     </div>
   </div>
 
-  <!-- Report modal (compact) -->
+  <!-- Report modal (compact, guaranteed present) -->
   <div id="report-modal" class="modal hidden" aria-hidden="true">
     <div class="modal-body">
       <div class="modal-head">
@@ -84,18 +92,16 @@
           <option value="bad_link">Broken / Unofficial link</option>
           <option value="other">Other</option>
         </select>
-
         <div class="grid2">
           <div>
             <label>Evidence URL (optional)</label>
-            <input id="reportEvidenceUrl" placeholder="https://...gov.in/..." />
+            <input id="reportEvidenceUrl" placeholder="Official page" />
           </div>
           <div>
             <label>Note (optional)</label>
             <input id="reportNote" placeholder="Tell more if needed" />
           </div>
         </div>
-
         <div class="row end gap">
           <button type="button" class="btn ghost" data-close>Close</button>
           <button type="submit" class="btn danger">Report</button>
@@ -130,25 +136,15 @@
           pill.textContent=h.ok?"Health: OK":"Health: Not OK"; pill.className="pill "+(h.ok?"ok":"bad");
           var ts=h.lastUpdated||""; last.textContent="Last updated: "+(ts?new Date(ts).toLocaleString():"—");
           total.textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
-        }catch(e){
-          pill.textContent="Health: Unknown"; pill.className="pill";
-          last.textContent="Last updated: —"; total.textContent="Listings: —";
-        }
+        }catch(e){ pill.textContent="Health: Unknown"; pill.className="pill"; last.textContent="Last updated: —"; total.textContent="Listings: —"; }
       }
-
-      // Local click-lock states to avoid accidental double submissions before the next run
-      var clickState = new Map(); // jobId -> {right:true|false, wrong:true|false, applied:true|false, noti:true|false}
 
       function setLocked(btn, label){
-        btn.textContent = label;
-        btn.classList.add("disabled");
-        btn.setAttribute("aria-disabled","true");
+        btn.textContent = label; btn.classList.add("disabled"); btn.setAttribute("aria-disabled","true");
       }
       function addUndo(container, onUndo){
-        var u = document.createElement("button");
-        u.className = "btn ghost tiny";
-        u.textContent = "Undo";
-        u.addEventListener("click", function(e){ e.stopPropagation(); e.preventDefault(); onUndo(); u.remove(); });
+        var u=document.createElement("button"); u.className="btn ghost tiny"; u.textContent="Undo";
+        u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); onUndo(); u.remove(); });
         container.appendChild(u);
       }
 
@@ -189,39 +185,21 @@
 
         for(var i=0;i<list.length;i++){
           var job=list[i], wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job); var card=wrap.firstElementChild;
-          var jid = job.id;
-
+          var jid=job.id;
           card.addEventListener("click", async function(e){
             var b=e.target.closest("[data-act]"); if(!b) return;
-            if(b.classList.contains("disabled")) return; // already saved, prevent double
+            if(b.classList.contains("disabled")) return;
             var act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
                 title=(this.querySelector(".title")?.textContent||"").trim().slice(0,240),
                 detailsUrl=(this.querySelector("a.primary")?.href||"");
             var payload=null, labelAfter="";
-            if(act==="right"||act==="wrong"){
-              payload={ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() };
-              labelAfter = act==="right" ? "Marked ✓" : "Marked ✖";
-            }else if(act==="report"){
-              qs("#reportListingId").value=id; openModal("#report-modal"); return;
-            }else if(act==="applied"||act==="not_interested"){
-              payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } };
-              labelAfter = act==="applied" ? "Saved" : "Hidden";
-            }
-            // confirm minimal
-            if(!confirm("Confirm: " + act.replace("_"," ")+ "?")) return;
-            var ok = await postJSON(payload);
-            if(ok){
-              setLocked(b, labelAfter);
-              addUndo(this.querySelector(".card-actions"), async ()=>{
-                let undoPayload = (act==="applied"||act==="not_interested")
-                  ? { type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }
-                  : { type:"vote", vote:"undo_"+act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() };
-                await postJSON(undoPayload);
-                b.classList.remove("disabled"); b.textContent = act==="right"?"Right":act==="wrong"?"Wrong":act==="applied"?"Applied":"Not interested";
-              });
-            } else {
-              alert("Network problem. Please try again.");
-            }
+            if(act==="right"||act==="wrong"){ payload={ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }; labelAfter= act==="right"?"Marked ✓":"Marked ✖"; }
+            else if(act==="report"){ qs("#reportListingId").value=id; openModal("#report-modal"); return; }
+            else if(act==="applied"||act==="not_interested"){ payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }; labelAfter= act==="applied"?"Saved":"Hidden"; }
+            if(!confirm("Confirm: "+act.replace("_"," ")+"?")) return;
+            var ok=await postJSON(payload);
+            if(ok){ setLocked(b,labelAfter); addUndo(this.querySelector(".card-actions"), async ()=>{ let undo=(act==="applied"||act==="not_interested")?{type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}:{type:"vote",vote:"undo_"+act,jobId:id,title:title,url:detailsUrl,ts:new Date().toISOString()}; await postJSON(undo); b.classList.remove("disabled"); b.textContent=act==="right"?"Right":act==="wrong"?"Wrong":act==="applied"?"Applied":"Not interested"; }); }
+            else alert("Network problem. Please try again.");
           });
 
           if(idsApplied.has(jid)) fA.appendChild(card);
@@ -238,21 +216,25 @@
 
         qs("#missingForm")?.addEventListener("submit", async function(e){
           e.preventDefault();
-          var a=qs("#missingTitle").value.trim(), b=qs("#missingUrl").value.trim(), c=qs("#missingLastDate").value.trim(), d=document.getElementById("missingNote").value.trim();
-          if(!a||!b) return alert("Post name and official link are required.");
-          var ok = await postJSON({ type:"missing", title:a, url:b, lastDate:c, note:d, ts:new Date().toISOString() });
+          var title=qs("#missingTitle").value.trim();
+          var url=qs("#missingUrl").value.trim();
+          var site=qs("#missingSite").value.trim();
+          var last=qs("#missingLastDate").value.trim();
+          var note=document.getElementById("missingNote").value.trim();
+          if(!title||!url) return alert("Post name and notification link are required.");
+          var ok = await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, note:note, ts:new Date().toISOString() });
           if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Saved."); }
         });
 
         qs("#reportForm")?.addEventListener("submit", async function(e){
           e.preventDefault();
           var id=qs("#reportListingId").value.trim();
-          var rc = document.getElementById("reportReason").value || "";
-          var rtxt = rc.replace(/_/g," ");
-          var ev = document.getElementById("reportEvidenceUrl").value.trim();
-          var note = document.getElementById("reportNote").value.trim();
-          if(!id || !rc) return alert("Please select a reason.");
-          var ok = await postJSON({ type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() });
+          var rc=document.getElementById("reportReason").value||"";
+          var rtxt=rc.replace(/_/g," ");
+          var ev=document.getElementById("reportEvidenceUrl").value.trim();
+          var note=document.getElementById("reportNote").value.trim();
+          if(!id||!rc) return alert("Please select a reason.");
+          var ok=await postJSON({ type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() });
           if(ok){ var m=e.target.closest(".modal"); m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); e.target.reset(); alert("Reported."); }
         });
       });
