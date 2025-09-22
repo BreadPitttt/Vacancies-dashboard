@@ -1,7 +1,69 @@
 {
   "jobListings": [
     {
-      "id": "user_266544051",
+      "id": "src_8c90227070afa641",
+      "title": "BSSC Welfare Organiser / LDC Exam Date Notice 2025",
+      "organization": "N/A",
+      "qualificationLevel": "10th pass",
+      "domicile": "All India",
+      "deadline": "N/A",
+      "applyLink": "https://sarkarijobfind.com/bssc-wo-ldc-online-form-2025/",
+      "detailLink": "https://sarkarijobfind.com/bssc-wo-ldc-online-form-2025/",
+      "source": "aggregator",
+      "type": "UPDATE",
+      "flags": {
+        "trusted": false,
+        "no_parent_found": true
+      }
+    },
+    {
+      "id": "src_e7a40b58f0eb1391",
+      "title": "Bihar BSSC Field Assistant Resived Exam Date Notice 2025",
+      "organization": "N/A",
+      "qualificationLevel": "10th pass",
+      "domicile": "All India",
+      "deadline": "N/A",
+      "applyLink": "https://sarkarijobfind.com/bssc-field-assistant-online-form-2025/",
+      "detailLink": "https://sarkarijobfind.com/bssc-field-assistant-online-form-2025/",
+      "source": "aggregator",
+      "type": "UPDATE",
+      "flags": {
+        "trusted": false,
+        "no_parent_found": true
+      }
+    },
+    {
+      "id": "src_1a2bb3aad2c352b4",
+      "title": "SSC Delhi Police Constable (Executive) Online Form 2025",
+      "organization": "N/A",
+      "qualificationLevel": "10th pass",
+      "domicile": "All India",
+      "deadline": "N/A",
+      "applyLink": "https://sarkarijobfind.com/ssc-delhi-police-recruitment-2025-apply-online/",
+      "detailLink": "https://sarkarijobfind.com/ssc-delhi-police-recruitment-2025-apply-online/",
+      "source": "aggregator",
+      "type": "VACANCY",
+      "flags": {
+        "trusted": false
+      }
+    },
+    {
+      "id": "src_732535db12477ed8",
+      "title": "SSC GD Constable Result / Cutoff 2025",
+      "organization": "N/A",
+      "qualificationLevel": "10th pass",
+      "domicile": "All India",
+      "deadline": "N/A",
+      "applyLink": "https://sarkarijobfind.com/ssc-gd-constable-result-2025/",
+      "detailLink": "https://sarkarijobfind.com/ssc-gd-constable-result-2025/",
+      "source": "aggregator",
+      "type": "VACANCY",
+      "flags": {
+        "trusted": false
+      }
+    },
+    {
+      "id": "user_850365730",
       "title": "IBPS RRB 14th Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -18,7 +80,7 @@
       "daysLeft": 6
     },
     {
-      "id": "user_76379024",
+      "id": "user_208652881",
       "title": "BSSC Office Attendant Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -35,7 +97,7 @@
       "daysLeft": 2
     },
     {
-      "id": "user_556275101",
+      "id": "user_401558135",
       "title": "RBI Officers Grade B Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -52,7 +114,7 @@
       "daysLeft": 4
     },
     {
-      "id": "user_770228204",
+      "id": "user_254132415",
       "title": "RRB Section Controller Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -69,7 +131,7 @@
       "daysLeft": 22
     },
     {
-      "id": "user_628204335",
+      "id": "user_107150207",
       "title": "BSSC CGL Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -86,7 +148,7 @@
       "daysLeft": 4
     },
     {
-      "id": "user_531344369",
+      "id": "user_131524496",
       "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -105,44 +167,22 @@
   ],
   "archivedListings": [
     {
-      "id": "src_f61bb6c955a40af5",
-      "title": "Corrigendum-1 regarding revision of notified vacancies for CEN 06-2024 NTPC-Undergraduate posts",
+      "id": "src_8cdeeddcddefdd2e",
+      "title": "Centralised Employment Notice No. 05/2024 for recruitment of various graduate posts of Non-Technical Popular Categories",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
-      "slug": "corrigendum-1-regarding-revision-of-notified-vacancies-for-cen-06-2024-ntpc-unde",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
+      "slug": "centralised-employment-notice-no-05-2024-for-recruitment-of-various-graduate-pos",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T13:44:07.581531Z",
+      "extractedAt": "2025-09-22T16:55:52.471533Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
       },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
-      "flags": {
-        "no_parent_found": true,
-        "removed_reason": "reported_hard"
-      }
-    },
-    {
-      "id": "src_857de82dd19ac693",
-      "title": "Corrigendum-2 regarding revision of notified vacancies of CEN 05-2024 NTPC-Graduate posts",
-      "organization": "N/A",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
-      "slug": "corrigendum-2-regarding-revision-of-notified-vacancies-of-cen-05-2024-ntpc-gradu",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-22T13:44:07.581698Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
+      "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
       "flags": {
         "no_parent_found": true,
         "removed_reason": "reported_hard"
@@ -159,7 +199,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T13:44:07.582196Z",
+      "extractedAt": "2025-09-22T16:55:52.471334Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -181,7 +221,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T13:44:07.582337Z",
+      "extractedAt": "2025-09-22T16:55:52.471469Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -193,22 +233,44 @@
       }
     },
     {
-      "id": "src_8cdeeddcddefdd2e",
-      "title": "Centralised Employment Notice No. 05/2024 for recruitment of various graduate posts of Non-Technical Popular Categories",
+      "id": "src_f61bb6c955a40af5",
+      "title": "Corrigendum-1 regarding revision of notified vacancies for CEN 06-2024 NTPC-Undergraduate posts",
       "organization": "N/A",
       "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
-      "slug": "centralised-employment-notice-no-05-2024-for-recruitment-of-various-graduate-pos",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
+      "slug": "corrigendum-1-regarding-revision-of-notified-vacancies-for-cen-06-2024-ntpc-unde",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T13:44:07.582403Z",
+      "extractedAt": "2025-09-22T16:55:52.470690Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
       },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
+      "detailLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
+      "flags": {
+        "no_parent_found": true,
+        "removed_reason": "reported_hard"
+      }
+    },
+    {
+      "id": "src_857de82dd19ac693",
+      "title": "Corrigendum-2 regarding revision of notified vacancies of CEN 05-2024 NTPC-Graduate posts",
+      "organization": "N/A",
+      "deadline": "N/A",
+      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
+      "slug": "corrigendum-2-regarding-revision-of-notified-vacancies-of-cen-05-2024-ntpc-gradu",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "source": "official",
+      "type": "UPDATE",
+      "extractedAt": "2025-09-22T16:55:52.470865Z",
+      "meta": {
+        "sourceUrl": "https://rrbcdg.gov.in/",
+        "sourceSite": "hint4"
+      },
+      "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
       "flags": {
         "no_parent_found": true,
         "removed_reason": "reported_hard"
@@ -219,22 +281,26 @@
     "applied": [],
     "other": [],
     "primary": [
-      "user_266544051",
-      "user_76379024",
-      "user_556275101",
-      "user_770228204",
-      "user_628204335",
-      "user_531344369"
+      "src_8c90227070afa641",
+      "src_e7a40b58f0eb1391",
+      "src_1a2bb3aad2c352b4",
+      "src_732535db12477ed8",
+      "user_850365730",
+      "user_208652881",
+      "user_401558135",
+      "user_254132415",
+      "user_107150207",
+      "user_131524496"
     ]
   },
   "transparencyInfo": {
     "schemaVersion": "1.4",
     "runMode": "nightly",
-    "totalListings": 6,
+    "totalListings": 10,
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-22T13:44:43.065692Z",
+    "lastUpdated": "2025-09-22T16:57:41.519873Z",
     "mergedUpdates": 0
   }
 }
