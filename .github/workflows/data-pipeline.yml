@@ -87,8 +87,8 @@ jobs:
           set -e
           git config user.name "GitHub Actions Bot"
           git config user.email "actions-bot@users.noreply.github.com"
-          if ! git diff --quiet -- data.json health.json learn.json rules.json; then
-            git add data.json health.json learn.json rules.json
+          if ! git diff --quiet -- data.json health.json learn.json rules.json rules.jsonl; then
+            git add data.json health.json learn.json rules.json rules.jsonl
             git commit -m "chore: ${{ steps.mode.outputs.mode }} QC+learn update"
             git pull --rebase
             git push
