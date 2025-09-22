@@ -1,4 +1,4 @@
-# qc_and_learn.py — QC, learn, sectioning, and aggregator score updates
+# qc_and_learn.py — QC + learn + better deadline extension + applied expiry
 import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
 
@@ -47,14 +47,18 @@ def parse_deadline(s):
         except: pass
     return None
 
+# --- Extension resolver helpers ---
 UPD_TOK = ["corrigendum","extension","extended","addendum","amendment","revised","rectified","notice","last date"]
+DATE_PAT = re.compile(r"(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})")
 def is_update_title(t): return any(k in (t or "").lower() for k in UPD_TOK)
-def pdf_base(u):
+
+def normalize_pdf_stem(u):
     try:
-        p=urllib.parse.urlparse(u or ""); fn=(p.path or "").rsplit("/",1)[-1]
+        p=urllib.parse.urlparse(u or ""); fn=(p.path or "").rsplit("/",1)[-1].lower()
         fn=re.sub(r"(?i)(corrigendum|extension|extended|addendum|amendment|notice|revised|rectified)","",fn)
-        return re.sub(r"[\W_]+","", fn.lower())
+        return re.sub(r"[\W_]+","", fn)
     except: return ""
+
 def url_root(u):
     try:
         p=urllib.parse.urlparse(u or "")
@@ -62,10 +66,12 @@ def url_root(u):
         path=(root.path or "/").rsplit("/",1)[0]
         return f"{root.scheme}://{root.netloc}{path}"
     except: return u or ""
+
 def adv_no(t):
     m=re.search(r"(advt|advertisement|notice)\s*(no\.?|number)?\s*[:\-]?\s*([A-Za-z0-9\/\-\._]+)", t or "", re.I)
     return m.group(3).lower() if m else ""
 
+# Split parents/updates
 parents=[j for j in jobs if not is_update_title(j.get("title"))]
 kept=[]; merged=0
 for j in jobs:
@@ -74,20 +80,27 @@ for j in jobs:
     best=None; score=0.0
     for p in parents:
         s=0.0
-        if url_root(j.get("applyLink"))==url_root(p.get("applyLink")): s+=0.5
-        if pdf_base(j.get("applyLink")) and pdf_base(j.get("applyLink"))==pdf_base(p.get("applyLink")): s+=0.3
-        if adv_no(j.get("title")) and adv_no(j.get("title"))==adv_no(p.get("title")): s+=0.3
+        if url_root(j.get("applyLink"))==url_root(p.get("applyLink")): s+=0.45
+        if normalize_pdf_stem(j.get("applyLink")) and normalize_pdf_stem(j.get("applyLink"))==normalize_pdf_stem(p.get("applyLink")): s+=0.35
+        if adv_no(j.get("title")) and adv_no(j.get("title"))==adv_no(p.get("title")): s+=0.25
         if s>score: score, best = s, p
     if best and score>=0.6:
         best.setdefault("updates", []).append({"title": j.get("title"), "link": j.get("applyLink"), "capturedAt": datetime.utcnow().isoformat()+"Z"})
-        m=re.search(r"(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})", j.get("title") or "")
-        if m: best["deadline"]=m.group(1)
+        # Improve deadline handling: take the MAX date found in title if later than current
+        dates=[m.group(1) for m in DATE_PAT.finditer(j.get("title") or "")]
+        parsed=[parse_deadline(x.replace("-","/")) for x in dates if x]
+        parsed=[d for d in parsed if d]
+        if parsed:
+            new_deadline=max(parsed)
+            cur=parse_deadline(best.get("deadline"))
+            if not cur or new_deadline>cur:
+                best["deadline"]=new_deadline.strftime("%d/%m/%Y")
         merged+=1
     else:
         j["type"]="UPDATE"; j.setdefault("flags",{})["no_parent_found"]=True; kept.append(j)
 jobs=kept
 
-# Hard reports -> archive
+# --- Hard reports -> archive ---
 hard_ids=set(); hard_urls=set(); hard_titles=set()
 for r in reports:
     if r.get("type")=="report":
@@ -105,7 +118,8 @@ for j in raw.get("jobListings", []):
         tmp.append(j)
 jobs=tmp
 
-# Missing submissions -> add card + learn hints (url + officialSite if present)
+# --- Missing submissions -> add card + learn hints (url + officialSite) ---
+subs = JLOADL("submissions.jsonl")
 seen={norm_url(j.get("applyLink")) for j in jobs}
 for s in subs:
     if s.get("type")=="missing":
@@ -134,7 +148,7 @@ for s in subs:
         if url not in rules["captureHints"]: rules["captureHints"].append(url)
         if site and site not in rules["captureHints"]: rules["captureHints"].append(site)
 
-# Votes pin/demote
+# --- Green tick learning + demotions (unchanged) ---
 pin=set(); demote=set()
 for v in votes:
     if v.get("type")=="vote":
@@ -148,7 +162,7 @@ for j in jobs:
     if j["id"] in demote:
         j.setdefault("flags",{})["demoted"]=True
 
-# User state and sectioning
+# --- User state and sectioning + applied soft expiry ---
 APPLIED=set(); NOTI={}
 for jid, st in (user_state or {}).items():
     a=(st or {}).get("action"); ts=(st or {}).get("ts")
@@ -173,7 +187,11 @@ for j in jobs:
     if last: j["daysLeft"]=(last - date.today()).days
     if jid in APPLIED:
         j.setdefault("flags",{})["applied"]=True
-        applied_list.append(j); 
+        # Soft expiry for applied when past last date by >100 days
+        d=parse_deadline(j.get("deadline"))
+        if d and (date.today()-d).days>60:
+            j.setdefault("flags",{})["applied_expired"]=True
+        applied_list.append(j)
         continue
     if jid in NOTI and (date.today()-NOTI[jid]).days>14:
         to_delete.add(jid); continue
@@ -186,6 +204,7 @@ jobs_out=[j for j in primary+other+applied_list if j["id"] not in to_delete]
 for j in jobs_out:
     if not j.get("detailLink"): j["detailLink"]= j.get("applyLink")
 
+# Transparancy + write
 transp = raw.get("transparencyInfo") or {}
 transp.update({
     "schemaVersion":"1.4",
@@ -206,10 +225,12 @@ out = {
 }
 JWRITE("data.json", out)
 JWRITE("learn.json", {"mergedUpdates": merged,"generatedAt": datetime.utcnow().isoformat()+"Z","runMode": RUN_MODE})
+
+# Keep rules coherent
 rules["blacklistedDomains"] = rules.get("blacklistedDomains", [])
 rules["autoRemoveReasons"] = rules.get("autoRemoveReasons", ["expired"])
 
-# ---- Aggregator score learner (new) ----
+# AggregatorScores learner retained (from previous patch)
 def domain_of(u):
     try: return urllib.parse.urlparse(u or "").netloc.lower()
     except: return ""
@@ -222,7 +243,6 @@ def bump(h, delta):
     v = float(scores.get(h, 0.5)) + delta
     v = max(0.0, min(1.0, v))
     scores[h] = round(v, 3)
-
 for v in votes:
     if v.get("type")!="vote": continue
     link = v.get("url") or ""
@@ -230,7 +250,7 @@ for v in votes:
     if not h: continue
     if v.get("vote")=="right": bump(h, +0.05)
     elif v.get("vote")=="wrong": bump(h, -0.05)
-
 rules["aggregatorScores"] = scores
+
 JWRITE("rules.json", rules)
 JWRITE("health.json", {"ok": True, **transp})
