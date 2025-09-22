@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Merge with fuzzy title normalization and stable sorting
 import json, sys, re, hashlib
 from datetime import datetime
 
@@ -8,7 +7,7 @@ def norm_spaces(s): return re.sub(r"\s+"," ", (s or "").strip())
 def fuzzy_title(s):
     s = (s or "").lower()
     s = re.sub(r"[\(\)\[\]\{\}]", " ", s)
-    s = re.sub(r"[^\w\s/:-]", " ", s)  # keep slashes and hyphens for advt no
+    s = re.sub(r"[^\w\s/:-]", " ", s)
     s = re.sub(r"\b(notice|notification|advertisement|advt|recruitment|online\s*form|apply\s*online)\b", " ", s)
     s = re.sub(r"\b(corrigendum|extension|extended|addendum|amendment|revised|rectified)\b", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
