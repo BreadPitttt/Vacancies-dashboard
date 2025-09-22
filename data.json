@@ -1,69 +1,7 @@
 {
   "jobListings": [
     {
-      "id": "src_8c90227070afa641",
-      "title": "BSSC Welfare Organiser / LDC Exam Date Notice 2025",
-      "organization": "N/A",
-      "qualificationLevel": "10th pass",
-      "domicile": "All India",
-      "deadline": "N/A",
-      "applyLink": "https://sarkarijobfind.com/bssc-wo-ldc-online-form-2025/",
-      "detailLink": "https://sarkarijobfind.com/bssc-wo-ldc-online-form-2025/",
-      "source": "aggregator",
-      "type": "UPDATE",
-      "flags": {
-        "trusted": false,
-        "no_parent_found": true
-      }
-    },
-    {
-      "id": "src_e7a40b58f0eb1391",
-      "title": "Bihar BSSC Field Assistant Resived Exam Date Notice 2025",
-      "organization": "N/A",
-      "qualificationLevel": "10th pass",
-      "domicile": "All India",
-      "deadline": "N/A",
-      "applyLink": "https://sarkarijobfind.com/bssc-field-assistant-online-form-2025/",
-      "detailLink": "https://sarkarijobfind.com/bssc-field-assistant-online-form-2025/",
-      "source": "aggregator",
-      "type": "UPDATE",
-      "flags": {
-        "trusted": false,
-        "no_parent_found": true
-      }
-    },
-    {
-      "id": "src_1a2bb3aad2c352b4",
-      "title": "SSC Delhi Police Constable (Executive) Online Form 2025",
-      "organization": "N/A",
-      "qualificationLevel": "10th pass",
-      "domicile": "All India",
-      "deadline": "N/A",
-      "applyLink": "https://sarkarijobfind.com/ssc-delhi-police-recruitment-2025-apply-online/",
-      "detailLink": "https://sarkarijobfind.com/ssc-delhi-police-recruitment-2025-apply-online/",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "flags": {
-        "trusted": false
-      }
-    },
-    {
-      "id": "src_732535db12477ed8",
-      "title": "SSC GD Constable Result / Cutoff 2025",
-      "organization": "N/A",
-      "qualificationLevel": "10th pass",
-      "domicile": "All India",
-      "deadline": "N/A",
-      "applyLink": "https://sarkarijobfind.com/ssc-gd-constable-result-2025/",
-      "detailLink": "https://sarkarijobfind.com/ssc-gd-constable-result-2025/",
-      "source": "aggregator",
-      "type": "VACANCY",
-      "flags": {
-        "trusted": false
-      }
-    },
-    {
-      "id": "user_850365730",
+      "id": "user_936098601",
       "title": "IBPS RRB 14th Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -80,7 +18,7 @@
       "daysLeft": 6
     },
     {
-      "id": "user_208652881",
+      "id": "user_163037982",
       "title": "BSSC Office Attendant Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -97,7 +35,7 @@
       "daysLeft": 2
     },
     {
-      "id": "user_401558135",
+      "id": "user_535184307",
       "title": "RBI Officers Grade B Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -114,7 +52,7 @@
       "daysLeft": 4
     },
     {
-      "id": "user_254132415",
+      "id": "user_629760966",
       "title": "RRB Section Controller Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -131,7 +69,7 @@
       "daysLeft": 22
     },
     {
-      "id": "user_107150207",
+      "id": "user_107906438",
       "title": "BSSC CGL Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -148,7 +86,7 @@
       "daysLeft": 4
     },
     {
-      "id": "user_131524496",
+      "id": "user_749028240",
       "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -177,7 +115,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T16:55:52.471533Z",
+      "extractedAt": "2025-09-22T17:27:41.178860Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -199,7 +137,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T16:55:52.471334Z",
+      "extractedAt": "2025-09-22T17:27:41.178665Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -221,7 +159,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T16:55:52.471469Z",
+      "extractedAt": "2025-09-22T17:27:41.178798Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -243,7 +181,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T16:55:52.470690Z",
+      "extractedAt": "2025-09-22T17:27:41.178032Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -265,7 +203,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-22T16:55:52.470865Z",
+      "extractedAt": "2025-09-22T17:27:41.178188Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -281,26 +219,22 @@
     "applied": [],
     "other": [],
     "primary": [
-      "src_8c90227070afa641",
-      "src_e7a40b58f0eb1391",
-      "src_1a2bb3aad2c352b4",
-      "src_732535db12477ed8",
-      "user_850365730",
-      "user_208652881",
-      "user_401558135",
-      "user_254132415",
-      "user_107150207",
-      "user_131524496"
+      "user_936098601",
+      "user_163037982",
+      "user_535184307",
+      "user_629760966",
+      "user_107906438",
+      "user_749028240"
     ]
   },
   "transparencyInfo": {
     "schemaVersion": "1.4",
     "runMode": "nightly",
-    "totalListings": 10,
+    "totalListings": 6,
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-22T16:57:41.519873Z",
+    "lastUpdated": "2025-09-22T17:29:01.314401Z",
     "mergedUpdates": 0
   }
 }

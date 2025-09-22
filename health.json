@@ -2,10 +2,10 @@
   "ok": true,
   "schemaVersion": "1.4",
   "runMode": "nightly",
-  "totalListings": 10,
+  "totalListings": 6,
   "sourcesTried": [
     "hint4"
   ],
-  "lastUpdated": "2025-09-22T16:57:41.519873Z",
+  "lastUpdated": "2025-09-22T17:29:01.314401Z",
   "mergedUpdates": 0
 }
