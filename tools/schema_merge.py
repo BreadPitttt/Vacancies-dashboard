@@ -7,7 +7,6 @@ def norm_date(s):
     s = (s or "").strip()
     for fmt in ("%d/%m/%Y","%d-%m-%Y","%Y-%m-%d"):
         try:
-            from datetime import datetime
             return datetime.strptime(s, fmt).strftime("%d/%m/%Y")
         except Exception:
             pass
@@ -54,7 +53,6 @@ def merge(existing, candidates):
         v = validate(raw)
         k = make_key(v)
         if k in idx:
-            # shallow enrich without changing id
             ex = idx[k]
             for f in ["organization","qualificationLevel","domicile","deadline","applyLink","detailLink","source","type"]:
                 if v.get(f) and (not ex.get(f) or ex.get(f)=="N/A"):
@@ -66,7 +64,6 @@ def merge(existing, candidates):
             existing.append(v)
             idx[k] = v
             added += 1
-    # sort soonest deadline first; N/A goes to bottom
     def sort_key(it):
         dd = it.get("deadline","")
         try:
@@ -79,7 +76,7 @@ def merge(existing, candidates):
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
-        print("Usage: python tools/schema_merge.py data.json candidates.jsonl out.json")
+        print("Usage: python tools/schema_merge.py data.json tmp/official.jsonl data.json")
         sys.exit(2)
     data_path, cand_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
     data = json.load(open(data_path,"r",encoding="utf-8"))
