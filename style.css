@@ -1,13 +1,67 @@
-/* style.css — minimal overrides to harmonize TailAdmin with existing tone */
-html, body { background-color: #0b1222; }
-.modal.hidden { display: none; }
-.modal .modal-body { width: min(640px, 92vw); margin: 10vh auto; background: #0f172a; border: 1px solid #1f2740; border-radius: 12px; padding: 14px; color: #e9eef9; }
-.modal .modal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-.modal .form input, .modal .form textarea, .modal .form select {
-  width:100%; background:#0e152b; color:#e9eef9; border:1px solid #223055; border-radius:8px; padding:8px 10px; margin-top:6px; margin-bottom:10px;
+/* Base */
+html, body { background-color: #f7f9fc; }
+.pill { padding:6px 10px; border-radius:999px; border:1px solid #e6eaf2; background:#fff; color:#334155; font-size:12px; }
+
+/* Tabs */
+.tabs {}
+.tab { padding:8px 12px; border-radius:10px; cursor:pointer; color:#334155; border:1px solid #e6eaf2; background:#fff; }
+.tab.active { background:#eaf1ff; border-color:#cfe0ff; color:#1e40af; }
+.panel { display:none; }
+.panel.active { display:block; }
+
+/* Grid and cards */
+.cards-grid { display:grid; grid-template-columns: repeat(12, minmax(0,1fr)); gap:16px; }
+.cards-grid > article { grid-column: span 4 / span 4; }
+@media (max-width: 1024px){ .cards-grid > article{ grid-column: span 6 / span 6; } }
+@media (max-width: 640px){ .cards-grid > article{ grid-column: span 12 / span 12; } }
+
+.ua-card { background:#ffffff; border:1px solid #e6eaf2; border-radius:14px; box-shadow: 0 6px 18px rgba(15,23,42,.06); }
+.ua-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px 8px 16px; }
+.ua-title { font-size:16px; font-weight:600; color:#0f172a; }
+.ua-chips { display:flex; align-items:center; gap:8px; } /* keeps official, tick, trusted on one line */
+.ua-body { padding:8px 16px 12px 16px; color:#334155; font-size:14px; }
+.ua-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e6eaf2; }
+.ua-row:last-child { border-bottom:none; }
+.ua-actions { padding:12px 16px 14px 16px; display:flex; align-items:center; gap:8px; }
+
+/* Chips and badges */
+.chip { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; border:1px solid #e6eaf2; background:#fff; color:#0f172a; font-size:12px; line-height:1; }
+.chip.ok { color:#15803d; border-color:#c6f6d5; background:#ecfdf5; }
+.chip.tick { border-color:#c6f6d5; background:#ecfdf5; color:#15803d; }
+.badge-done{ padding:2px 8px; border-radius:999px; border:1px solid #e6eaf2; background:#eef2ff; color:#1e40af; font-size:12px; }
+
+/* Buttons */
+.btn{ padding:8px 12px; border-radius:10px; background:#ffffff; color:#0f172a; border:1px solid #e6eaf2; cursor:pointer; font-size:13px; }
+.btn.primary{ background:#eef2ff; border-color:#cfe0ff; color:#1e40af; }
+.btn.ok{ background:#ecfdf5; border-color:#c6f6d5; color:#15803d; }
+.btn.warn{ background:#fff7ed; border-color:#ffedd5; color:#b45309; }
+.btn.danger{ background:#fef2f2; border-color:#fecaca; color:#b91c1c; }
+.btn.ghost{ background:#ffffff; color:#334155; border:1px dashed #e6eaf2; }
+.btn.tiny{ padding:6px 8px; font-size:12px; }
+
+/* Toast, snackbar, confirm */
+#toast{ position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:#0f172a; color:#e9eef9; border:1px solid #1f2740; border-radius:10px; padding:8px 12px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:30; }
+#confirm{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(15,23,42,.35); z-index:25; }
+#confirm .box{ width:min(360px,92vw); background:#ffffff; border:1px solid #e6eaf2; border-radius:12px; padding:14px; color:#0f172a; }
+#confirm .row{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; flex-direction: row-reverse; }
+#snackbar{ position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:#0f172a; color:#ffffff; border:1px solid #1f2740; border-radius:12px; padding:10px 12px; font-size:13px; display:none; align-items:center; gap:12px; z-index:35; }
+#snackbar .count{ color:#c7d2fe; }
+
+/* Forms and modal */
+.modal.hidden{ display:none; }
+.modal .modal-body{ width:min(640px,92vw); margin:10vh auto; background:#ffffff; border:1px solid #e6eaf2; border-radius:12px; padding:14px; color:#0f172a; }
+.modal .modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.modal .form input, .modal .form textarea, .modal .form select{
+  width:100%; background:#ffffff; color:#0f172a; border:1px solid #e6eaf2; border-radius:8px; padding:10px 12px; margin-top:6px; margin-bottom:10px;
 }
-.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.row.end { display:flex; justify-content:flex-end; gap:10px; }
-.row.end.gap { display:flex; justify-content:flex-end; gap:10px; }
-.icon-btn { background:transparent; color:#bcd2ff; border:1px dashed #2a355a; padding:4px 8px; border-radius:8px; cursor:pointer; }
-.empty { color:#9fb3ff; padding:14px; border:1px dashed #2a355a; border-radius:10px; background:#0e152b; }
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.row.end{ display:flex; justify-content:flex-end; gap:10px; }
+.row.end.gap{ display:flex; justify-content:flex-end; gap:10px; }
+.icon-btn{ background:#ffffff; color:#334155; border:1px dashed #e6eaf2; padding:4px 8px; border-radius:8px; cursor:pointer; }
+
+/* Empty */
+.empty{ color:#334155; padding:14px; border:1px dashed #e6eaf2; border-radius:10px; background:#ffffff; }
+
+/* Alignment fixes for chips row */
+.ua-head .ua-chips > .chip, .ua-head .ua-chips > .badge-done { vertical-align:middle; }
+.ua-head .ua-chips { line-height:0; } /* keeps icons/text level */
