@@ -5,20 +5,26 @@
   <title>General Vacancy Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
+  <!-- Tailwind (TailAdmin style) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      darkMode: 'class',
+      darkMode: false,
       theme: {
         extend: {
           colors: {
-            brand: { 50:'#eef2ff', 500:'#3b82f6' },
-            surface:'#f7f9fc',
-            line:'#e6eaf2',
-            darkcard:'#0f172a'
+            brand: '#1e40af',
+            surface: '#f7f9fc',
+            card: '#ffffff',
+            line: '#e6eaf2',
+            text: '#0f172a',
+            sub: '#64748b',
+            ok: '#16a34a',
+            warn: '#f59e0b',
+            danger: '#ef4444',
           },
           boxShadow: {
-            card:'0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10)'
+            card: '0 6px 18px rgba(15, 23, 42, 0.06)',
           }
         }
       }
@@ -26,31 +32,37 @@
   </script>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body class="bg-surface text-slate-900">
-  <header class="w-full border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-20">
-    <div class="mx-auto max-w-7xl px-4 h-14 flex items-center justify-between">
+
+<body class="bg-surface text-text">
+  <!-- Top bar -->
+  <header class="w-full border-b border-line bg-white sticky top-0 z-20">
+    <div class="mx-auto max-w-7xl px-4 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-500">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3h14a2 2 0 0 1 2 2v13.5A2.5 2.5 0 0 1 18.5 21H7a4 4 0 0 1-4-4V5a2 2 0 0 1 2-2Zm2 4v2h10V7H7Z"/></svg>
+        <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 3h10a2 2 0 0 1 2 2v12.2a2 2 0 0 1-.9 1.67l-5 3.2a2 2 0 0 1-2.2 0l-5-3.2A2 2 0 0 1 5 17.2V5a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.5"/></svg>
         </span>
         <h1 class="font-semibold text-lg">General Vacancy Dashboard</h1>
         <span id="health-pill" class="pill ml-3">Health: Unknown</span>
-        <span id="last-updated" class="ml-3 text-slate-500 text-sm">Last updated: —</span>
-        <span id="total-listings" class="ml-2 text-slate-500 text-sm">Listings: —</span>
+        <span id="last-updated" class="ml-3 text-sub text-sm">Last updated: —</span>
+        <span id="total-listings" class="ml-2 text-sub text-sm">Listings: —</span>
       </div>
-      <div class="flex items-center gap-2">
+      <div>
         <button id="btn-missing" class="btn ghost" type="button">Submit missing</button>
       </div>
     </div>
   </header>
 
-  <main class="mx-auto max-w-7xl px-4 py-6">
-    <nav class="flex gap-2">
+  <!-- Content -->
+  <main class="mx-auto max-w-7xl px-4 py-5">
+    <!-- Tabs -->
+    <div class="tabs"></div>
+    <div class="flex gap-2">
       <div class="tab active" data-tab="open">Open</div>
       <div class="tab" data-tab="applied">Applied</div>
       <div class="tab" data-tab="other">Other</div>
-    </nav>
+    </div>
 
+    <!-- Panels -->
     <section id="panel-open" class="panel active mt-4">
       <div id="open-root" class="cards-grid"></div>
     </section>
@@ -133,7 +145,7 @@
     </div>
   </div>
 
-  <!-- Custom confirm + snackbar + toast -->
+  <!-- Confirm + snackbar + toast -->
   <div id="confirm"><div class="box">
     <div id="confirm-text">Confirm?</div>
     <div class="row">
@@ -148,6 +160,7 @@
   </div>
   <div id="toast"></div>
 
+  <!-- App logic: identical to your last file; only cardHTML changed to use TailAdmin classes -->
   <script>
     (function(){
       var ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
@@ -159,8 +172,9 @@
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
       function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
-      // Snackbar
-      var LAST_ACTION=null, SNACK_TIMER=null, SNACK_LEFT=0;
+      // Global snackbar
+      var LAST_ACTION = null;
+      var SNACK_TIMER = null, SNACK_LEFT = 0;
       function showSnack(text, seconds, undoFn){
         var s=qs("#snackbar"); qs("#snack-text").textContent=text; SNACK_LEFT=seconds;
         qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; s.style.display="flex";
@@ -231,38 +245,29 @@
         u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
       }
 
-      function chipRowHTML(srcRibbon, voteTick, chip, appliedBadge){
-        // ensure baseline alignment and equal height
-        return '<div class="inline-flex items-center gap-2 align-middle">'+
-               '<span class="align-middle inline-flex">'+srcRibbon+'</span>'+
-               (voteTick?'<span class="align-middle inline-flex">'+voteTick+'</span>':'')+
-               (chip?'<span class="align-middle inline-flex">'+chip+'</span>':'')+
-               (appliedBadge?'<span class="align-middle inline-flex">'+appliedBadge+'</span>':'')+
-               '</div>';
-      }
-
+      // Card layout (light, aligned chips)
       function cardHTML(j, applied=false){
         var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip ok">✓ trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
         var det=esc(j.detailLink||j.applyLink||"#");
         var appliedBadge = applied ? '<span class="badge-done">Applied</span>' : '';
-        var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip">Official</span>' : '<span class="chip">Agg</span>';
+        var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
         var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
-        var voteTick = vote==="right" ? '<span class="chip ok">✓</span>' : "";
+        var voteTick = vote==="right" ? '<span class="chip tick" title="Verified by user">✓</span>' : "";
         var verifiedClass = vote==="right" ? " verified" : "";
 
-        return '<article class="bg-white border border-slate-200 rounded-xl shadow-card hover:shadow-md transition-shadow '+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
-          '<header class="px-4 pt-4 pb-1 flex items-start justify-between">'+
-            '<h3 class="font-semibold text-[15px] leading-5">'+esc(j.title||"No Title")+'</h3>'+
-            chipRowHTML(srcRibbon, voteTick, chip, appliedBadge)+
-          '</header>'+
-          '<div class="px-4 py-3 text-[14px] text-slate-700">'+
-            '<div class="flex justify-between py-1 border-b border-dashed border-slate-200"><span class="text-slate-500">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
-            '<div class="flex justify-between py-1 border-b border-dashed border-slate-200"><span class="text-slate-500">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
-            '<div class="flex justify-between py-1 border-b border-dashed border-slate-200"><span class="text-slate-500">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
-            '<div class="flex justify-between py-1"><span class="text-slate-500">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="text-slate-400">('+d+' days)</span></span></div>'+
+        return '<article class="ua-card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
+          '<div class="ua-head">'+
+            '<h3 class="ua-title">'+esc(j.title||"No Title")+'</h3>'+
+            '<div class="ua-chips">'+srcRibbon+voteTick+chip+appliedBadge+'</div>'+
           '</div>'+
-          '<footer class="px-4 pb-4 card-actions">'+
+          '<div class="ua-body">'+
+            '<div class="ua-row"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
+            '<div class="ua-row"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
+            '<div class="ua-row"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
+            '<div class="ua-row"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
+          '</div>'+
+          '<footer class="ua-actions card-actions">'+
             '<span class="hide-on-verified">'+
               '<button class="btn danger" data-act="report">Report</button>'+
               '<button class="btn ok" data-act="right">Right</button>'+
@@ -314,7 +319,7 @@
             const b=e.target.closest("[data-act]"); if(!b) return;
             if(b.classList.contains("disabled")) return;
             const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
-                  title=(this.querySelector("h3")?.textContent||"").trim().slice(0,240),
+                  title=(this.querySelector(".ua-title")?.textContent||"").trim().slice(0,240),
                   detailsUrl=(this.querySelector("a.primary")?.href||"");
             const actions = this.querySelector(".hide-on-verified");
 
@@ -381,17 +386,28 @@
       function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
       document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
 
+      // Deadline alerts (local)
       async function scheduleDeadlineAlerts(list){
-        try{ if(Notification && Notification.permission==="default"){ await Notification.requestPermission(); } }catch(e){}
+        try{
+          if(Notification && Notification.permission==="default"){ await Notification.requestPermission(); }
+        }catch(e){}
         const notified = JSON.parse(localStorage.getItem("vac_deadline_notified")||"{}");
         const today = new Date(); today.setHours(0,0,0,0);
-        function parseDDMMYYYY(s){ if(!s||s.toUpperCase()==="N/A") return null; const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null; const d=new Date(+a[2], +a[1]-1, +a[0]); d.setHours(0,0,0,0); return isNaN(d.getTime())?null:d; }
+        function parseDDMMYYYY(s){
+          if(!s||s.toUpperCase()==="N/A") return null;
+          const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null;
+          const d=new Date(+a[2], +a[1]-1, +a[0]); d.setHours(0,0,0,0); return isNaN(d.getTime())?null:d;
+        }
         for(const j of list){
           const d=parseDDMMYYYY(j.deadline); if(!d) continue;
           const diffDays = Math.round((d.getTime()-today.getTime())/86400000);
           if(diffDays<=2 && diffDays>=0){
             const id=j.id||esc(j.title||""); if(notified[id]) continue;
-            try{ if(Notification && Notification.permission==="granted"){ new Notification("Vacancy closing soon",{ body:(j.title||"")+" ends in "+diffDays+" day(s)." }); } else { toast((j.title||"")+" ends in "+diffDays+" day(s)."); } }catch(e){ toast((j.title||"")+" ends in "+diffDays+" day(s)."); }
+            try{
+              if(Notification && Notification.permission==="granted"){
+                new Notification("Vacancy closing soon", { body: (j.title||"") + " ends in "+diffDays+" day(s)." });
+              } else { toast((j.title||"") + " ends in "+diffDays+" day(s)."); }
+            }catch(e){ toast((j.title||"") + " ends in "+diffDays+" day(s)."); }
             notified[id]=true;
           }
         }
@@ -416,6 +432,7 @@
           if(ok){ closeModal(e.target); e.target.reset(); toast("Reported."); }
         });
 
+        // Missing guard
         var SUBMIT_LOCK = new Set();
         qs("#missingForm")?.addEventListener("submit", async function(e){
           e.preventDefault();
