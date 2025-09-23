@@ -90,8 +90,16 @@
             <input id="missingSite" placeholder="https://…gov.in/ or portal home" />
           </div>
         </div>
-        <label>Last date (DD-MM-YYYY or N/A)</label>
-        <input id="missingLastDate" placeholder="27-10-2025 or N/A" />
+        <div class="grid2">
+          <div>
+            <label>Number of posts (optional)</label>
+            <input id="missingPosts" placeholder="e.g., 420" />
+          </div>
+          <div>
+            <label>Last date (DD-MM-YYYY or N/A)</label>
+            <input id="missingLastDate" placeholder="27-10-2025 or N/A" />
+          </div>
+        </div>
         <label>Note (optional)</label>
         <textarea id="missingNote" rows="3" placeholder="Any extra info"></textarea>
         <div class="row end">
@@ -130,9 +138,13 @@
             <input id="reportEvidenceUrl" placeholder="Official page" />
           </div>
           <div>
-            <label>Note (optional)</label>
-            <input id="reportNote" placeholder="Tell more if needed" />
+            <label>Number of posts (optional)</label>
+            <input id="reportPosts" placeholder="e.g., 420" />
           </div>
+        </div>
+        <div>
+          <label>Note (optional)</label>
+          <input id="reportNote" placeholder="Tell more if needed" />
         </div>
         <div class="row end gap">
           <button type="button" class="btn ghost" data-close>Close</button>
@@ -168,58 +180,30 @@
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
       function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
-      var LAST_ACTION = null;
-      var SNACK_TIMER = null, SNACK_LEFT = 0;
-      function showSnack(text, seconds, undoFn){
-        var s=qs("#snackbar"); qs("#snack-text").textContent=text; SNACK_LEFT=seconds;
-        qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; s.style.display="flex";
-        clearInterval(SNACK_TIMER);
-        SNACK_TIMER=setInterval(()=>{ SNACK_LEFT--; if(SNACK_LEFT<=0){ hideSnack(); } else { qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; } }, 1000);
-        qs("#snack-undo").onclick = async function(){ hideSnack(); await undoFn(); };
-      }
-      function hideSnack(){ var s=qs("#snackbar"); s.style.display="none"; clearInterval(SNACK_TIMER); SNACK_TIMER=null; }
+      // Persistent client-side stores (never reset on render) [Sticky across refresh and runs]
+      var USER_STATE = {}; // {jobId:{action:'applied'|'not_interested'|'undo', ts:ISO}}
+      var USER_VOTES = {}; // {jobId:{vote:'right'|'wrong', ts:ISO}}
+      var EXAM_DONE = {};  // {jobId: ISO} auto-expires 2 days
 
-      function confirmBox(message){
-        return new Promise(res=>{
-          var c=qs("#confirm"); qs("#confirm-text").textContent = message || "Confirm?";
-          c.style.display="flex";
-          function done(v){ c.style.display="none"; ok.removeEventListener("click",okH); cancel.removeEventListener("click",cancelH); res(v); }
-          var ok=qs("#confirm-ok"), cancel=qs("#confirm-cancel");
-          function okH(){ done(true); } function cancelH(){ done(false); }
-          ok.addEventListener("click", okH); cancel.addEventListener("click", cancelH);
-        });
-      }
+      // Load once per session
+      function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
+      function saveVotesLocal(){ try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
+      function setVoteLocal(jobId, vote){ USER_VOTES[jobId]={vote, ts:new Date().toISOString()}; saveVotesLocal(); }
+      function clearVoteLocal(jobId){ delete USER_VOTES[jobId]; saveVotesLocal(); }
 
-      function activate(tab){
-        qsa(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===tab));
-        qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+tab));
-      }
-      document.addEventListener("click", function(e){
-        var t=e.target.closest(".tab"); if(!t) return;
-        activate(t.dataset.tab);
-      });
-
-      var USER_STATE = {};
-      var USER_VOTES = {};
-      var EXAM_DONE = {}; // {jobId: tsISO} local-only with auto-expiry
+      function loadUserStateLocal(){ try{ USER_STATE=JSON.parse(localStorage.getItem("vac_user_state")||"{}")||{}; }catch{ USER_STATE={}; } }
+      function saveUserStateLocal(){ try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{} }
+      function setUserStateLocal(jobId, action){ if(!jobId) return; if(action==="undo") delete USER_STATE[jobId]; else USER_STATE[jobId]={action, ts:new Date().toISOString()}; saveUserStateLocal(); }
 
       function loadExamDone(){ try{ EXAM_DONE = JSON.parse(localStorage.getItem("vac_exam_done")||"{}")||{}; }catch{ EXAM_DONE={}; } }
       function saveExamDone(){ try{ localStorage.setItem("vac_exam_done", JSON.stringify(EXAM_DONE)); }catch{} }
       function purgeOldExamDone(){
-        var now = Date.now();
-        var changed=false;
+        var now = Date.now(), changed=false;
         Object.keys(EXAM_DONE).forEach(id=>{
           if(now - Date.parse(EXAM_DONE[id]) > 2*24*60*60*1000){ delete EXAM_DONE[id]; changed=true; }
         });
         if(changed) saveExamDone();
       }
-
-      async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok){ USER_STATE=await r.json(); } }catch{} }
-      function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({}, USER_STATE, j); }catch{} }
-      function setUserStateLocal(jobId, action){ if(!jobId) return; if(action==="undo") delete USER_STATE[jobId]; else USER_STATE[jobId]={action, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{} }
-      function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
-      function setVoteLocal(jobId, vote){ USER_VOTES[jobId]={vote, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
-      function clearVoteLocal(jobId){ delete USER_VOTES[jobId]; try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
 
       async function postJSON(payload){
         try{
@@ -250,6 +234,10 @@
         u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
       }
 
+      function postsValue(j){
+        return j.numberOfPosts ?? j.posts ?? j.vacancies ?? "N/A";
+      }
+
       function cardHTML(j, applied=false){
         var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip trust big">trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
@@ -257,13 +245,12 @@
         var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip big" title="Official source">Official</span>' : '<span class="chip big" title="From aggregator">Agg</span>';
         var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
         var isExamDone = !!EXAM_DONE[lid];
-        var showVotePair = !isExamDone; // hide Right/Wrong if exam done
-        var verifiedClass = vote==="right" ? " verified" : "";
+        var showVotePair = !(applied || isExamDone); // hide on applied or exam done
 
-        return '<article class="ua-card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
+        return '<article class="ua-card'+(applied?' applied':'')+'" data-id="'+esc(lid)+'">'+
           '<div class="ua-head"><h3 class="ua-title">'+esc(j.title||"No Title")+'</h3><div class="ua-chips">'+srcRibbon+chip+'</div></div>'+
           '<div class="ua-body">'+
-            '<div class="ua-row"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
+            '<div class="ua-row"><span class="muted">Number of posts</span><span>'+esc(postsValue(j))+'</span></div>'+
             '<div class="ua-row"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
@@ -274,14 +261,14 @@
             '<button class="btn danger" data-act="report">Report</button>'+
           '</div>'+
           '<footer class="ua-actions2">'+
-            (isExamDone ? 
-              '<div class="exam-row"><span class="exam-badge">Exam over</span><button class="btn ghost tiny" data-act="exam_clear">Clear</button></div>' : 
-              '<div class="row2">'+
-                (showVotePair? '<div class="btn-pair hide-on-verified"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div>' : '<span></span>')+
-                '<span class="spacer"></span>'+
-                (applied ? '<button class="btn applied-pill" data-act="exam_done">Exam done</button>'
-                         : '<div class="btn-pair"><button class="btn applied-pill" data-act="applied">Applied</button><button class="btn neutral-pill" data-act="not_interested">Not interested</button></div>')+
-              '</div>')+
+              (isExamDone ? 
+                '<div class="exam-row"><span class="exam-badge">Exam over</span><button class="btn ghost tiny" data-act="exam_clear">Clear</button></div>' : 
+                '<div class="row2">'+
+                  (showVotePair? '<div class="btn-pair"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div>' : '<span></span>')+
+                  '<span class="spacer"></span>'+
+                  (applied ? '<button class="btn applied-pill" data-act="exam_done">Exam done</button>'
+                           : '<div class="btn-pair"><button class="btn applied-pill" data-act="applied">Applied</button><button class="btn neutral-pill" data-act="not_interested">Not interested</button></div>')+
+                '</div>')+
           '</footer>'+
         '</article>';
       }
@@ -295,16 +282,20 @@
         var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
         rootOpen.innerHTML=rootApp.innerHTML=rootOther.innerHTML="";
 
-        loadExamDone(); purgeOldExamDone();
-        await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal();
+        // Load persistent local stores first
+        loadVotesLocal(); loadUserStateLocal(); loadExamDone(); purgeOldExamDone();
 
+        // Fetch fresh data
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
         var list = sortByDeadline(Array.isArray(data.jobListings)? data.jobListings : []);
         var sections = data.sections || {};
         qs("#total-listings").textContent = "Listings: " + list.length;
 
+        // Start from REMOTE sections, then re-apply LOCAL overrides last
         var idsApplied = new Set(sections.applied||[]);
         var idsOther = new Set(sections.other||[]);
+
+        // Merge user local state regardless of server sections (make sticky)
         Object.entries(USER_STATE).forEach(([jid, s])=>{
           if(!s || !s.action) return;
           if(s.action==="applied"){ idsApplied.add(jid); idsOther.delete(jid); }
@@ -327,7 +318,6 @@
             const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
                   title=(this.querySelector(".ua-title")?.textContent||"").trim().slice(0,240),
                   detailsUrl=(this.querySelector("a.primary")?.href||"");
-            const votePair = this.querySelector(".hide-on-verified");
 
             if(act==="report"){
               qs("#reportListingId").value=id;
@@ -337,72 +327,43 @@
             }
 
             if(act==="right"){
-              const ok = await confirmBox("Confirm: mark right?");
-              if(!ok) return;
               setVoteLocal(id, "right");
-              if(votePair) votePair.style.display="none";
-              const undoFn = async ()=>{ clearVoteLocal(id); if(votePair) votePair.style.display=""; await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); };
-              addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
-              LAST_ACTION = { type:"vote_right", jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
-              showSnack("Saved ✓", 10, LAST_ACTION.undo);
-              postJSON({ type:"vote", vote:"right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
-              return;
+              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
+              addUndo(this.querySelector(".ua-actions2"), undoFn, 10);
+              showSnack("Saved ✓", 10, undoFn);
+              postJSON({ type:"vote", vote:"right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() });
+              await render(); return;
             }
 
             if(act==="wrong"){
-              const ok = await confirmBox("Confirm: mark wrong?");
-              if(!ok) return;
               setVoteLocal(id, "wrong");
-              setLocked(b,"Marked ✖");
-              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); };
-              addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
-              LAST_ACTION = { type:"vote_wrong", jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
-              showSnack("Saved ✖", 10, LAST_ACTION.undo);
-              postJSON({ type:"vote", vote:"wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
-              return;
+              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
+              addUndo(this.querySelector(".ua-actions2"), undoFn, 10);
+              showSnack("Saved ✖", 10, undoFn);
+              postJSON({ type:"vote", vote:"wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() });
+              await render(); return;
             }
 
             if(act==="applied"){
-              const ok = await confirmBox("Confirm: applied?");
-              if(!ok) return;
               setUserStateLocal(id, "applied");
-              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); };
-              addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
-              LAST_ACTION = { type:"state_applied", jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
-              showSnack("Saved", 10, LAST_ACTION.undo);
-              await postJSON({ type:"state", payload:{ jobId:id, action:"applied", ts:new Date().toISOString() } });
-              await render();
-              return;
+              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await render(); };
+              addUndo(this.querySelector(".ua-actions2"), undoFn, 10);
+              showSnack("Saved", 10, undoFn);
+              postJSON({ type:"state", payload:{ jobId:id, action:"applied", ts:new Date().toISOString() } });
+              await render(); return;
             }
 
             if(act==="not_interested"){
-              const ok = await confirmBox("Confirm: not interested?");
-              if(!ok) return;
               setUserStateLocal(id, "not_interested");
-              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); };
-              addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
-              LAST_ACTION = { type:"state_not_interested", jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
-              showSnack("Saved", 10, LAST_ACTION.undo);
-              await postJSON({ type:"state", payload:{ jobId:id, action:"not_interested", ts:new Date().toISOString() } });
-              await render();
-              return;
+              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await render(); };
+              addUndo(this.querySelector(".ua-actions2"), undoFn, 10);
+              showSnack("Saved", 10, undoFn);
+              postJSON({ type:"state", payload:{ jobId:id, action:"not_interested", ts:new Date().toISOString() } });
+              await render(); return;
             }
 
-            if(act==="exam_done"){
-              EXAM_DONE[id] = new Date().toISOString(); saveExamDone();
-              await render();
-              return;
-            }
-
-            if(act==="exam_clear"){
-              delete EXAM_DONE[id]; saveExamDone();
-              await render();
-              return;
-            }
-
-            if(act==="exam_done_finalize"){
-              setLocked(b,"Done ✓"); return;
-            }
+            if(act==="exam_done"){ EXAM_DONE[id]=new Date().toISOString(); saveExamDone(); await render(); return; }
+            if(act==="exam_clear"){ delete EXAM_DONE[id]; saveExamDone(); await render(); return; }
           });
 
           if(isApplied) fApp.appendChild(card);
@@ -448,11 +409,11 @@
           e.preventDefault();
           var id=qs("#reportListingId").value.trim();
           var rc = document.getElementById("reportReason").value || "";
-          var rtxt = rc.replace(/_/g," ");
           var ev = document.getElementById("reportEvidenceUrl").value.trim();
           var note = document.getElementById("reportNote").value.trim();
+          var posts = document.getElementById("reportPosts").value.trim();
           if(!id || !rc) return toast("Please select a reason.");
-          var ok = await postJSON({ type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() });
+          var ok = await postJSON({ type:"report", jobId:id, reasonCode:rc, evidenceUrl:ev, note:note, posts:posts||null, ts:new Date().toISOString() });
           if(ok){ closeModal(e.target); e.target.reset(); toast("Reported."); }
         });
 
@@ -463,12 +424,13 @@
           var url=qs("#missingUrl").value.trim();
           var site=qs("#missingSite").value.trim();
           var last=qs("#missingLastDate").value.trim();
+          var posts=document.getElementById("missingPosts").value.trim();
           var note=document.getElementById("missingNote").value.trim();
           if(!title||!url) return toast("Post name and notification link are required.");
           var key = url.replace(/[?#].*$/,"").toLowerCase();
           if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
           SUBMIT_LOCK.add(key);
-          var ok = await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, note:note, ts:new Date().toISOString() });
+          var ok = await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, posts:posts||null, note:note, ts:new Date().toISOString() });
           if(ok){ closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh."); }
           else { toast("Network problem. Please try again."); SUBMIT_LOCK.delete(key); }
         });
