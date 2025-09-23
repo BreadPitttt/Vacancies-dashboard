@@ -49,8 +49,13 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:8px}
 .group{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
 
-/* Keep constant button widths so everything stays on one line */
-.actions-row .btn{min-width:106px}
+/* Keep buttons on one line but allow controlled shrink so both show */
+/* CHANGED: min-width from 106px -> 96px and allow flex shrink */
+.actions-row .btn{
+  min-width:96px;
+  max-width:140px;
+  flex:0 1 auto;
+}
 
 /* Chips and badges */
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
