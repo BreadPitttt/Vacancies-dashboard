@@ -41,16 +41,16 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .rowline .muted{color:var(--muted)}
 .rowline:last-child{border-bottom:none}
 
-/* Action rows: rock-solid grid (2 columns) so buttons never drift */
+/* Action rows: fixed two-column grid — no wrap, no drift */
 .actions-row{border-top:1px dashed var(--line);padding:10px 12px}
 .actions-row.row1{display:grid;grid-template-columns:1fr 1fr;align-items:center}
 .actions-row.row1 .left{justify-self:start}
 .actions-row.row1 .right{justify-self:end}
-.actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center}
+.actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:8px}
 .group{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
 
-/* Fix widths so wrap never occurs */
-.actions-row .btn{min-width:100px}
+/* Keep constant button widths so everything stays on one line */
+.actions-row .btn{min-width:106px}
 
 /* Chips and badges */
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
@@ -70,7 +70,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.tiny{padding:6px 8px;font-size:12px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
-/* Keep left/right cells aligned after Right: hide content but preserve column width */
+/* Keep left/right cell widths after Right; hide content only */
 .verified .row2 .group.vote{visibility:hidden}
 
 /* Modal */
