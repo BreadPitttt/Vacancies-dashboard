@@ -21,6 +21,7 @@
             ok: '#16a34a',
             warn: '#b45309',
             danger: '#b91c1c',
+            neutral: '#475569'
           },
           boxShadow: {
             card: '0 10px 28px rgba(15, 23, 42, 0.08)',
@@ -167,7 +168,6 @@
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
       function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
-      // Snackbar
       var LAST_ACTION = null;
       var SNACK_TIMER = null, SNACK_LEFT = 0;
       function showSnack(text, seconds, undoFn){
@@ -179,7 +179,6 @@
       }
       function hideSnack(){ var s=qs("#snackbar"); s.style.display="none"; clearInterval(SNACK_TIMER); SNACK_TIMER=null; }
 
-      // Confirm
       function confirmBox(message){
         return new Promise(res=>{
           var c=qs("#confirm"); qs("#confirm-text").textContent = message || "Confirm?";
@@ -191,7 +190,6 @@
         });
       }
 
-      // Tabs
       function activate(tab){
         qsa(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===tab));
         qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+tab));
@@ -201,7 +199,6 @@
         activate(t.dataset.tab);
       });
 
-      // State
       var USER_STATE = {};
       var USER_VOTES = {};
       async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok){ USER_STATE=await r.json(); } }catch{} }
@@ -240,13 +237,12 @@
         u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
       }
 
-      // Card
       function cardHTML(j, applied=false){
-        var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip trust">trusted</span>':"";
+        var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip trust big">trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
         var det=esc(j.detailLink||j.applyLink||"#");
         var appliedBadge = applied ? '<span class="badge-done">Applied</span>' : '';
-        var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
+        var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip big" title="Official source">Official</span>' : '<span class="chip big" title="From aggregator">Agg</span>';
         var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
         var verifiedClass = vote==="right" ? " verified" : "";
 
@@ -255,6 +251,11 @@
             '<h3 class="ua-title">'+esc(j.title||"No Title")+'</h3>'+
             '<div class="ua-chips">'+srcRibbon+chip+appliedBadge+'</div>'+
           '</div>'+
+          '<div class="ua-topbar">'+
+            '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
+            '<span class="spacer"></span>'+
+            '<button class="btn danger" data-act="report">Report</button>'+
+          '</div>'+
           '<div class="ua-body">'+
             '<div class="ua-row"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
@@ -262,19 +263,14 @@
             '<div class="ua-row"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
           '</div>'+
           '<footer class="ua-actions2">'+
-            '<div class="row1 '+(verifiedClass?'hide':'')+'">'+
-              '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
-              '<span class="spacer"></span>'+
-              '<button class="btn danger" data-act="report">Report</button>'+
-            '</div>'+
             '<div class="row2">'+
               '<div class="btn-pair hide-on-verified">'+
                 '<button class="btn ok" data-act="right">Right</button>'+
                 '<button class="btn warn" data-act="wrong">Wrong</button>'+
               '</div>'+
               '<span class="spacer"></span>'+
-              (applied ? '<button class="btn" data-act="exam_done">Exam done</button>'
-                       : '<div class="btn-pair"><button class="btn" data-act="applied">Applied</button><button class="btn" data-act="not_interested">Not interested</button></div>')+
+              (applied ? '<button class="btn applied-pill" data-act="exam_done">Applied</button>'
+                       : '<div class="btn-pair"><button class="btn applied-pill" data-act="applied">Applied</button><button class="btn neutral-pill" data-act="not_interested">Not interested</button></div>')+
             '</div>'+
           '</footer>'+
         '</article>';
@@ -320,8 +316,7 @@
             const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
                   title=(this.querySelector(".ua-title")?.textContent||"").trim().slice(0,240),
                   detailsUrl=(this.querySelector("a.primary")?.href||"");
-            const row1 = this.querySelector(".row1");
-            const actions = this.querySelector(".hide-on-verified");
+            const hidePair = this.querySelector(".hide-on-verified");
 
             if(act==="report"){
               qs("#reportListingId").value=id;
@@ -334,9 +329,8 @@
               const ok = await confirmBox("Confirm: mark right?");
               if(!ok) return;
               setVoteLocal(id, "right");
-              if(row1) row1.classList.add("hide");
-              if(actions) actions.style.display="none";
-              const undoFn = async ()=>{ clearVoteLocal(id); if(row1) row1.classList.remove("hide"); if(actions) actions.style.display=""; await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); };
+              if(hidePair) hidePair.style.display="none";
+              const undoFn = async ()=>{ clearVoteLocal(id); if(hidePair) hidePair.style.display=""; await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); };
               addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
               LAST_ACTION = { type:"vote_right", jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
               showSnack("Saved ✓", 10, LAST_ACTION.undo);
