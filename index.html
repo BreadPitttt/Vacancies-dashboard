@@ -5,13 +5,15 @@
 <title>General Vacancy Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-store" />
-<link rel="stylesheet" href="style.css" />
+<link id="main-css" rel="stylesheet" href="style.css?v=2025-09-23-2" />
 <style>
+/* Keep only the tiny inline overrides from the old build */
 .tabs{ display:flex; gap:10px; border-bottom:1px solid #1f2740; margin:10px 0 16px; }
 .tab{ padding:8px 12px; border-radius:8px 8px 0 0; cursor:pointer; color:#bcd2ff; }
 .tab.active{ background:#131a31; border:1px solid #1f2740; border-bottom-color:transparent; }
 .panel{ display:none; }
 .panel.active{ display:block; }
+/* Verified/undo behaviors from prior build */
 .card-actions{ flex-wrap: wrap; row-gap: 6px; }
 .btn[data-act="report"]{ min-width: 68px; }
 .applied .card-actions .btn:not([data-act="exam_done"]):not([data-act="undo_vote"]){ display:none; }
@@ -131,7 +133,7 @@
   </div>
 </div>
 
-<!-- Confirm / Snackbar / Toast -->
+<!-- Confirm + snackbar + toast -->
 <div id="confirm"><div class="box">
   <div id="confirm-text">Confirm?</div>
   <div class="row">
@@ -155,19 +157,18 @@
   function qsa(s, r){ return Array.from((r||document).querySelectorAll(s)); }
   function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]; }); }
   function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
-  function toast(msg){ var t=qs("#toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; },1600); }
+  function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
-  // Global snackbar
+  // Confirm + snackbar
   var SNACK_TIMER=null, SNACK_LEFT=0;
   function showSnack(text, seconds, undoFn){
     var s=qs("#snackbar"); qs("#snack-text").textContent=text; SNACK_LEFT=seconds;
     qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; s.style.display="flex";
     clearInterval(SNACK_TIMER);
-    SNACK_TIMER=setInterval(()=>{ SNACK_LEFT--; if(SNACK_LEFT<=0){ hideSnack(); } else { qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; } },1000);
-    qs("#snack-undo").onclick = async function(){ hideSnack(); try{ await undoFn(); }catch(e){} };
+    SNACK_TIMER=setInterval(()=>{ SNACK_LEFT--; if(SNACK_LEFT<=0){ hideSnack(); } else { qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; } }, 1000);
+    qs("#snack-undo").onclick = async function(){ hideSnack(); await undoFn(); };
   }
   function hideSnack(){ var s=qs("#snackbar"); s.style.display="none"; clearInterval(SNACK_TIMER); SNACK_TIMER=null; }
-
   function confirmBox(message){
     return new Promise(res=>{
       var c=qs("#confirm"); qs("#confirm-text").textContent = message || "Confirm?";
@@ -198,17 +199,15 @@
   function setVoteLocal(jobId, vote){ USER_VOTES[jobId]={vote, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(jobId){ delete USER_VOTES[jobId]; try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
 
-  // Robust POST with queue to avoid losses on refresh
+  // Outbox queue to avoid action loss
   var OUTBOX = (function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; } })();
   function saveOutbox(){ try{ localStorage.setItem("vac_outbox", JSON.stringify(OUTBOX)); }catch{} }
   async function flushOutbox(){
     if(!OUTBOX.length) return;
     let rest=[];
     for(const p of OUTBOX){
-      try{
-        const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});
-        if(!r.ok) rest.push(p);
-      }catch{ rest.push(p); }
+      try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p); }
+      catch{ rest.push(p); }
     }
     OUTBOX = rest; saveOutbox();
   }
@@ -281,18 +280,17 @@
     return list.slice().sort((a,b)=>{ const da=parse(a.deadline), db=parse(b.deadline); if(da===null && db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da - db; });
   }
 
-  // Render guard to stop white flash on fast clicks/refresh
+  // Render guard to avoid white flash on racing fetches
   let renderToken = 0;
   async function render(){
     const myToken = ++renderToken;
-
-    var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
-    // Do not clear panels yet; build fragments first to avoid blank
     await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); await flushOutbox();
 
-    var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
-    if (myToken !== renderToken) return; // stale
+    const dataResp = await fetch("data.json"+bust(),{cache:"no-store"});
+    const data = await dataResp.json();
+    if (myToken !== renderToken) return;
 
+    var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
     var list = sortByDeadline(Array.isArray(data.jobListings)? data.jobListings : []);
     var sections = data.sections || {};
     qs("#total-listings").textContent = "Listings: " + list.length;
@@ -324,7 +322,7 @@
         const actions = this.querySelector(".hide-on-verified");
 
         if(act==="report"){
-          qs("#reportListingId").value=id; qs("#report-modal").classList.remove("hidden"); qs("#report-modal").setAttribute("aria-hidden","false"); return;
+          qs("#reportListingId").value=id; const m=qs("#report-modal"); m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); return;
         }
 
         if(act==="right"){
@@ -365,11 +363,9 @@
       else fOpen.appendChild(card);
     }
 
-    // Now swap DOM content once, preventing white flash
     rootOpen.replaceChildren(fOpen);
     rootApp.replaceChildren(fApp);
     rootOther.replaceChildren(fOther);
-
     scheduleDeadlineAlerts(list);
   }
 
@@ -395,6 +391,9 @@
   }
 
   document.addEventListener("DOMContentLoaded", async function(){
+    // ensure CSS actually loaded (dev aids)
+    const css = document.getElementById("main-css");
+    css.addEventListener("error", ()=>toast("Stylesheet failed to load."));
     await renderStatus();
     await render();
 
