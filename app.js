@@ -1,7 +1,6 @@
-// app.js v2025-09-24-3a — robust loading guards + strict alignment + working modals
+// app.js v2025-09-24-3b — robust JSON loader + visible empty state + aligned two-row layout
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
-  const bust = () => "?t=" + Date.now();
 
   const qs=(s,r)=>(r||document).querySelector(s);
   const qsa=(s,r)=>Array.from((r||document).querySelectorAll(s));
@@ -9,21 +8,24 @@
   const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s : "N/A";
   const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1600); };
 
-  // Tabs
-  document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return; qsa(".tab").forEach(x=>x.classList.toggle("active",x===t)); qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab)); });
-
-  // State
-  let USER_STATE={}, USER_VOTES={};
+  // Force no-store for JSON every time
   async function loadJSON(path){
     try{
-      const r = await fetch(path + bust(), { cache:"no-store" });
-      if(!r.ok) throw new Error(r.status);
+      const url = path + (path.includes("?") ? "&" : "?") + "t=" + Date.now();
+      const r = await fetch(url, { cache:"no-store" });
+      if(!r.ok) throw new Error(String(r.status));
       return await r.json();
     }catch(e){
-      console.error("Load failed:", path, e);
+      console.error("Failed to load", path, e);
       return null;
     }
   }
+
+  // Tabs
+  document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return; qsa(".tab").forEach(x=>x.classList.toggle("active",x===t)); qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab)); });
+
+  // Self-learning stores
+  let USER_STATE={}, USER_VOTES={};
   async function loadUserStateServer(){ const j=await loadJSON("user_state.json"); if(j) USER_STATE=j; }
   function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({},USER_STATE,j);}catch{} }
   function setUserStateLocal(id,a){ if(!id) return; if(a==="undo") delete USER_STATE[id]; else USER_STATE[id]={action:a,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{} }
@@ -31,7 +33,7 @@
   function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
-  // Outbox
+  // Outbox with retry
   let OUTBOX=(function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; }})();
   function saveOutbox(){ try{ localStorage.setItem("vac_outbox",JSON.stringify(OUTBOX)); }catch{} }
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
@@ -64,7 +66,7 @@
         '<div class="rowline"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
         '<div class="rowline"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
         '<div class="rowline"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
-      </div>'+
+      '</div>'+
       '<div class="actions-row row1"><div class="left"><a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a></div><div class="right"><button class="btn danger" data-act="report">Report</button></div></div>'+
       '<div class="actions-row row2"><div class="group vote"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div><div class="group interest">'+
       (applied?'<button class="btn applied" data-act="exam_done">Exam done</button>':'<button class="btn applied" data-act="applied">Applied</button><button class="btn other" data-act="not_interested">Not interested</button>')+
@@ -76,16 +78,21 @@
   let TOKEN=0;
   async function render(){
     const my=++TOKEN;
+
     await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); await flushOutbox();
 
     const data = await loadJSON("data.json");
     if(my!==TOKEN) return;
-    if(!data || !Array.isArray(data.jobListings)){ // fail silent, don’t clear UI
-      console.warn("No listings in data.json");
+
+    const rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
+
+    if(!data || !Array.isArray(data.jobListings)){
+      // Visible fallback instead of blank page
+      rootOpen.innerHTML = '<div class="empty">No active job listings found (data unavailable).</div>';
+      qs("#total-listings").textContent = "Listings: —";
       return;
     }
 
-    const rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
     const list=sortByDeadline(data.jobListings||[]);
     const sections=data.sections||{};
     qs("#total-listings").textContent="Listings: "+list.length;
@@ -99,6 +106,7 @@
     });
 
     const fOpen=document.createDocumentFragment(), fApp=document.createDocumentFragment(), fOther=document.createDocumentFragment();
+
     for(const job of list){
       const applied=idsApplied.has(job.id);
       const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
@@ -166,7 +174,6 @@
 
     qs("#btn-missing")?.addEventListener("click",()=>openModal("#missing-modal"));
 
-    // Report submit
     qs("#reportForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
       const id=qs("#reportListingId").value.trim();
@@ -179,7 +186,6 @@
       closeModal(e.target); e.target.reset(); toast("Reported.");
     });
 
-    // Submit missing
     const SUBMIT_LOCK=new Set();
     qs("#missingForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
