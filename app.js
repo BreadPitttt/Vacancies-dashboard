@@ -1,19 +1,30 @@
-// app.js v2025-09-24-3 — strict alignment with grid cells, reliable modals, self-learning intact
+// app.js v2025-09-24-3a — robust loading guards + strict alignment + working modals
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const bust = () => "?t=" + Date.now();
 
   const qs=(s,r)=>(r||document).querySelector(s);
+  const qsa=(s,r)=>Array.from((r||document).querySelectorAll(s));
   const esc=(s)=>(s==null?"":String(s)).replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]));
   const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s : "N/A";
-  const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1600);};
+  const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1600); };
 
   // Tabs
-  document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return; document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===t)); document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab)); });
+  document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return; qsa(".tab").forEach(x=>x.classList.toggle("active",x===t)); qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab)); });
 
   // State
   let USER_STATE={}, USER_VOTES={};
-  async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
+  async function loadJSON(path){
+    try{
+      const r = await fetch(path + bust(), { cache:"no-store" });
+      if(!r.ok) throw new Error(r.status);
+      return await r.json();
+    }catch(e){
+      console.error("Load failed:", path, e);
+      return null;
+    }
+  }
+  async function loadUserStateServer(){ const j=await loadJSON("user_state.json"); if(j) USER_STATE=j; }
   function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({},USER_STATE,j);}catch{} }
   function setUserStateLocal(id,a){ if(!id) return; if(a==="undo") delete USER_STATE[id]; else USER_STATE[id]={action:a,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{} }
   function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
@@ -26,7 +37,12 @@
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
   async function postJSON(payload){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); if(!r.ok) throw new Error("net"); }catch{ OUTBOX.push(payload); saveOutbox(); setTimeout(flushOutbox,1500); } return true; }
 
-  async function renderStatus(){ const pill=qs("#health-pill"), last=qs("#last-updated"), total=qs("#total-listings"); try{ const h=await (await fetch("health.json"+bust(),{cache:"no-store"})).json(); pill.textContent=h.ok?"Health: OK":"Health: Not OK"; pill.className="pill "+(h.ok?"ok":"bad"); const ts=h.lastUpdated||""; last.textContent="Last updated: "+(ts?new Date(ts).toLocaleString():"—"); total.textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—"); }catch{ pill.textContent="Health: Unknown"; pill.className="pill"; last.textContent="Last updated: —"; total.textContent="Listings: —"; } }
+  async function renderStatus(){
+    const pill=qs("#health-pill"), last=qs("#last-updated"), total=qs("#total-listings");
+    const h=await loadJSON("health.json");
+    if(h){ pill.textContent=h.ok?"Health: OK":"Health: Not OK"; pill.className="pill "+(h.ok?"ok":"bad"); const ts=h.lastUpdated||""; last.textContent="Last updated: "+(ts?new Date(ts).toLocaleString():"—"); total.textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—"); }
+    else { pill.textContent="Health: Unknown"; pill.className="pill"; last.textContent="Last updated: —"; total.textContent="Listings: —"; }
+  }
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
 
@@ -48,37 +64,29 @@
         '<div class="rowline"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
         '<div class="rowline"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
         '<div class="rowline"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
-      '</div>'+
-
-      '<div class="actions-row row1">'+
-        '<div class="left"><a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a></div>'+
-        '<div class="right"><button class="btn danger" data-act="report">Report</button></div>'+
-      '</div>'+
-
-      '<div class="actions-row row2">'+
-        '<div class="group vote">'+
-          '<button class="btn ok" data-act="right">Right</button>'+
-          '<button class="btn warn" data-act="wrong">Wrong</button>'+
-        </div>'+
-        '<div class="group interest">'+
-          (applied ? '<button class="btn applied" data-act="exam_done">Exam done</button>'
-                   : '<button class="btn applied" data-act="applied">Applied</button><button class="btn other" data-act="not_interested">Not interested</button>')+
-        '</div>'+
-      '</div>'+
-    '</article>';
+      </div>'+
+      '<div class="actions-row row1"><div class="left"><a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a></div><div class="right"><button class="btn danger" data-act="report">Report</button></div></div>'+
+      '<div class="actions-row row2"><div class="group vote"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div><div class="group interest">'+
+      (applied?'<button class="btn applied" data-act="exam_done">Exam done</button>':'<button class="btn applied" data-act="applied">Applied</button><button class="btn other" data-act="not_interested">Not interested</button>')+
+      '</div></div></article>';
   }
 
-  function sortByDeadline(list){ const parse=(s)=>{ if(!s||s.toUpperCase()==="N/A") return null; const t=s.replaceAll("-","/"); const a=t.split("/"); if(a.length!==3) return null; const ms=Date.UTC(+a[2],+a[1]-1,+a[0]); return isNaN(ms)?null:ms; }; return list.slice().sort((a,b)=>{ const da=parse(a.deadline),db=parse(b.deadline); if(da===null&&db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da-db; }); }
+  function sortByDeadline(list){ const parse=(s)=>{ if(!s||s.toUpperCase()==="N/A") return null; const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null; const ms=Date.UTC(+a[2],+a[1]-1,+a[0]); return isNaN(ms)?null:ms; }; return list.slice().sort((a,b)=>{ const da=parse(a.deadline),db=parse(b.deadline); if(da===null&&db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da-db; }); }
 
-  let USER_TOKEN=0;
+  let TOKEN=0;
   async function render(){
-    const my=++USER_TOKEN;
+    const my=++TOKEN;
     await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); await flushOutbox();
-    const data=await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
-    if(my!==USER_TOKEN) return;
+
+    const data = await loadJSON("data.json");
+    if(my!==TOKEN) return;
+    if(!data || !Array.isArray(data.jobListings)){ // fail silent, don’t clear UI
+      console.warn("No listings in data.json");
+      return;
+    }
 
     const rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
-    const list=sortByDeadline(Array.isArray(data.jobListings)?data.jobListings:[]);
+    const list=sortByDeadline(data.jobListings||[]);
     const sections=data.sections||{};
     qs("#total-listings").textContent="Listings: "+list.length;
 
@@ -91,8 +99,6 @@
     });
 
     const fOpen=document.createDocumentFragment(), fApp=document.createDocumentFragment(), fOther=document.createDocumentFragment();
-    if(list.length===0){ rootOpen.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
-
     for(const job of list){
       const applied=idsApplied.has(job.id);
       const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
@@ -112,32 +118,20 @@
           return;
         }
         if(act==="right"){
-          setVoteLocal(id,"right"); card.classList.add("verified"); // vote cell hidden but width kept via CSS
-          addUndo(card.querySelector(".row2 .interest"), async ()=>{
-            clearVoteLocal(id);
-            await postJSON({type:"vote",vote:"undo_right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
-            await render();
-          });
+          setVoteLocal(id,"right"); card.classList.add("verified");
+          addUndo(card.querySelector(".row2 .interest"), async ()=>{ clearVoteLocal(id); await postJSON({type:"vote",vote:"undo_right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()}); await render(); });
           postJSON({type:"vote",vote:"right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
         if(act==="wrong"){
           setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled");
-          addUndo(card.querySelector(".row2 .interest"), async ()=>{
-            clearVoteLocal(id);
-            await postJSON({type:"vote",vote:"undo_wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
-            await render();
-          });
+          addUndo(card.querySelector(".row2 .interest"), async ()=>{ clearVoteLocal(id); await postJSON({type:"vote",vote:"undo_wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()}); await render(); });
           postJSON({type:"vote",vote:"wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
         if(act==="applied"||act==="not_interested"){
           setUserStateLocal(id,act);
-          addUndo(card.querySelector(".row2 .interest"), async ()=>{
-            setUserStateLocal(id,"undo");
-            await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}});
-            await render();
-          });
+          addUndo(card.querySelector(".row2 .interest"), async ()=>{ setUserStateLocal(id,"undo"); await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}); await render(); });
           postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}});
           await render(); return;
         }
@@ -152,7 +146,6 @@
     rootOpen.replaceChildren(fOpen);
     rootApp.replaceChildren(fApp);
     rootOther.replaceChildren(fOther);
-    scheduleDeadlineAlerts(list);
   }
 
   function addUndo(container,onUndo){
@@ -170,9 +163,10 @@
   document.addEventListener("DOMContentLoaded", async ()=>{
     qs("#main-css")?.addEventListener("error",()=>toast("Stylesheet failed to load."));
     await renderStatus(); await render();
+
     qs("#btn-missing")?.addEventListener("click",()=>openModal("#missing-modal"));
 
-    // Reliable submits
+    // Report submit
     qs("#reportForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
       const id=qs("#reportListingId").value.trim();
@@ -185,6 +179,7 @@
       closeModal(e.target); e.target.reset(); toast("Reported.");
     });
 
+    // Submit missing
     const SUBMIT_LOCK=new Set();
     qs("#missingForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
@@ -201,21 +196,4 @@
       closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh.");
     });
   });
-
-  async function scheduleDeadlineAlerts(list){
-    try{ if(Notification && Notification.permission==="default"){ await Notification.requestPermission(); } }catch{}
-    const notified=JSON.parse(localStorage.getItem("vac_deadline_notified")||"{}");
-    const today=new Date(); today.setHours(0,0,0,0);
-    function parseDDMMYYYY(s){ if(!s||s.toUpperCase()==="N/A") return null; const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null; const d=new Date(+a[2],+a[1]-1,+a[0]); d.setHours(0,0,0,0); return isNaN(d.getTime())?null:d; }
-    for(const j of list){
-      const d=parseDDMMYYYY(j.deadline); if(!d) continue;
-      const diffDays=Math.round((d.getTime()-today.getTime())/86400000);
-      if(diffDays<=2 && diffDays>=0){
-        const id=j.id||esc(j.title||""); if(notified[id]) continue;
-        toast((j.title||"")+" ends in "+diffDays+" day(s).");
-        notified[id]=true;
-      }
-    }
-    localStorage.setItem("vac_deadline_notified",JSON.stringify(notified));
-  }
 })();
