@@ -13,7 +13,7 @@
         extend: {
           colors: {
             brand: '#1e40af',
-            surface: '#f3f6fb',   /* softer background */
+            surface: '#f3f6fb',
             card: '#ffffff',
             line: '#e6eaf2',
             text: '#0f172a',
@@ -24,10 +24,6 @@
           },
           boxShadow: {
             card: '0 10px 28px rgba(15, 23, 42, 0.08)',
-            soft: '0 6px 18px rgba(15, 23, 42, 0.06)',
-          },
-          borderRadius: {
-            xl2: '14px'
           }
         }
       }
@@ -50,21 +46,19 @@
         <span id="total-listings" class="ml-2 text-sub text-sm">Listings: —</span>
       </div>
       <div>
-        <button id="btn-missing" class="btn primary" type="button">Submit missing</button>
+        <button id="btn-missing" class="btn primary" type="button">Submit missing vacancy</button>
       </div>
     </div>
   </header>
 
   <!-- Content -->
   <main class="mx-auto max-w-7xl px-4 py-5">
-    <!-- Tabs -->
     <div class="flex gap-2">
       <div class="tab active" data-tab="open">Open</div>
       <div class="tab" data-tab="applied">Applied</div>
       <div class="tab" data-tab="other">Other</div>
     </div>
 
-    <!-- Panels -->
     <section id="panel-open" class="panel active mt-4">
       <div id="open-root" class="cards-grid"></div>
     </section>
@@ -76,9 +70,9 @@
     </section>
   </main>
 
-  <!-- Missing modal (center overlay) -->
+  <!-- Missing modal -->
   <div id="missing-modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-backdrop"></div>
+    <div class="modal-backdrop" data-close></div>
     <div class="modal-body">
       <div class="modal-head">
         <h3>Submit Missing Vacancy</h3>
@@ -109,9 +103,9 @@
     </div>
   </div>
 
-  <!-- Report modal (center overlay) -->
+  <!-- Report modal -->
   <div id="report-modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-backdrop"></div>
+    <div class="modal-backdrop" data-close></div>
     <div class="modal-body">
       <div class="modal-head">
         <h3>Report listing</h3>
@@ -250,37 +244,39 @@
 
       // Card
       function cardHTML(j, applied=false){
-        var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip ok">✓ trusted</span>':"";
+        var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip trust">trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
         var det=esc(j.detailLink||j.applyLink||"#");
         var appliedBadge = applied ? '<span class="badge-done">Applied</span>' : '';
         var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
         var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
-        var voteTick = vote==="right" ? '<span class="chip tick" title="Verified by user">✓</span>' : "";
         var verifiedClass = vote==="right" ? " verified" : "";
 
-        // Two clean groups: actions-left (Report / Right / Wrong), actions-right (Details / Applied / Not interested)
+        // First row: Details (left), Report (right). If verified, first row hides.
+        // Second row: Right/Wrong together, Applied/Not interested together.
         return '<article class="ua-card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
           '<div class="ua-head">'+
             '<h3 class="ua-title">'+esc(j.title||"No Title")+'</h3>'+
-            '<div class="ua-chips">'+srcRibbon+voteTick+chip+appliedBadge+'</div>'+
-          '</div>'+
+            '<div class="ua-chips">'+srcRibbon+chip+appliedBadge+'</div>'+
+          </div>'+
           '<div class="ua-body">'+
             '<div class="ua-row"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
           '</div>'+
-          '<footer class="ua-actions">'+
-            '<div class="group-left hide-on-verified">'+
+          '<footer class="ua-actions2">'+
+            '<div class="row1 '+(verifiedClass?'hide':'')+'">'+
+              '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
+              '<span class="spacer"></span>'+
               '<button class="btn danger" data-act="report">Report</button>'+
-              '<div class="btn-pair">'+
+            '</div>'+
+            <div class="row2">'+
+              '<div class="btn-pair hide-on-verified">'+
                 '<button class="btn ok" data-act="right">Right</button>'+
                 '<button class="btn warn" data-act="wrong">Wrong</button>'+
               '</div>'+
-            '</div>'+
-            '<div class="group-right">'+
-              '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
+              '<span class="spacer"></span>'+
               (applied ? '<button class="btn" data-act="exam_done">Exam done</button>'
                        : '<div class="btn-pair"><button class="btn" data-act="applied">Applied</button><button class="btn" data-act="not_interested">Not interested</button></div>')+
             '</div>'+
@@ -328,22 +324,26 @@
             const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
                   title=(this.querySelector(".ua-title")?.textContent||"").trim().slice(0,240),
                   detailsUrl=(this.querySelector("a.primary")?.href||"");
+            const row1 = this.querySelector(".row1");
             const actions = this.querySelector(".hide-on-verified");
 
             if(act==="report"){
-              qs("#reportListingId").value=id; document.getElementById("report-modal").classList.remove("hidden"); document.getElementById("report-modal").setAttribute("aria-hidden","false"); return;
+              qs("#reportListingId").value=id;
+              const modal=document.getElementById("report-modal");
+              modal.classList.remove("hidden"); modal.classList.add("flex"); modal.setAttribute("aria-hidden","false");
+              return;
             }
 
             if(act==="right"){
               const ok = await confirmBox("Confirm: mark right?");
               if(!ok) return;
               setVoteLocal(id, "right");
-              this.classList.add("verified");
+              if(row1) row1.classList.add("hide");
               if(actions) actions.style.display="none";
-              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
-              addUndo(this.querySelector(".ua-actions"), undoFn, 10);
-              LAST_ACTION = { type:"vote_right", jobId:id, title, url:detailsUrl, undo: undoFn };
-              showSnack("Saved ✓", 10, undoFn);
+              const undoFn = async ()=>{ clearVoteLocal(id); if(row1) row1.classList.remove("hide"); if(actions) actions.style.display=""; await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); };
+              addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
+              LAST_ACTION = { type:"vote_right", jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
+              showSnack("Saved ✓", 10, LAST_ACTION.undo);
               postJSON({ type:"vote", vote:"right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
               return;
             }
@@ -353,10 +353,10 @@
               if(!ok) return;
               setVoteLocal(id, "wrong");
               setLocked(b,"Marked ✖");
-              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
-              addUndo(this.querySelector(".ua-actions"), undoFn, 10);
-              LAST_ACTION = { type:"vote_wrong", jobId:id, title, url:detailsUrl, undo: undoFn };
-              showSnack("Saved ✖", 10, undoFn);
+              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); };
+              addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
+              LAST_ACTION = { type:"vote_wrong", jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
+              showSnack("Saved ✖", 10, LAST_ACTION.undo);
               postJSON({ type:"vote", vote:"wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
               return;
             }
@@ -365,10 +365,10 @@
               const ok = await confirmBox("Confirm: "+act.replace("_"," ")+"?");
               if(!ok) return;
               setUserStateLocal(id, act);
-              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await render(); };
-              addUndo(this.querySelector(".ua-actions"), undoFn, 10);
-              LAST_ACTION = { type:"state_"+act, jobId:id, title, url:detailsUrl, undo: undoFn };
-              showSnack("Saved", 10, undoFn);
+              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); };
+              addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
+              LAST_ACTION = { type:"state_"+act, jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
+              showSnack("Saved", 10, LAST_ACTION.undo);
               await postJSON({ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
               await render();
               return;
@@ -389,7 +389,7 @@
         scheduleDeadlineAlerts(list);
       }
 
-      function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.classList.add('flex'); } }
+      function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.classList.add('flex'); m.setAttribute("aria-hidden","false"); } }
       function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.classList.remove('flex'); m.setAttribute("aria-hidden","true"); } }
       document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
 
