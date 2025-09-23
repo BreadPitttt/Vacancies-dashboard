@@ -9,9 +9,6 @@
   --applied-bg:#e3f2fd; --applied-line:#bbdefb; --applied:#0b62c0;
   --other-bg:#fef3c7; --other-line:#fde68a; --other:#a16207;
 }
-/* CHANGE 1: widen container slightly so button pairs get a little more room */
-.container{max-width:1140px; margin:0 auto; padding:12px} /* was 1100px */
-
 html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0}
 
 .topbar{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 14px;display:flex;justify-content:space-between;align-items:center}
@@ -21,19 +18,18 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .pill.ok{background:#ecfdf5;border-color:#c6f6d5;color:#065f46}
 .pill.bad{background:#fef2f2;border-color:#fecaca;color:#7f1d1d}
 
-/* Tabs */
+.container{max-width:1140px;margin:0 auto;padding:12px}
+
 .tabs{display:flex;gap:10px;border-bottom:1px solid var(--line);margin:10px 0 16px}
 .tab{padding:8px 12px;border-radius:8px 8px 0 0;cursor:pointer;color:#1e3a8a}
 .tab.active{background:var(--primary-bg);border:1px solid var(--primary-line);border-bottom-color:transparent;color:var(--primary)}
 .panel{display:none}
 .panel.active{display:block}
 
-/* Grid */
 .cards-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 @media(max-width:1000px){.cards-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.cards-grid{grid-template-columns:1fr}}
 
-/* Card */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.06);overflow:hidden}
 .card-head{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px dashed var(--line)}
 .title{font-size:15px;font-weight:600;margin-right:auto}
@@ -42,7 +38,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .rowline .muted{color:var(--muted)}
 .rowline:last-child{border-bottom:none}
 
-/* Action rows: fixed two-column grid — no wrap, no drift */
+/* Fixed two-column action rows */
 .actions-row{border-top:1px dashed var(--line);padding:10px 12px}
 .actions-row.row1{display:grid;grid-template-columns:1fr 1fr;align-items:center}
 .actions-row.row1 .left{justify-self:start}
@@ -50,22 +46,22 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:8px}
 .group{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
 
-/* CHANGE 2: allow both buttons to fit via smaller font + lower min-width and controlled shrink */
+/* Fit both buttons on one line on all cards, remain aligned after clicks */
 .actions-row .btn{
-  min-width:92px;        /* was 106 -> 96; now 92 for tighter fit */
+  min-width:92px;        /* tighter fit */
   max-width:140px;
-  flex:0 1 auto;
-  font-size:12px;        /* was 13px; slight reduction */
-  padding:7px 10px;      /* slightly tighter padding to match size */
+  flex:0 1 auto;         /* allow controlled shrink */
+  font-size:12px;        /* slightly smaller for fit */
+  padding:7px 10px;      /* balanced height */
 }
 
 /* Chips and badges */
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
 .chip.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 .badge-done{padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
-.trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)} /* green, no tick */
+.trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 
-/* Buttons (base) */
+/* Base button skins */
 .btn{border-radius:10px;background:var(--btn);border:1px solid var(--btn-line);color:var(--text);cursor:pointer}
 .btn.primary{background:var(--primary-bg);border-color:var(--primary-line);color:var(--primary)}
 .btn.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
@@ -77,7 +73,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.tiny{padding:6px 8px;font-size:12px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
-/* Preserve alignment after Right */
+/* Preserve left column width after Right to keep alignment locked */
 .verified .row2 .group.vote{visibility:hidden}
 
 /* Modal */
@@ -93,7 +89,6 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .hidden{display:none}
 .empty{border:1px dashed var(--line);border-radius:12px;background:#fff;padding:14px;color:var(--muted)}
 
-/* Snackbar and toast */
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0f172a;color:#e9eef9;border:1px solid #1f2740;border-radius:10px;padding:8px 12px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:30}
 #confirm{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:25}
 #confirm .box{width:min(360px,92vw);background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;color:var(--text)}
