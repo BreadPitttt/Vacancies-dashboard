@@ -1,20 +1,26 @@
-// app.js v2025-09-24-stable-align-modal2 — hardened modal open/submit, minimal changes
+// app.js v2025-09-24-final — alignment intact + reliable Report/Submit modals, no other logic changed
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
+
   const qs=(s,r)=>(r||document).querySelector(s);
   const qsa=(s,r)=>Array.from((r||document).querySelectorAll(s));
   const esc=(s)=>(s==null?"":String(s)).replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]));
   const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s : "N/A";
-  const bust=(p)=>p+(p.includes("?")?"&":"?")+"t="+Date.now();
   const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1600); };
 
-  // State
+  const bust=(p)=>p+(p.includes("?")?"&":"?")+"t="+Date.now();
+
+  // Tabs
+  document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return; qsa(".tab").forEach(x=>x.classList.toggle("active",x===t)); qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab)); });
+
+  // Self-learning state
   let USER_STATE={}, USER_VOTES={};
   async function loadUserStateServer(){ try{ const r=await fetch(bust("user_state.json"),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
   function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({},USER_STATE,j);}catch{} }
   function setUserStateLocal(id,a){ if(!id) return; if(a==="undo") delete USER_STATE[id]; else USER_STATE[id]={action:a,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{} }
   function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
   function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
+  function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
   // Outbox
   let OUTBOX=(function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; }})();
@@ -22,14 +28,14 @@
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
   async function postJSON(payload){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); if(!r.ok) throw new Error("net"); }catch{ OUTBOX.push(payload); saveOutbox(); setTimeout(flushOutbox,1500); } return true; }
 
-  // Status
+  // Status header
   async function renderStatus(){
     try{
       const r=await fetch(bust("health.json"),{cache:"no-store"}); if(!r.ok) throw 0;
       const h=await r.json();
       qs("#health-pill").textContent=h.ok?"Health: OK":"Health: Not OK";
       qs("#health-pill").className="pill "+(h.ok?"ok":"bad");
-      qs("#last-updated").textContent="Last updated: "+(h.lastUpdated? new Date(h.lastUpdated).toLocaleString():"—");
+      qs("#last-updated").textContent="Last updated: "+(h.lastUpdated? new Date(h.lastUpdated).toLocaleString() : "—");
       qs("#total-listings").textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
     }catch{
       qs("#health-pill").textContent="Health: Unknown";
@@ -42,7 +48,9 @@
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
 
   function cardHTML(j, applied=false){
-    const src=(j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
+    const src=(j.source||"").toLowerCase()==="official"
+      ? '<span class="chip" title="Official source">Official</span>'
+      : '<span class="chip" title="From aggregator">Agg</span>';
     const d=j.daysLeft!=null?j.daysLeft:"—";
     const det=esc(j.detailLink||j.applyLink||"#");
     const lid=j.id||"";
@@ -54,33 +62,45 @@
 
     return [
       '<article class="card', (applied?' applied':''), verified, '" data-id="', esc(lid), '">',
-      '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, tick, trust, appliedBadge, '</header>',
-      '<div class="card-body">',
-      '<div class="rowline"><span class="muted">Organization</span><span>', esc(j.organization||"N/A"), '</span></div>',
-      '<div class="rowline"><span class="muted">Qualification</span><span>', esc(j.qualificationLevel||"N/A"), '</span></div>',
-      '<div class="rowline"><span class="muted">Domicile</span><span>', esc(j.domicile||"All India"), '</span></div>',
-      '<div class="rowline"><span class="muted">Last date</span><span>', esc(fmtDate(j.deadline)), ' <span class="muted">(', d, ' days)</span></span></div>',
-      '</div>',
-      '<div class="actions-row row1">',
-      '<div class="left"><a class="btn primary" href="', det, '" target="_blank" rel="noopener">Details</a></div>',
-      '<div class="right"><button class="btn danger" data-act="report">Report</button></div>',
-      '</div>',
-      '<div class="actions-row row2">',
-      '<div class="group vote"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div>',
-      '<div class="group interest">', (applied?'<button class="btn applied" data-act="exam_done">Exam done</button>':'<button class="btn applied" data-act="applied">Applied</button><button class="btn other" data-act="not_interested">Not interested</button>'), '</div>',
-      '</div>',
+        '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, tick, trust, appliedBadge, '</header>',
+        '<div class="card-body">',
+          '<div class="rowline"><span class="muted">Organization</span><span>', esc(j.organization||"N/A"), '</span></div>',
+          '<div class="rowline"><span class="muted">Qualification</span><span>', esc(j.qualificationLevel||"N/A"), '</span></div>',
+          '<div class="rowline"><span class="muted">Domicile</span><span>', esc(j.domicile||"All India"), '</span></div>',
+          '<div class="rowline"><span class="muted">Last date</span><span>', esc(fmtDate(j.deadline)), ' <span class="muted">(', d, ' days)</span></span></div>',
+        '</div>',
+        '<div class="actions-row row1">',
+          '<div class="left"><a class="btn primary" href="', det, '" target="_blank" rel="noopener">Details</a></div>',
+          '<div class="right"><button class="btn danger" data-act="report">Report</button></div>',
+        '</div>',
+        '<div class="actions-row row2">',
+          '<div class="group vote">',
+            '<button class="btn ok" data-act="right">Right</button>',
+            '<button class="btn warn" data-act="wrong">Wrong</button>',
+          '</div>',
+          '<div class="group interest">',
+            applied
+              ? '<button class="btn applied" data-act="exam_done">Exam done</button>'
+              : '<button class="btn applied" data-act="applied">Applied</button><button class="btn other" data-act="not_interested">Not interested</button>',
+          '</div>',
+        '</div>',
       '</article>'
     ].join('');
   }
 
   function sortByDeadline(list){
-    const parse=(s)=>{ if(!s||s.toUpperCase()==="N/A") return null; const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null; const ms=Date.UTC(+a[2],+a[1]-1,+a[0]); return isNaN(ms)?null:ms; };
-    return list.slice().sort((a,b)=>{ const da=parse(a.deadline),db=parse(b.deadline); if(da===null&&db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da-db; });
+    const parse=(s)=>{ if(!s||s.toUpperCase()==="N/A") return null;
+      const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null;
+      const ms=Date.UTC(+a[2],+a[1]-1,+a[0]); return isNaN(ms)?null:ms; };
+    return list.slice().sort((a,b)=>{ const da=parse(a.deadline),db=parse(b.deadline);
+      if(da===null&&db===null) return (a.title||"").localeCompare(b.title||"");
+      if(da===null) return 1; if(db===null) return -1; return da-db; });
   }
 
   let TOKEN=0;
   async function render(){
     const my=++TOKEN;
+
     await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); await flushOutbox();
 
     let data=null;
@@ -113,10 +133,9 @@
       const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
       const card=wrap.firstElementChild;
 
-      // Delegated click with hard stops so modals always open
       card.addEventListener("click", async (e)=>{
         const btn=e.target.closest("[data-act]"); if(!btn) return;
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault();
         const act=btn.getAttribute("data-act"), id=card.getAttribute("data-id");
         const detailsUrl=(card.querySelector(".row1 .left a")?.href||"");
 
@@ -126,13 +145,27 @@
           m.classList.remove("hidden"); m.setAttribute("aria-hidden","false");
           return;
         }
-        if(act==="right"){ setVoteLocal(id,"right"); card.classList.add("verified"); postJSON({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()}); return; }
-        if(act==="wrong"){ setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled"); postJSON({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()}); return; }
-        if(act==="applied"||act==="not_interested"){ setUserStateLocal(id,act); postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}}); await render(); return; }
+        if(act==="right"){
+          setVoteLocal(id,"right"); card.classList.add("verified");
+          postJSON({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
+          return;
+        }
+        if(act==="wrong"){
+          setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled");
+          postJSON({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
+          return;
+        }
+        if(act==="applied"||act==="not_interested"){
+          setUserStateLocal(id,act);
+          postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}});
+          await render(); return;
+        }
         if(act==="exam_done"){ btn.textContent="Done ✓"; btn.classList.add("disabled"); return; }
       });
 
-      if(applied) fApp.appendChild(card); else if(idsOther.has(job.id)) fOther.appendChild(card); else fOpen.appendChild(card);
+      if(applied) fApp.appendChild(card);
+      else if(idsOther.has(job.id)) fOther.appendChild(card);
+      else fOpen.appendChild(card);
     }
 
     rootOpen.replaceChildren(fOpen);
@@ -140,33 +173,23 @@
     rootOther.replaceChildren(fOther);
   }
 
-  // Global safety-net: open report modal even if per-card listener is missed
-  document.addEventListener("click",(e)=>{
-    const btn=e.target.closest && e.target.closest('[data-act="report"]');
-    if(!btn) return;
-    e.preventDefault(); e.stopPropagation();
-    const card=btn.closest(".card"); if(!card) return;
-    const id=card.getAttribute("data-id")||"";
-    const m=qs("#report-modal"); if(!m) return;
-    qs("#reportListingId").value=id;
-    m.classList.remove("hidden"); m.setAttribute("aria-hidden","false");
-  });
-
+  // Modal helpers
   function openModal(sel){ const m=qs(sel); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
   function closeModal(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
 
-  // Close buttons and overlay
+  // Close buttons + overlay close
   document.addEventListener("click",(e)=>{
     if(e.target && e.target.hasAttribute("data-close")){ e.preventDefault(); closeModal(e.target); }
-    if(e.target && e.target.classList && e.target.classList.contains("modal")){ e.preventDefault(); e.target.classList.add("hidden"); e.target.setAttribute("aria-hidden","true"); }
+    if(e.target && e.target.classList.contains("modal")){ e.preventDefault(); e.target.classList.add("hidden"); e.target.setAttribute("aria-hidden","true"); }
   });
 
   document.addEventListener("DOMContentLoaded", async ()=>{
     await renderStatus(); await render();
+
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); openModal("#missing-modal"); });
 
     qs("#reportForm")?.addEventListener("submit", async (e)=>{
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
       const id=qs("#reportListingId").value.trim();
       const rc=document.getElementById("reportReason").value||"";
       const ev=document.getElementById("reportEvidenceUrl")?.value?.trim()||"";
@@ -179,7 +202,7 @@
 
     const SUBMIT_LOCK=new Set();
     qs("#missingForm")?.addEventListener("submit", async (e)=>{
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
       const title=document.getElementById("missingTitle").value.trim();
       const url=document.getElementById("missingUrl").value.trim();
       const site=document.getElementById("missingSite").value.trim();
