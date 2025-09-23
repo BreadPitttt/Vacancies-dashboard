@@ -180,36 +180,40 @@
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
       function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
-      // Persistent client-side stores (never reset on render) [Sticky across refresh and runs]
-      var USER_STATE = {}; // {jobId:{action:'applied'|'not_interested'|'undo', ts:ISO}}
-      var USER_VOTES = {}; // {jobId:{vote:'right'|'wrong', ts:ISO}}
-      var EXAM_DONE = {};  // {jobId: ISO} auto-expires 2 days
+      // Persistent client-side stores
+      var USER_STATE = {};   // applied / not_interested
+      var USER_VOTES = {};   // right / wrong
+      var EXAM_DONE = {};    // exam done (local-only 2d)
 
-      // Load once per session
-      function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
-      function saveVotesLocal(){ try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
-      function setVoteLocal(jobId, vote){ USER_VOTES[jobId]={vote, ts:new Date().toISOString()}; saveVotesLocal(); }
-      function clearVoteLocal(jobId){ delete USER_VOTES[jobId]; saveVotesLocal(); }
+      // Load/save helpers
+      function L(k, d){ try{ return JSON.parse(localStorage.getItem(k)||JSON.stringify(d)); }catch{ return d; } }
+      function S(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+      function loadAll(){ USER_STATE=L("vac_user_state",{}); USER_VOTES=L("vac_user_votes",{}); EXAM_DONE=L("vac_exam_done",{}); }
+      function saveState(){ S("vac_user_state", USER_STATE); }
+      function saveVotes(){ S("vac_user_votes", USER_VOTES); }
+      function saveExam(){ S("vac_exam_done", EXAM_DONE); }
+      function purgeExam(){ var now=Date.now(), ch=false; Object.keys(EXAM_DONE).forEach(id=>{ if(now-Date.parse(EXAM_DONE[id])>172800000){ delete EXAM_DONE[id]; ch=true; } }); if(ch) saveExam(); }
 
-      function loadUserStateLocal(){ try{ USER_STATE=JSON.parse(localStorage.getItem("vac_user_state")||"{}")||{}; }catch{ USER_STATE={}; } }
-      function saveUserStateLocal(){ try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{} }
-      function setUserStateLocal(jobId, action){ if(!jobId) return; if(action==="undo") delete USER_STATE[jobId]; else USER_STATE[jobId]={action, ts:new Date().toISOString()}; saveUserStateLocal(); }
-
-      function loadExamDone(){ try{ EXAM_DONE = JSON.parse(localStorage.getItem("vac_exam_done")||"{}")||{}; }catch{ EXAM_DONE={}; } }
-      function saveExamDone(){ try{ localStorage.setItem("vac_exam_done", JSON.stringify(EXAM_DONE)); }catch{} }
-      function purgeOldExamDone(){
-        var now = Date.now(), changed=false;
-        Object.keys(EXAM_DONE).forEach(id=>{
-          if(now - Date.parse(EXAM_DONE[id]) > 2*24*60*60*1000){ delete EXAM_DONE[id]; changed=true; }
-        });
-        if(changed) saveExamDone();
+      // Robust POST with retry queue
+      var QUEUE = L("vac_outbox", []);
+      function saveQueue(){ S("vac_outbox", QUEUE); }
+      async function flushQueue(){
+        if(!QUEUE.length) return;
+        var rest=[];
+        for(const payload of QUEUE){
+          try{ const r=await fetch(ENDPOINT, {method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(payload)}); if(!r.ok) rest.push(payload); }
+          catch{ rest.push(payload); }
+        }
+        QUEUE=rest; saveQueue();
       }
-
       async function postJSON(payload){
         try{
-          var res = await fetch(ENDPOINT, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
-          return res.ok;
-        }catch(e){ return false; }
+          const r=await fetch(ENDPOINT, {method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload)});
+          if(!r.ok) throw new Error("net");
+        }catch{
+          QUEUE.push(payload); saveQueue();
+          setTimeout(flushQueue, 2000);
+        }
       }
 
       async function renderStatus(){
@@ -234,18 +238,15 @@
         u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
       }
 
-      function postsValue(j){
-        return j.numberOfPosts ?? j.posts ?? j.vacancies ?? "N/A";
-      }
+      function postsValue(j){ return j.numberOfPosts ?? j.posts ?? j.vacancies ?? "N/A"; }
 
       function cardHTML(j, applied=false){
         var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip trust big">trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
         var det=esc(j.detailLink||j.applyLink||"#");
         var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip big" title="Official source">Official</span>' : '<span class="chip big" title="From aggregator">Agg</span>';
-        var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
-        var isExamDone = !!EXAM_DONE[lid];
-        var showVotePair = !(applied || isExamDone); // hide on applied or exam done
+        var lid=j.id||"", isExamDone = !!EXAM_DONE[lid];
+        var showVotePair = !(applied || isExamDone);
 
         return '<article class="ua-card'+(applied?' applied':'')+'" data-id="'+esc(lid)+'">'+
           '<div class="ua-head"><h3 class="ua-title">'+esc(j.title||"No Title")+'</h3><div class="ua-chips">'+srcRibbon+chip+'</div></div>'+
@@ -261,14 +262,14 @@
             '<button class="btn danger" data-act="report">Report</button>'+
           '</div>'+
           '<footer class="ua-actions2">'+
-              (isExamDone ? 
-                '<div class="exam-row"><span class="exam-badge">Exam over</span><button class="btn ghost tiny" data-act="exam_clear">Clear</button></div>' : 
-                '<div class="row2">'+
-                  (showVotePair? '<div class="btn-pair"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div>' : '<span></span>')+
-                  '<span class="spacer"></span>'+
-                  (applied ? '<button class="btn applied-pill" data-act="exam_done">Exam done</button>'
-                           : '<div class="btn-pair"><button class="btn applied-pill" data-act="applied">Applied</button><button class="btn neutral-pill" data-act="not_interested">Not interested</button></div>')+
-                '</div>')+
+            (isExamDone ? 
+              '<div class="exam-row"><span class="exam-badge">Exam over</span><button class="btn ghost tiny" data-act="exam_clear">Clear</button></div>' : 
+              '<div class="row2">'+
+                (showVotePair? '<div class="btn-pair"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div>' : '<span></span>')+
+                '<span class="spacer"></span>'+
+                (applied ? '<button class="btn applied-pill" data-act="exam_done">Exam done</button>'
+                         : '<div class="btn-pair"><button class="btn applied-pill" data-act="applied">Applied</button><button class="btn neutral-pill" data-act="not_interested">Not interested</button></div>')+
+              '</div>')+
           '</footer>'+
         '</article>';
       }
@@ -281,21 +282,16 @@
       async function render(){
         var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
         rootOpen.innerHTML=rootApp.innerHTML=rootOther.innerHTML="";
+        loadAll(); purgeExam(); await flushQueue();  // ensure outbox flushed
 
-        // Load persistent local stores first
-        loadVotesLocal(); loadUserStateLocal(); loadExamDone(); purgeOldExamDone();
-
-        // Fetch fresh data
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
         var list = sortByDeadline(Array.isArray(data.jobListings)? data.jobListings : []);
         var sections = data.sections || {};
         qs("#total-listings").textContent = "Listings: " + list.length;
 
-        // Start from REMOTE sections, then re-apply LOCAL overrides last
+        // Start with server sections, then overlay local sticky state (never overwrite local)
         var idsApplied = new Set(sections.applied||[]);
         var idsOther = new Set(sections.other||[]);
-
-        // Merge user local state regardless of server sections (make sticky)
         Object.entries(USER_STATE).forEach(([jid, s])=>{
           if(!s || !s.action) return;
           if(s.action==="applied"){ idsApplied.add(jid); idsOther.delete(jid); }
@@ -319,6 +315,8 @@
                   title=(this.querySelector(".ua-title")?.textContent||"").trim().slice(0,240),
                   detailsUrl=(this.querySelector("a.primary")?.href||"");
 
+            const rerender = async ()=>{ await render(); };
+
             if(act==="report"){
               qs("#reportListingId").value=id;
               const modal=document.getElementById("report-modal");
@@ -327,43 +325,35 @@
             }
 
             if(act==="right"){
-              setVoteLocal(id, "right");
-              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
-              addUndo(this.querySelector(".ua-actions2"), undoFn, 10);
-              showSnack("Saved ✓", 10, undoFn);
-              postJSON({ type:"vote", vote:"right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() });
-              await render(); return;
+              USER_VOTES[id]={vote:"right", ts:new Date().toISOString()}; saveVotes();
+              addUndo(this.querySelector(".ua-actions2"), async ()=>{ delete USER_VOTES[id]; saveVotes(); await postJSON({ type:"vote", vote:"undo_right", jobId:id, title, url:detailsUrl, ts:new Date().toISOString() }); await rerender(); }, 10);
+              postJSON({ type:"vote", vote:"right", jobId:id, title, url:detailsUrl, ts:new Date().toISOString() });
+              showSnack("Saved ✓", 10, async()=>{}); await rerender(); return;
             }
 
             if(act==="wrong"){
-              setVoteLocal(id, "wrong");
-              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
-              addUndo(this.querySelector(".ua-actions2"), undoFn, 10);
-              showSnack("Saved ✖", 10, undoFn);
-              postJSON({ type:"vote", vote:"wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() });
-              await render(); return;
+              USER_VOTES[id]={vote:"wrong", ts:new Date().toISOString()}; saveVotes();
+              addUndo(this.querySelector(".ua-actions2"), async ()=>{ delete USER_VOTES[id]; saveVotes(); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title, url:detailsUrl, ts:new Date().toISOString() }); await rerender(); }, 10);
+              postJSON({ type:"vote", vote:"wrong", jobId:id, title, url:detailsUrl, ts:new Date().toISOString() });
+              showSnack("Saved ✖", 10, async()=>{}); await rerender(); return;
             }
 
             if(act==="applied"){
-              setUserStateLocal(id, "applied");
-              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await render(); };
-              addUndo(this.querySelector(".ua-actions2"), undoFn, 10);
-              showSnack("Saved", 10, undoFn);
+              USER_STATE[id]={action:"applied", ts:new Date().toISOString()}; saveState();
+              addUndo(this.querySelector(".ua-actions2"), async ()=>{ delete USER_STATE[id]; saveState(); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await rerender(); }, 10);
               postJSON({ type:"state", payload:{ jobId:id, action:"applied", ts:new Date().toISOString() } });
-              await render(); return;
+              showSnack("Saved", 10, async()=>{}); await rerender(); return;
             }
 
             if(act==="not_interested"){
-              setUserStateLocal(id, "not_interested");
-              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await render(); };
-              addUndo(this.querySelector(".ua-actions2"), undoFn, 10);
-              showSnack("Saved", 10, undoFn);
+              USER_STATE[id]={action:"not_interested", ts:new Date().toISOString()}; saveState();
+              addUndo(this.querySelector(".ua-actions2"), async ()=>{ delete USER_STATE[id]; saveState(); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await rerender(); }, 10);
               postJSON({ type:"state", payload:{ jobId:id, action:"not_interested", ts:new Date().toISOString() } });
-              await render(); return;
+              showSnack("Saved", 10, async()=>{}); await rerender(); return;
             }
 
-            if(act==="exam_done"){ EXAM_DONE[id]=new Date().toISOString(); saveExamDone(); await render(); return; }
-            if(act==="exam_clear"){ delete EXAM_DONE[id]; saveExamDone(); await render(); return; }
+            if(act==="exam_done"){ EXAM_DONE[id]=new Date().toISOString(); saveExam(); await rerender(); return; }
+            if(act==="exam_clear"){ delete EXAM_DONE[id]; saveExam(); await rerender(); return; }
           });
 
           if(isApplied) fApp.appendChild(card);
@@ -382,6 +372,18 @@
       function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.classList.remove('flex'); m.setAttribute("aria-hidden","true"); } }
       document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
 
+      // Snack utilities
+      var LAST_ACTION = null, SNACK_TIMER=null, SNACK_LEFT=0;
+      function showSnack(text, seconds, undoFn){
+        var s=qs("#snackbar"); qs("#snack-text").textContent=text; SNACK_LEFT=seconds;
+        qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; s.style.display="flex";
+        clearInterval(SNACK_TIMER);
+        SNACK_TIMER=setInterval(()=>{ SNACK_LEFT--; if(SNACK_LEFT<=0){ hideSnack(); } else { qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; } }, 1000);
+        qs("#snack-undo").onclick = async function(){ hideSnack(); await undoFn(); };
+      }
+      function hideSnack(){ var s=qs("#snackbar"); s.style.display="none"; clearInterval(SNACK_TIMER); SNACK_TIMER=null; }
+
+      // Deadline alerts
       async function scheduleDeadlineAlerts(list){
         try{ if(Notification && Notification.permission==="default"){ await Notification.requestPermission(); } }catch(e){}
         const notified = JSON.parse(localStorage.getItem("vac_deadline_notified")||"{}");
@@ -413,8 +415,8 @@
           var note = document.getElementById("reportNote").value.trim();
           var posts = document.getElementById("reportPosts").value.trim();
           if(!id || !rc) return toast("Please select a reason.");
-          var ok = await postJSON({ type:"report", jobId:id, reasonCode:rc, evidenceUrl:ev, note:note, posts:posts||null, ts:new Date().toISOString() });
-          if(ok){ closeModal(e.target); e.target.reset(); toast("Reported."); }
+          await postJSON({ type:"report", jobId:id, reasonCode:rc, evidenceUrl:ev, note:note, posts:posts||null, ts:new Date().toISOString() });
+          closeModal(e.target); e.target.reset(); toast("Reported.");
         });
 
         var SUBMIT_LOCK = new Set();
@@ -430,9 +432,8 @@
           var key = url.replace(/[?#].*$/,"").toLowerCase();
           if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
           SUBMIT_LOCK.add(key);
-          var ok = await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, posts:posts||null, note:note, ts:new Date().toISOString() });
-          if(ok){ closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh."); }
-          else { toast("Network problem. Please try again."); SUBMIT_LOCK.delete(key); }
+          await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, posts:posts||null, note:note, ts:new Date().toISOString() });
+          closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh.");
         });
       });
     })();
