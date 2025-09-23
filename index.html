@@ -5,7 +5,6 @@
   <title>General Vacancy Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
-  <!-- Tailwind (TailAdmin style) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -14,17 +13,21 @@
         extend: {
           colors: {
             brand: '#1e40af',
-            surface: '#f7f9fc',
+            surface: '#f3f6fb',   /* softer background */
             card: '#ffffff',
             line: '#e6eaf2',
             text: '#0f172a',
             sub: '#64748b',
             ok: '#16a34a',
-            warn: '#f59e0b',
-            danger: '#ef4444',
+            warn: '#b45309',
+            danger: '#b91c1c',
           },
           boxShadow: {
-            card: '0 6px 18px rgba(15, 23, 42, 0.06)',
+            card: '0 10px 28px rgba(15, 23, 42, 0.08)',
+            soft: '0 6px 18px rgba(15, 23, 42, 0.06)',
+          },
+          borderRadius: {
+            xl2: '14px'
           }
         }
       }
@@ -47,7 +50,7 @@
         <span id="total-listings" class="ml-2 text-sub text-sm">Listings: —</span>
       </div>
       <div>
-        <button id="btn-missing" class="btn ghost" type="button">Submit missing</button>
+        <button id="btn-missing" class="btn primary" type="button">Submit missing</button>
       </div>
     </div>
   </header>
@@ -55,7 +58,6 @@
   <!-- Content -->
   <main class="mx-auto max-w-7xl px-4 py-5">
     <!-- Tabs -->
-    <div class="tabs"></div>
     <div class="flex gap-2">
       <div class="tab active" data-tab="open">Open</div>
       <div class="tab" data-tab="applied">Applied</div>
@@ -74,8 +76,9 @@
     </section>
   </main>
 
-  <!-- Missing modal -->
+  <!-- Missing modal (center overlay) -->
   <div id="missing-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop"></div>
     <div class="modal-body">
       <div class="modal-head">
         <h3>Submit Missing Vacancy</h3>
@@ -91,7 +94,7 @@
           </div>
           <div>
             <label>Official website (optional)</label>
-            <input id="missingSite" placeholder="https://...gov.in/ or portal home" />
+            <input id="missingSite" placeholder="https://…gov.in/ or portal home" />
           </div>
         </div>
         <label>Last date (DD-MM-YYYY or N/A)</label>
@@ -106,8 +109,9 @@
     </div>
   </div>
 
-  <!-- Report modal -->
+  <!-- Report modal (center overlay) -->
   <div id="report-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop"></div>
     <div class="modal-body">
       <div class="modal-head">
         <h3>Report listing</h3>
@@ -160,7 +164,6 @@
   </div>
   <div id="toast"></div>
 
-  <!-- App logic: identical to your last file; only cardHTML changed to use TailAdmin classes -->
   <script>
     (function(){
       var ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
@@ -172,7 +175,7 @@
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
       function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
-      // Global snackbar
+      // Snackbar
       var LAST_ACTION = null;
       var SNACK_TIMER = null, SNACK_LEFT = 0;
       function showSnack(text, seconds, undoFn){
@@ -245,7 +248,7 @@
         u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
       }
 
-      // Card layout (light, aligned chips)
+      // Card
       function cardHTML(j, applied=false){
         var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip ok">✓ trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
@@ -256,6 +259,7 @@
         var voteTick = vote==="right" ? '<span class="chip tick" title="Verified by user">✓</span>' : "";
         var verifiedClass = vote==="right" ? " verified" : "";
 
+        // Two clean groups: actions-left (Report / Right / Wrong), actions-right (Details / Applied / Not interested)
         return '<article class="ua-card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
           '<div class="ua-head">'+
             '<h3 class="ua-title">'+esc(j.title||"No Title")+'</h3>'+
@@ -267,16 +271,19 @@
             '<div class="ua-row"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
           '</div>'+
-          '<footer class="ua-actions card-actions">'+
-            '<span class="hide-on-verified">'+
+          '<footer class="ua-actions">'+
+            '<div class="group-left hide-on-verified">'+
               '<button class="btn danger" data-act="report">Report</button>'+
-              '<button class="btn ok" data-act="right">Right</button>'+
-              '<button class="btn warn" data-act="wrong">Wrong</button>'+
-            '</span>'+
-            '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
-            '<span class="spacer"></span>'+
-            (applied ? '<button class="btn" data-act="exam_done">Exam done</button>'
-                     : '<button class="btn" data-act="applied">Applied</button><button class="btn" data-act="not_interested">Not interested</button>')+
+              '<div class="btn-pair">'+
+                '<button class="btn ok" data-act="right">Right</button>'+
+                '<button class="btn warn" data-act="wrong">Wrong</button>'+
+              '</div>'+
+            '</div>'+
+            '<div class="group-right">'+
+              '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
+              (applied ? '<button class="btn" data-act="exam_done">Exam done</button>'
+                       : '<div class="btn-pair"><button class="btn" data-act="applied">Applied</button><button class="btn" data-act="not_interested">Not interested</button></div>')+
+            '</div>'+
           '</footer>'+
         '</article>';
       }
@@ -334,7 +341,7 @@
               this.classList.add("verified");
               if(actions) actions.style.display="none";
               const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
-              addUndo(this.querySelector(".card-actions"), undoFn, 10);
+              addUndo(this.querySelector(".ua-actions"), undoFn, 10);
               LAST_ACTION = { type:"vote_right", jobId:id, title, url:detailsUrl, undo: undoFn };
               showSnack("Saved ✓", 10, undoFn);
               postJSON({ type:"vote", vote:"right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
@@ -347,7 +354,7 @@
               setVoteLocal(id, "wrong");
               setLocked(b,"Marked ✖");
               const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
-              addUndo(this.querySelector(".card-actions"), undoFn, 10);
+              addUndo(this.querySelector(".ua-actions"), undoFn, 10);
               LAST_ACTION = { type:"vote_wrong", jobId:id, title, url:detailsUrl, undo: undoFn };
               showSnack("Saved ✖", 10, undoFn);
               postJSON({ type:"vote", vote:"wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
@@ -359,7 +366,7 @@
               if(!ok) return;
               setUserStateLocal(id, act);
               const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await render(); };
-              addUndo(this.querySelector(".card-actions"), undoFn, 10);
+              addUndo(this.querySelector(".ua-actions"), undoFn, 10);
               LAST_ACTION = { type:"state_"+act, jobId:id, title, url:detailsUrl, undo: undoFn };
               showSnack("Saved", 10, undoFn);
               await postJSON({ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
@@ -382,32 +389,22 @@
         scheduleDeadlineAlerts(list);
       }
 
-      function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
-      function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
+      function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.classList.add('flex'); } }
+      function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.classList.remove('flex'); m.setAttribute("aria-hidden","true"); } }
       document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
 
-      // Deadline alerts (local)
+      // Deadline alerts
       async function scheduleDeadlineAlerts(list){
-        try{
-          if(Notification && Notification.permission==="default"){ await Notification.requestPermission(); }
-        }catch(e){}
+        try{ if(Notification && Notification.permission==="default"){ await Notification.requestPermission(); } }catch(e){}
         const notified = JSON.parse(localStorage.getItem("vac_deadline_notified")||"{}");
         const today = new Date(); today.setHours(0,0,0,0);
-        function parseDDMMYYYY(s){
-          if(!s||s.toUpperCase()==="N/A") return null;
-          const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null;
-          const d=new Date(+a[2], +a[1]-1, +a[0]); d.setHours(0,0,0,0); return isNaN(d.getTime())?null:d;
-        }
+        function parseDDMMYYYY(s){ if(!s||s.toUpperCase()==="N/A") return null; const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null; const d=new Date(+a[2], +a[1]-1, +a[0]); d.setHours(0,0,0,0); return isNaN(d.getTime())?null:d; }
         for(const j of list){
           const d=parseDDMMYYYY(j.deadline); if(!d) continue;
           const diffDays = Math.round((d.getTime()-today.getTime())/86400000);
           if(diffDays<=2 && diffDays>=0){
             const id=j.id||esc(j.title||""); if(notified[id]) continue;
-            try{
-              if(Notification && Notification.permission==="granted"){
-                new Notification("Vacancy closing soon", { body: (j.title||"") + " ends in "+diffDays+" day(s)." });
-              } else { toast((j.title||"") + " ends in "+diffDays+" day(s)."); }
-            }catch(e){ toast((j.title||"") + " ends in "+diffDays+" day(s)."); }
+            try{ if(Notification && Notification.permission==="granted"){ new Notification("Vacancy closing soon", { body: (j.title||"") + " ends in "+diffDays+" day(s)." }); } else { toast((j.title||"") + " ends in "+diffDays+" day(s)."); } }catch(e){ toast((j.title||"") + " ends in "+diffDays+" day(s)."); }
             notified[id]=true;
           }
         }
