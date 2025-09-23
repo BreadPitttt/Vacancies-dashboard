@@ -1,17 +1,17 @@
-// app.js v2025-09-24-2 — strict two-row actions + reliable modals + self-learning
+// app.js v2025-09-24-3 — strict alignment with grid cells, reliable modals, self-learning intact
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const bust = () => "?t=" + Date.now();
 
   const qs=(s,r)=>(r||document).querySelector(s);
-  const qsa=(s,r)=>Array.from((r||document).querySelectorAll(s));
   const esc=(s)=>(s==null?"":String(s)).replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]));
   const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s : "N/A";
-  const toast=(m)=>{const t=qs("#toast");if(!t)return alert(m);t.textContent=m;t.style.opacity="1";clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity="0",1600);};
+  const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1600);};
 
-  function activate(tab){ qsa(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===tab)); qsa(".panel").forEach(p=>p.classList.toggle("active",p.id==="panel-"+tab)); }
-  document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(t) activate(t.dataset.tab); });
+  // Tabs
+  document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return; document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===t)); document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab)); });
 
+  // State
   let USER_STATE={}, USER_VOTES={};
   async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
   function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({},USER_STATE,j);}catch{} }
@@ -20,6 +20,7 @@
   function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
+  // Outbox
   let OUTBOX=(function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; }})();
   function saveOutbox(){ try{ localStorage.setItem("vac_outbox",JSON.stringify(OUTBOX)); }catch{} }
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
@@ -58,7 +59,7 @@
         '<div class="group vote">'+
           '<button class="btn ok" data-act="right">Right</button>'+
           '<button class="btn warn" data-act="wrong">Wrong</button>'+
-        '</div>'+
+        </div>'+
         '<div class="group interest">'+
           (applied ? '<button class="btn applied" data-act="exam_done">Exam done</button>'
                    : '<button class="btn applied" data-act="applied">Applied</button><button class="btn other" data-act="not_interested">Not interested</button>')+
@@ -69,13 +70,12 @@
 
   function sortByDeadline(list){ const parse=(s)=>{ if(!s||s.toUpperCase()==="N/A") return null; const t=s.replaceAll("-","/"); const a=t.split("/"); if(a.length!==3) return null; const ms=Date.UTC(+a[2],+a[1]-1,+a[0]); return isNaN(ms)?null:ms; }; return list.slice().sort((a,b)=>{ const da=parse(a.deadline),db=parse(b.deadline); if(da===null&&db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da-db; }); }
 
-  let renderToken=0;
+  let USER_TOKEN=0;
   async function render(){
-    const myToken=++renderToken;
+    const my=++USER_TOKEN;
     await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); await flushOutbox();
-
     const data=await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
-    if(myToken!==renderToken) return;
+    if(my!==USER_TOKEN) return;
 
     const rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
     const list=sortByDeadline(Array.isArray(data.jobListings)?data.jobListings:[]);
@@ -94,16 +94,17 @@
     if(list.length===0){ rootOpen.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
 
     for(const job of list){
-      const isApplied=idsApplied.has(job.id);
-      const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,isApplied);
+      const applied=idsApplied.has(job.id);
+      const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
       const card=wrap.firstElementChild;
 
       card.addEventListener("click", async (e)=>{
         const btn=e.target.closest("[data-act]"); if(!btn) return;
         if(btn.classList.contains("disabled")) return;
-        const act=btn.getAttribute("data-act"), id=card.getAttribute("data-id"),
-              title=(card.querySelector(".title")?.textContent||"").trim().slice(0,240),
-              detailsUrl=(card.querySelector(".row1 .left a")?.href||"");
+
+        const act=btn.getAttribute("data-act"), id=card.getAttribute("data-id");
+        const title=(card.querySelector(".title")?.textContent||"").trim().slice(0,240);
+        const detailsUrl=(card.querySelector(".row1 .left a")?.href||"");
 
         if(act==="report"){
           qs("#reportListingId").value=id;
@@ -111,30 +112,39 @@
           return;
         }
         if(act==="right"){
-          setVoteLocal(id,"right"); card.classList.add("verified");
-          const undo=async()=>{ clearVoteLocal(id); await postJSON({type:"vote",vote:"undo_right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()}); await render(); };
-          addUndoInline(card.querySelector(".row2 .interest"),undo,10);
+          setVoteLocal(id,"right"); card.classList.add("verified"); // vote cell hidden but width kept via CSS
+          addUndo(card.querySelector(".row2 .interest"), async ()=>{
+            clearVoteLocal(id);
+            await postJSON({type:"vote",vote:"undo_right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
+            await render();
+          });
           postJSON({type:"vote",vote:"right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
         if(act==="wrong"){
           setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled");
-          const undo=async()=>{ clearVoteLocal(id); await postJSON({type:"vote",vote:"undo_wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()}); await render(); };
-          addUndoInline(card.querySelector(".row2 .interest"),undo,10);
+          addUndo(card.querySelector(".row2 .interest"), async ()=>{
+            clearVoteLocal(id);
+            await postJSON({type:"vote",vote:"undo_wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
+            await render();
+          });
           postJSON({type:"vote",vote:"wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
         if(act==="applied"||act==="not_interested"){
           setUserStateLocal(id,act);
-          const undo=async()=>{ setUserStateLocal(id,"undo"); await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}); await render(); };
-          addUndoInline(card.querySelector(".row2 .interest"),undo,10);
+          addUndo(card.querySelector(".row2 .interest"), async ()=>{
+            setUserStateLocal(id,"undo");
+            await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}});
+            await render();
+          });
           postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}});
           await render(); return;
         }
         if(act==="exam_done"){ btn.textContent="Done ✓"; btn.classList.add("disabled"); return; }
       });
 
-      if(isApplied) fApp.appendChild(card);
+      if(applied) fApp.appendChild(card);
       else if(idsOther.has(job.id)) fOther.appendChild(card);
       else fOpen.appendChild(card);
     }
@@ -145,12 +155,12 @@
     scheduleDeadlineAlerts(list);
   }
 
-  function addUndoInline(container,onUndo,seconds){
+  function addUndo(container,onUndo){
     const u=document.createElement("button");
-    u.className="btn ghost tiny"; u.textContent="Undo ("+seconds+"s)";
+    u.className="btn ghost tiny"; let left=10; u.textContent=`Undo (${left}s)`;
     container.appendChild(u);
-    let left=seconds; const iv=setInterval(()=>{ left--; if(left<=0){ clearInterval(iv); u.remove(); } else { u.textContent="Undo ("+left+"s)"; } },1000);
-    u.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
+    const iv=setInterval(()=>{ left--; if(left<=0){ clearInterval(iv); u.remove(); } else { u.textContent=`Undo (${left}s)`; } },1000);
+    u.addEventListener("click",(e)=>{ e.preventDefault(); clearInterval(iv); u.remove(); onUndo(); });
   }
 
   function openModal(id){ const m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
@@ -158,18 +168,18 @@
   document.addEventListener("click",(e)=>{ if(e.target && e.target.hasAttribute("data-close")) closeModal(e.target); });
 
   document.addEventListener("DOMContentLoaded", async ()=>{
-    const css=qs("#main-css"); css&&css.addEventListener("error",()=>toast("Stylesheet failed to load."));
+    qs("#main-css")?.addEventListener("error",()=>toast("Stylesheet failed to load."));
     await renderStatus(); await render();
     qs("#btn-missing")?.addEventListener("click",()=>openModal("#missing-modal"));
 
-    // Robust submits: prevent navigation
+    // Reliable submits
     qs("#reportForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
       const id=qs("#reportListingId").value.trim();
-      const rc=qs("#reportReason").value||"";
-      const ev=qs("#reportEvidenceUrl").value?.trim()||"";
-      const posts=qs("#reportPosts").value?.trim()||"";
-      const note=qs("#reportNote").value?.trim()||"";
+      const rc=document.getElementById("reportReason").value||"";
+      const ev=document.getElementById("reportEvidenceUrl")?.value?.trim()||"";
+      const posts=document.getElementById("reportPosts")?.value?.trim()||"";
+      const note=document.getElementById("reportNote")?.value?.trim()||"";
       if(!id||!rc) return toast("Please select a reason.");
       await postJSON({type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,note,ts:new Date().toISOString()});
       closeModal(e.target); e.target.reset(); toast("Reported.");
@@ -178,15 +188,14 @@
     const SUBMIT_LOCK=new Set();
     qs("#missingForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
-      const title=qs("#missingTitle").value.trim();
-      const url=qs("#missingUrl").value.trim();
-      const site=qs("#missingSite").value.trim();
-      const last=qs("#missingLastDate").value.trim();
-      const posts=qs("#missingPosts").value?.trim()||"";
-      const note=qs("#missingNote").value.trim();
+      const title=document.getElementById("missingTitle").value.trim();
+      const url=document.getElementById("missingUrl").value.trim();
+      const site=document.getElementById("missingSite").value.trim();
+      const last=document.getElementById("missingLastDate").value.trim();
+      const posts=document.getElementById("missingPosts")?.value?.trim()||"";
+      const note=document.getElementById("missingNote").value.trim();
       if(!title||!url) return toast("Post name and notification link are required.");
-      const key=url.replace(/[?#].*$/,"").toLowerCase();
-      if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
+      const key=url.replace(/[?#].*$/,"").toLowerCase(); if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
       SUBMIT_LOCK.add(key);
       await postJSON({type:"missing",title,url,officialSite:site,lastDate:last,posts:posts||null,note,ts:new Date().toISOString()});
       closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh.");
