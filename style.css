@@ -1,20 +1,43 @@
-/* Old dark UI baseline restored */
+/* Warm, blue-light friendly palette with the same UX layout */
 :root{
-  --bg:#0b1022; --panel:#0f1528; --line:#1f2740; --text:#e9eef9; --muted:#9fb3ff;
-  --chip:#141b33; --chip-line:#2a334f; --ok:#0f2a18; --ok-line:#2f6e3a; --warn:#2a1c0f; --warn-line:#6e4a2f; --danger:#2a1416; --danger-line:#6e2f3a;
-  --btn:#131a31; --btn-line:#223055; --pill:#10162c;
+  --bg:#f7f9fc;
+  --panel:#ffffff;
+  --line:#e6eaf2;
+  --text:#0f172a;
+  --muted:#64748b;
+  --chip:#eef2ff; --chip-line:#cfe0ff; --chip-text:#1e40af;
+  --ok-bg:#ecfdf5; --ok-line:#c6f6d5; --ok:#15803d;
+  --warn-bg:#fff7ed; --warn-line:#ffedd5; --warn:#b45309;
+  --danger-bg:#fef2f2; --danger-line:#fecaca; --danger:#b91c1c;
+  --btn:#ffffff; --btn-line:#e6eaf2;
+  --primary-bg:#eaf1ff; --primary-line:#cfe0ff; --primary:#1e40af;
 }
-html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;margin:0}
-.topbar{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
+html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0}
+
+/* Header */
+.topbar{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 14px;display:flex;justify-content:space-between;align-items:center}
 .brand h1{font-size:18px;margin:0 0 4px 0}
 .meta{display:flex;gap:10px;align-items:center}
-.pill{padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--pill);color:var(--muted);font-size:12px}
+.pill{padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font-size:12px}
+.pill.ok{background:#ecfdf5;border-color:#c6f6d5;color:#065f46}
+.pill.bad{background:#fef2f2;border-color:#fecaca;color:#7f1d1d}
+
 .container{max-width:1100px;margin:0 auto;padding:12px}
+
+/* Tabs */
+.tabs{display:flex;gap:10px;border-bottom:1px solid var(--line);margin:10px 0 16px}
+.tab{padding:8px 12px;border-radius:8px 8px 0 0;cursor:pointer;color:#1e3a8a}
+.tab.active{background:var(--primary-bg);border:1px solid var(--primary-line);border-bottom-color:transparent;color:var(--primary)}
+.panel{display:none}
+.panel.active{display:block}
+
+/* Grid */
 .cards-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 @media(max-width:1000px){.cards-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.cards-grid{grid-template-columns:1fr}}
 
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.25);overflow:hidden}
+/* Card */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(15,23,42,.06);overflow:hidden}
 .card-head{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px dashed var(--line)}
 .title{font-size:15px;font-weight:600;margin-right:auto}
 .card-body{padding:12px}
@@ -23,23 +46,42 @@ html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-sy
 .card-actions{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px dashed var(--line)}
 .spacer{flex:1}
 
+/* Chips and badges */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
+.chip.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.badge-done{padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
+.tick{border:1px solid var(--ok-line);background:var(--ok-bg);color:var(--ok);margin-left:6px}
+
+/* Buttons */
 .btn{padding:8px 12px;border-radius:10px;background:var(--btn);border:1px solid var(--btn-line);color:var(--text);cursor:pointer;font-size:13px}
-.btn.primary{background:#162041;border-color:#2f4373}
-.btn.ok{background:var(--ok);border-color:var(--ok-line);color:#8EE59E}
-.btn.warn{background:var(--warn);border-color:var(--warn-line);color:#ffce8a}
-.btn.danger{background:var(--danger);border-color:var(--danger-line);color:#ff99a8}
-.btn.ghost{background:transparent;border:1px dashed var(--line);color:var(--muted)}
+.btn.primary{background:var(--primary-bg);border-color:var(--primary-line);color:var(--primary)}
+.btn.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.btn.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.btn.danger{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.btn.ghost{background:#fff;border:1px dashed var(--line);color:var(--muted)}
 .btn.tiny{padding:6px 8px;font-size:12px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
-.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--text);font-size:12px}
+/* Applied UX parity: hide Right/Wrong/Report when verified/applied logic matches prior build */
+.applied .card-actions .btn:not([data-act="exam_done"]):not([data-act="undo_vote"]){display:none}
 
-.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(9,12,23,0.6);z-index:20}
-.modal .modal-body{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;width:min(640px,94vw)}
+/* Modal */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20}
+.modal .modal-body{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;width:min(640px,94vw);box-shadow:0 20px 44px rgba(15,23,42,.12)}
 .modal .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.modal .form input,.modal .form textarea,.modal .form select{width:100%;background:#0e152b;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px;margin-bottom:10px}
+.modal .form input,.modal .form textarea,.modal .form select{width:100%;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px;margin-bottom:10px}
+.icon-btn{background:#fff;color:var(--muted);border:1px dashed var(--line);padding:4px 8px;border-radius:8px;cursor:pointer}
+
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row{display:flex;gap:10px}
 .row.end{justify-content:flex-end}
 .hidden{display:none}
-.empty{border:1px dashed var(--line);border-radius:12px;background:var(--panel);padding:14px;color:var(--muted)}
+.empty{border:1px dashed var(--line);border-radius:12px;background:#fff;padding:14px;color:var(--muted)}
+
+/* Snackbar and toast */
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0f172a;color:#e9eef9;border:1px solid #1f2740;border-radius:10px;padding:8px 12px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:30}
+#confirm{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:25}
+#confirm .box{width:min(360px,92vw);background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;color:var(--text)}
+#confirm .row{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;flex-direction:row-reverse}
+#snackbar{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);background:#0f172a;color:#ffffff;border:1px solid #1f2740;border-radius:12px;padding:10px 12px;font-size:13px;display:none;align-items:center;gap:12px;z-index:35}
+#snackbar .count{color:#c7d2fe}
