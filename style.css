@@ -7,8 +7,8 @@
   --danger-bg:#fef2f2; --danger-line:#fecaca; --danger:#b91c1c;
   --btn:#ffffff; --btn-line:#e6eaf2;
   --primary-bg:#eaf1ff; --primary-line:#cfe0ff; --primary:#1e40af;
-  --applied-bg:#e3f2fd; --applied-line:#bbdefb; --applied:#0b62c0;   /* added color for Applied */
-  --other-bg:#fef3c7; --other-line:#fde68a; --other:#a16207;         /* added color for Not interested */
+  --applied-bg:#e3f2fd; --applied-line:#bbdefb; --applied:#0b62c0;
+  --other-bg:#fef3c7; --other-line:#fde68a; --other:#a16207;
 }
 html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0}
 
@@ -29,24 +29,29 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .panel.active{display:block}
 
 /* Grid */
-.cards-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.cards-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 @media(max-width:1000px){.cards-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.cards-grid{grid-template-columns:1fr}}
 
 /* Card */
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(15,23,42,.06);overflow:hidden}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.06);overflow:hidden}
 .card-head{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px dashed var(--line)}
 .title{font-size:15px;font-weight:600;margin-right:auto}
 .card-body{padding:12px}
-.rowline{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.rowline{display:grid;grid-template-columns:160px 1fr;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.rowline .muted{color:var(--muted)}
 .rowline:last-child{border-bottom:none}
 
-/* Action rows layout */
-.actions-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px dashed var(--line)}
-.actions-row.row1 .left{margin-right:auto}
+/* Two action rows with strict alignment */
+.actions-row{display:flex;align-items:center;padding:10px 12px;border-top:1px dashed var(--line)}
+.actions-row.row1{gap:10px}
+.actions-row.row1 .left{flex:1;display:flex;align-items:center}
 .actions-row.row1 .right{display:flex;gap:10px}
-.actions-row.row2{justify-content:space-between}
-.group{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.actions-row.row2{justify-content:space-between;gap:16px}
+.group{display:flex;align-items:center;gap:10px}
+
+/* Keep consistent button sizing to avoid wrap jitter */
+.actions-row .btn{min-width:88px}
 
 /* Chips and badges */
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
@@ -60,15 +65,14 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 .btn.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
 .btn.danger{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
-.btn.applied{background:var(--applied-bg);border-color:var(--applied-line);color:var(--applied)}           /* colored Applied */
-.btn.other{background:var(--other-bg);border-color:var(--other-line);color:var(--other)}                  /* colored Not interested */
+.btn.applied{background:var(--applied-bg);border-color:var(--applied-line);color:var(--applied)}
+.btn.other{background:var(--other-bg);border-color:var(--other-line);color:var(--other)}
 .btn.ghost{background:#fff;border:1px dashed var(--line);color:var(--muted)}
 .btn.tiny{padding:6px 8px;font-size:12px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
 /* Behavior parity */
-.verified .row2 .group.vote{display:none} /* hide vote group after Right */
-.applied .row2 .group:not(.exam){display:none}
+.verified .row2 .group.vote{display:none}
 
 /* Modal */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20}
