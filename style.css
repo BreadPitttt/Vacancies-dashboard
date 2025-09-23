@@ -1,4 +1,4 @@
-/* Warm, blue-light friendly palette with previous UX preserved */
+/* Warm, blue-light friendly palette */
 :root{
   --bg:#f7f9fc; --panel:#ffffff; --line:#e6eaf2; --text:#0f172a; --muted:#64748b;
   --chip:#eef2ff; --chip-line:#cfe0ff; --chip-text:#1e40af;
@@ -7,6 +7,8 @@
   --danger-bg:#fef2f2; --danger-line:#fecaca; --danger:#b91c1c;
   --btn:#ffffff; --btn-line:#e6eaf2;
   --primary-bg:#eaf1ff; --primary-line:#cfe0ff; --primary:#1e40af;
+  --applied-bg:#e3f2fd; --applied-line:#bbdefb; --applied:#0b62c0;   /* added color for Applied */
+  --other-bg:#fef3c7; --other-line:#fde68a; --other:#a16207;         /* added color for Not interested */
 }
 html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0}
 
@@ -39,17 +41,18 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .rowline{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
 .rowline:last-child{border-bottom:none}
 
-/* Action row: fixed alignment across cards */
-.card-actions{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px dashed var(--line);flex-wrap:wrap}
-.card-actions .btn{min-width:72px} /* keep Report/Right/Wrong size steady */
-.card-actions .spacer{flex:1}
+/* Action rows layout */
+.actions-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px dashed var(--line)}
+.actions-row.row1 .left{margin-right:auto}
+.actions-row.row1 .right{display:flex;gap:10px}
+.actions-row.row2{justify-content:space-between}
+.group{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
 /* Chips and badges */
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
 .chip.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 .badge-done{padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
-/* No tick on trusted per requirement */
-.trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)} /* green, no tick */
 
 /* Buttons */
 .btn{padding:8px 12px;border-radius:10px;background:var(--btn);border:1px solid var(--btn-line);color:var(--text);cursor:pointer;font-size:13px}
@@ -57,15 +60,15 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 .btn.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
 .btn.danger{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.btn.applied{background:var(--applied-bg);border-color:var(--applied-line);color:var(--applied)}           /* colored Applied */
+.btn.other{background:var(--other-bg);border-color:var(--other-line);color:var(--other)}                  /* colored Not interested */
 .btn.ghost{background:#fff;border:1px dashed var(--line);color:var(--muted)}
 .btn.tiny{padding:6px 8px;font-size:12px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
-/* Hide Report/Right/Wrong after Right verification (previous rule) */
-.verified .card-actions .hide-on-verified{display:none}
-
-/* Applied: keep only exam_done + details row visible when applied section shows */
-.applied .card-actions .btn:not([data-act="exam_done"]):not([data-act="undo_vote"]){display:none}
+/* Behavior parity */
+.verified .row2 .group.vote{display:none} /* hide vote group after Right */
+.applied .row2 .group:not(.exam){display:none}
 
 /* Modal */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20}
