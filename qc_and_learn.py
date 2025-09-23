@@ -1,4 +1,4 @@
-# qc_and_learn.py — QC + learn + better deadline extension + applied expiry
+# qc_and_learn.py — QC + learn + deadline extension + sticky user state + posts normalization
 import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
 
@@ -31,7 +31,7 @@ votes = JLOADL("votes.jsonl")
 reports = JLOADL("reports.jsonl")
 subs = JLOADL("submissions.jsonl")
 rules = JLOAD("rules.json", {"captureHints":[]})
-user_state = JLOAD("user_state.json", {})
+user_state = JLOAD("user_state.json", {})  # sticky server-side store for user actions
 
 def norm_url(u):
     try:
@@ -71,6 +71,16 @@ def adv_no(t):
     m=re.search(r"(advt|advertisement|notice)\s*(no\.?|number)?\s*[:\-]?\s*([A-Za-z0-9\/\-\._]+)", t or "", re.I)
     return m.group(3).lower() if m else ""
 
+# Posts normalization
+POSTS_PAT = re.compile(r"(\d{1,6})\s*(posts?|vacanc(?:y|ies)|seats?)", re.I)
+def parse_posts_from_text(txt):
+    if not txt: return None
+    m = POSTS_PAT.search(txt)
+    if m:
+        try: return int(m.group(1))
+        except: return None
+    return None
+
 # Split parents/updates
 parents=[j for j in jobs if not is_update_title(j.get("title"))]
 kept=[]; merged=0
@@ -86,7 +96,7 @@ for j in jobs:
         if s>score: score, best = s, p
     if best and score>=0.6:
         best.setdefault("updates", []).append({"title": j.get("title"), "link": j.get("applyLink"), "capturedAt": datetime.utcnow().isoformat()+"Z"})
-        # Improve deadline handling: take the MAX date found in title if later than current
+        # Max deadline found in title if later
         dates=[m.group(1) for m in DATE_PAT.finditer(j.get("title") or "")]
         parsed=[parse_deadline(x.replace("-","/")) for x in dates if x]
         parsed=[d for d in parsed if d]
@@ -95,13 +105,18 @@ for j in jobs:
             cur=parse_deadline(best.get("deadline"))
             if not cur or new_deadline>cur:
                 best["deadline"]=new_deadline.strftime("%d/%m/%Y")
+        # Try posts from update title
+        pcount = parse_posts_from_text(j.get("title"))
+        if pcount and not best.get("numberOfPosts"):
+            best["numberOfPosts"]=pcount
         merged+=1
     else:
         j["type"]="UPDATE"; j.setdefault("flags",{})["no_parent_found"]=True; kept.append(j)
 jobs=kept
 
-# --- Hard reports -> archive ---
+# --- Hard reports -> archive + optional posts intake ---
 hard_ids=set(); hard_urls=set(); hard_titles=set()
+report_posts={}
 for r in reports:
     if r.get("type")=="report":
         jid=(r.get("jobId") or r.get("listingId") or "").strip()
@@ -109,16 +124,24 @@ for r in reports:
         if r.get("url"): hard_urls.add(norm_url(r["url"]))
         if r.get("evidenceUrl"): hard_urls.add(norm_url(r["evidenceUrl"]))
         if r.get("title"): hard_titles.add((r["title"] or "").strip().lower())
+        # take posts if provided
+        try:
+            p = r.get("posts")
+            if isinstance(p,str) and p.strip().isdigit(): p=int(p.strip())
+            if isinstance(p,int) and p>0: report_posts[jid]=p
+        except: pass
 tmp=[]
 for j in raw.get("jobListings", []):
     jid=j.get("id",""); url=norm_url(j.get("applyLink")); title=(j.get("title") or "").strip().lower()
+    # posts from reports (non-destructive)
+    if jid in report_posts and not j.get("numberOfPosts"): j["numberOfPosts"]=report_posts[jid]
     if jid in hard_ids or url in hard_urls or title in hard_titles:
         j.setdefault("flags",{})["removed_reason"]="reported_hard"; archived.append(j)
     else:
         tmp.append(j)
 jobs=tmp
 
-# --- Missing submissions -> add card + learn hints (url + officialSite) ---
+# --- Missing submissions -> add card + capture hints + posts intake ---
 subs = JLOADL("submissions.jsonl")
 seen={norm_url(j.get("applyLink")) for j in jobs}
 for s in subs:
@@ -127,6 +150,7 @@ for s in subs:
         url=(s.get("url") or "").strip()
         site=(s.get("officialSite") or "").strip()
         last=(s.get("lastDate") or s.get("deadline") or "").strip()
+        posts = s.get("posts")
         if not title or not url: continue
         if norm_url(url) in seen:
             if site and site not in rules["captureHints"]: rules["captureHints"].append(site)
@@ -134,7 +158,6 @@ for s in subs:
         card={
             "id": f"user_{abs(hash(url))%10**9}",
             "title": title,
-            "organization": "",
             "qualificationLevel": "Any graduate",
             "domicile": "All India",
             "deadline": last if last else "N/A",
@@ -144,6 +167,11 @@ for s in subs:
             "type": "VACANCY",
             "flags": {"added_from_missing": True, "trusted": True}
         }
+        # posts if provided
+        try:
+            if isinstance(posts,str) and posts.strip().isdigit(): posts=int(posts.strip())
+            if isinstance(posts,int) and posts>0: card["numberOfPosts"]=posts
+        except: pass
         jobs.append(card)
         if url not in rules["captureHints"]: rules["captureHints"].append(url)
         if site and site not in rules["captureHints"]: rules["captureHints"].append(site)
@@ -162,7 +190,7 @@ for j in jobs:
     if j["id"] in demote:
         j.setdefault("flags",{})["demoted"]=True
 
-# --- User state and sectioning + applied soft expiry ---
+# --- User state + sectioning + soft expiry; merge server + sticky user_state ---
 APPLIED=set(); NOTI={}
 for jid, st in (user_state or {}).items():
     a=(st or {}).get("action"); ts=(st or {}).get("ts")
@@ -185,9 +213,12 @@ for j in jobs:
     jid=j["id"]
     last=keep_date(j)
     if last: j["daysLeft"]=(last - date.today()).days
+    # bring posts from title if missing
+    if not j.get("numberOfPosts"):
+        c=parse_posts_from_text(j.get("title"))
+        if c: j["numberOfPosts"]=c
     if jid in APPLIED:
         j.setdefault("flags",{})["applied"]=True
-        # Soft expiry for applied when past last date by >100 days
         d=parse_deadline(j.get("deadline"))
         if d and (date.today()-d).days>60:
             j.setdefault("flags",{})["applied_expired"]=True
@@ -204,10 +235,10 @@ jobs_out=[j for j in primary+other+applied_list if j["id"] not in to_delete]
 for j in jobs_out:
     if not j.get("detailLink"): j["detailLink"]= j.get("applyLink")
 
-# Transparancy + write
+# Transparency + write
 transp = raw.get("transparencyInfo") or {}
 transp.update({
-    "schemaVersion":"1.4",
+    "schemaVersion":"1.5",
     "runMode": RUN_MODE,
     "lastUpdated": datetime.utcnow().isoformat()+"Z",
     "mergedUpdates": merged,
@@ -230,7 +261,7 @@ JWRITE("learn.json", {"mergedUpdates": merged,"generatedAt": datetime.utcnow().i
 rules["blacklistedDomains"] = rules.get("blacklistedDomains", [])
 rules["autoRemoveReasons"] = rules.get("autoRemoveReasons", ["expired"])
 
-# AggregatorScores learner retained (from previous patch)
+# AggregatorScores learner retained
 def domain_of(u):
     try: return urllib.parse.urlparse(u or "").netloc.lower()
     except: return ""
