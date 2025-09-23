@@ -201,6 +201,19 @@
 
       var USER_STATE = {};
       var USER_VOTES = {};
+      var EXAM_DONE = {}; // {jobId: tsISO} local-only with auto-expiry
+
+      function loadExamDone(){ try{ EXAM_DONE = JSON.parse(localStorage.getItem("vac_exam_done")||"{}")||{}; }catch{ EXAM_DONE={}; } }
+      function saveExamDone(){ try{ localStorage.setItem("vac_exam_done", JSON.stringify(EXAM_DONE)); }catch{} }
+      function purgeOldExamDone(){
+        var now = Date.now();
+        var changed=false;
+        Object.keys(EXAM_DONE).forEach(id=>{
+          if(now - Date.parse(EXAM_DONE[id]) > 2*24*60*60*1000){ delete EXAM_DONE[id]; changed=true; }
+        });
+        if(changed) saveExamDone();
+      }
+
       async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok){ USER_STATE=await r.json(); } }catch{} }
       function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({}, USER_STATE, j); }catch{} }
       function setUserStateLocal(jobId, action){ if(!jobId) return; if(action==="undo") delete USER_STATE[jobId]; else USER_STATE[jobId]={action, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{} }
@@ -241,37 +254,34 @@
         var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip trust big">trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
         var det=esc(j.detailLink||j.applyLink||"#");
-        var appliedBadge = applied ? '<span class="badge-done">Applied</span>' : '';
         var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip big" title="Official source">Official</span>' : '<span class="chip big" title="From aggregator">Agg</span>';
         var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
+        var isExamDone = !!EXAM_DONE[lid];
+        var showVotePair = !isExamDone; // hide Right/Wrong if exam done
         var verifiedClass = vote==="right" ? " verified" : "";
 
         return '<article class="ua-card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
-          '<div class="ua-head">'+
-            '<h3 class="ua-title">'+esc(j.title||"No Title")+'</h3>'+
-            '<div class="ua-chips">'+srcRibbon+chip+appliedBadge+'</div>'+
-          '</div>'+
-          '<div class="ua-topbar">'+
-            '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
-            '<span class="spacer"></span>'+
-            '<button class="btn danger" data-act="report">Report</button>'+
-          '</div>'+
+          '<div class="ua-head"><h3 class="ua-title">'+esc(j.title||"No Title")+'</h3><div class="ua-chips">'+srcRibbon+chip+'</div></div>'+
           '<div class="ua-body">'+
             '<div class="ua-row"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
           '</div>'+
+          '<div class="ua-bottombar">'+
+            '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
+            '<span class="spacer"></span>'+
+            '<button class="btn danger" data-act="report">Report</button>'+
+          '</div>'+
           '<footer class="ua-actions2">'+
-            '<div class="row2">'+
-              '<div class="btn-pair hide-on-verified">'+
-                '<button class="btn ok" data-act="right">Right</button>'+
-                '<button class="btn warn" data-act="wrong">Wrong</button>'+
-              '</div>'+
-              '<span class="spacer"></span>'+
-              (applied ? '<button class="btn applied-pill" data-act="exam_done">Applied</button>'
-                       : '<div class="btn-pair"><button class="btn applied-pill" data-act="applied">Applied</button><button class="btn neutral-pill" data-act="not_interested">Not interested</button></div>')+
-            '</div>'+
+            (isExamDone ? 
+              '<div class="exam-row"><span class="exam-badge">Exam over</span><button class="btn ghost tiny" data-act="exam_clear">Clear</button></div>' : 
+              '<div class="row2">'+
+                (showVotePair? '<div class="btn-pair hide-on-verified"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div>' : '<span></span>')+
+                '<span class="spacer"></span>'+
+                (applied ? '<button class="btn applied-pill" data-act="exam_done">Exam done</button>'
+                         : '<div class="btn-pair"><button class="btn applied-pill" data-act="applied">Applied</button><button class="btn neutral-pill" data-act="not_interested">Not interested</button></div>')+
+              '</div>')+
           '</footer>'+
         '</article>';
       }
@@ -285,6 +295,7 @@
         var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
         rootOpen.innerHTML=rootApp.innerHTML=rootOther.innerHTML="";
 
+        loadExamDone(); purgeOldExamDone();
         await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal();
 
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
@@ -316,7 +327,7 @@
             const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
                   title=(this.querySelector(".ua-title")?.textContent||"").trim().slice(0,240),
                   detailsUrl=(this.querySelector("a.primary")?.href||"");
-            const hidePair = this.querySelector(".hide-on-verified");
+            const votePair = this.querySelector(".hide-on-verified");
 
             if(act==="report"){
               qs("#reportListingId").value=id;
@@ -329,8 +340,8 @@
               const ok = await confirmBox("Confirm: mark right?");
               if(!ok) return;
               setVoteLocal(id, "right");
-              if(hidePair) hidePair.style.display="none";
-              const undoFn = async ()=>{ clearVoteLocal(id); if(hidePair) hidePair.style.display=""; await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); };
+              if(votePair) votePair.style.display="none";
+              const undoFn = async ()=>{ clearVoteLocal(id); if(votePair) votePair.style.display=""; await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); };
               addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
               LAST_ACTION = { type:"vote_right", jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
               showSnack("Saved ✓", 10, LAST_ACTION.undo);
@@ -351,20 +362,47 @@
               return;
             }
 
-            if(act==="applied"||act==="not_interested"){
-              const ok = await confirmBox("Confirm: "+act.replace("_"," ")+"?");
+            if(act==="applied"){
+              const ok = await confirmBox("Confirm: applied?");
               if(!ok) return;
-              setUserStateLocal(id, act);
+              setUserStateLocal(id, "applied");
               const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); };
               addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
-              LAST_ACTION = { type:"state_"+act, jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
+              LAST_ACTION = { type:"state_applied", jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
               showSnack("Saved", 10, LAST_ACTION.undo);
-              await postJSON({ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
+              await postJSON({ type:"state", payload:{ jobId:id, action:"applied", ts:new Date().toISOString() } });
               await render();
               return;
             }
 
-            if(act==="exam_done"){ setLocked(b,"Done ✓"); return; }
+            if(act==="not_interested"){
+              const ok = await confirmBox("Confirm: not interested?");
+              if(!ok) return;
+              setUserStateLocal(id, "not_interested");
+              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); };
+              addUndo(this.querySelector(".ua-actions2"), async ()=>{ await undoFn(); await render(); }, 10);
+              LAST_ACTION = { type:"state_not_interested", jobId:id, title, url:detailsUrl, undo: async ()=>{ await undoFn(); await render(); } };
+              showSnack("Saved", 10, LAST_ACTION.undo);
+              await postJSON({ type:"state", payload:{ jobId:id, action:"not_interested", ts:new Date().toISOString() } });
+              await render();
+              return;
+            }
+
+            if(act==="exam_done"){
+              EXAM_DONE[id] = new Date().toISOString(); saveExamDone();
+              await render();
+              return;
+            }
+
+            if(act==="exam_clear"){
+              delete EXAM_DONE[id]; saveExamDone();
+              await render();
+              return;
+            }
+
+            if(act==="exam_done_finalize"){
+              setLocked(b,"Done ✓"); return;
+            }
           });
 
           if(isApplied) fApp.appendChild(card);
