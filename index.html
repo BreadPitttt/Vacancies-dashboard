@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
   <link rel="stylesheet" href="style.css" />
-  <link id="main-css" rel="stylesheet" href="style.css?v=2025-09-24-2" />
+  <link id="main-css" rel="stylesheet" href="style.css?v=2025-09-24-3" />
 </head>
 <body class="u-bg">
   <header class="topbar">
@@ -48,7 +48,7 @@
         <h3>Submit Missing Vacancy</h3>
         <button type="button" class="icon-btn" data-close>&times;</button>
       </div>
-      <form id="missingForm" class="form">
+      <form id="missingForm" class="form" novalidate>
         <label>Post name</label>
         <input id="missingTitle" placeholder="e.g., EMRS Non‑teaching 2025" required />
         <div class="grid2">
@@ -88,7 +88,7 @@
         <h3>Report listing</h3>
         <button type="button" class="icon-btn" data-close>&times;</button>
       </div>
-      <form id="reportForm" class="form">
+      <form id="reportForm" class="form" novalidate>
         <input type="hidden" id="reportListingId" />
         <label>Reason</label>
         <select id="reportReason" class="select" required>
@@ -139,7 +139,6 @@
   </div>
   <div id="toast"></div>
 
-  <!-- Self-learning app with cache busting -->
-  <script src="app.js?v=2025-09-24-2" defer></script>
+  <script src="app.js?v=2025-09-24-3" defer></script>
 </body>
 </html>
