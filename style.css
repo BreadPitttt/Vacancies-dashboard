@@ -1,13 +1,7 @@
-/* Light, soft theme with aligned controls */
-
-/* Header pills */
+/* Light theme */
 .pill { padding:6px 10px; border-radius:999px; border:1px solid #e6eaf2; background:#fff; color:#334155; font-size:12px; }
-
-/* Tabs */
 .tab { padding:8px 12px; border-radius:10px; cursor:pointer; color:#334155; border:1px solid #e6eaf2; background:#fff; box-shadow:0 2px 6px rgba(15,23,42,.04); }
 .tab.active { background:#eaf1ff; border-color:#cfe0ff; color:#1e40af; }
-
-/* Panels */
 .panel { display:none; }
 .panel.active { display:block; }
 
@@ -22,19 +16,21 @@
 .ua-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px 8px 16px; }
 .ua-title { font-size:16px; font-weight:600; color:#0f172a; }
 .ua-chips { display:flex; align-items:center; gap:8px; line-height:0; }
-.ua-body { padding:8px 16px 12px 16px; color:#334155; font-size:14px; }
+.ua-body { padding:8px 16px 8px 16px; color:#334155; font-size:14px; }
 .ua-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e6eaf2; }
 .ua-row:last-child { border-bottom:none; }
-.ua-actions { padding:12px 16px 14px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
 
-/* Two clean groups */
-.group-left, .group-right { display:flex; align-items:center; gap:10px; }
+/* Actions split in two stacked rows to avoid overflow */
+.ua-actions2 { padding:10px 16px 14px 16px; display:flex; flex-direction:column; gap:8px; }
+.ua-actions2 .row1, .ua-actions2 .row2 { display:flex; align-items:center; gap:10px; }
+.ua-actions2 .row1 .spacer, .ua-actions2 .row2 .spacer { flex:1; }
+.hide { display:none !important; }
+
 .btn-pair { display:flex; gap:8px; }
 
-/* Chips and badges */
+/* Chips & badges */
 .chip { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; border:1px solid #e6eaf2; background:#fff; color:#0f172a; font-size:12px; }
-.chip.ok { color:#15803d; border-color:#c6f6d5; background:#ecfdf5; }
-.chip.tick { border-color:#c6f6d5; background:#ecfdf5; color:#15803d; }
+.chip.trust { font-weight:600; color:#065f46; border-color:#befae1; background:#ecfdf5; } /* larger 'trusted', no tick */
 .badge-done{ padding:2px 8px; border-radius:999px; border:1px solid #e6eaf2; background:#eef2ff; color:#1e40af; font-size:12px; }
 
 /* Buttons */
@@ -46,7 +42,7 @@
 .btn.ghost{ background:#ffffff; color:#334155; border:1px dashed #e6eaf2; }
 .btn.tiny{ padding:6px 8px; font-size:12px; }
 
-/* Toast, snackbar, confirm */
+/* Overlays */
 #toast{ position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:#0f172a; color:#e9eef9; border:1px solid #1f2740; border-radius:10px; padding:8px 12px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:30; }
 #confirm{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(15,23,42,.35); z-index:25; }
 #confirm .box{ width:min(360px,92vw); background:#ffffff; border:1px solid #e6eaf2; border-radius:12px; padding:14px; color:#0f172a; }
@@ -54,7 +50,7 @@
 #snackbar{ position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:#0f172a; color:#ffffff; border:1px solid #1f2740; border-radius:12px; padding:10px 12px; font-size:13px; display:none; align-items:center; gap:12px; z-index:35; }
 #snackbar .count{ color:#c7d2fe; }
 
-/* Modal overlay centered (prevents “bottom sheet” feel) */
+/* Modal center overlay */
 .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:40; }
 .modal.flex{ display:flex; }
 .modal-backdrop{ position:absolute; inset:0; background:rgba(15,23,42,.35); }
@@ -69,5 +65,5 @@
 .row.end.gap{ display:flex; justify-content:flex-end; gap:10px; }
 .icon-btn{ background:#ffffff; color:#334155; border:1px dashed #e6eaf2; padding:4px 8px; border-radius:8px; cursor:pointer; }
 
-/* Empty state */
+/* Empty */
 .empty{ color:#334155; padding:14px; border:1px dashed #e6eaf2; border-radius:10px; background:#ffffff; }
