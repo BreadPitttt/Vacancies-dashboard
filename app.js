@@ -1,6 +1,7 @@
-// app.js v2025-09-24-rollback-stable — stable loader from working build + visible fallback + two-row layout intact
+// app.js v2025-09-24-final — strict two-row layout + reliable modals + self-learning intact
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
+  const bust = () => "?t=" + Date.now();
 
   const qs=(s,r)=>(r||document).querySelector(s);
   const qsa=(s,r)=>Array.from((r||document).querySelectorAll(s));
@@ -8,39 +9,36 @@
   const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s : "N/A";
   const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1600); };
 
-  function url(path){ return path + (path.includes("?") ? "&" : "?") + "t=" + Date.now(); }
-
   // Tabs
   document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return; qsa(".tab").forEach(x=>x.classList.toggle("active",x===t)); qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab)); });
 
-  // Self-learning storage
+  // Local state
   let USER_STATE={}, USER_VOTES={};
-  async function loadUserStateServer(){ try{ const r=await fetch(url("user_state.json"),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
+  async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
   function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({},USER_STATE,j);}catch{} }
   function setUserStateLocal(id,a){ if(!id) return; if(a==="undo") delete USER_STATE[id]; else USER_STATE[id]={action:a,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{} }
   function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
   function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
-  // Reliable outbox
+  // Outbox
   let OUTBOX=(function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; }})();
   function saveOutbox(){ try{ localStorage.setItem("vac_outbox",JSON.stringify(OUTBOX)); }catch{} }
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
   async function postJSON(payload){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); if(!r.ok) throw new Error("net"); }catch{ OUTBOX.push(payload); saveOutbox(); setTimeout(flushOutbox,1500); } return true; }
 
-  // Status
   async function renderStatus(){
     try{
-      const r=await fetch(url("health.json"),{cache:"no-store"}); if(!r.ok) throw 0;
-      const h=await r.json();
-      const pill=qs("#health-pill"); const last=qs("#last-updated"); const total=qs("#total-listings");
-      pill.textContent=h.ok?"Health: OK":"Health: Not OK"; pill.className="pill "+(h.ok?"ok":"bad");
-      last.textContent="Last updated: " + (h.lastUpdated? new Date(h.lastUpdated).toLocaleString() : "—");
-      total.textContent="Listings: " + (typeof h.totalListings==="number"? h.totalListings : "—");
+      const h=await (await fetch("health.json"+bust(),{cache:"no-store"})).json();
+      qs("#health-pill").textContent=h.ok?"Health: OK":"Health: Not OK";
+      qs("#health-pill").className="pill "+(h.ok?"ok":"bad");
+      qs("#last-updated").textContent="Last updated: "+(h.lastUpdated? new Date(h.lastUpdated).toLocaleString():"—");
+      qs("#total-listings").textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
     }catch{
-      const pill=qs("#health-pill"); const last=qs("#last-updated"); const total=qs("#total-listings");
-      pill.textContent="Health: Unknown"; pill.className="pill";
-      last.textContent="Last updated: —"; total.textContent="Listings: —";
+      qs("#health-pill").textContent="Health: Unknown";
+      qs("#health-pill").className="pill";
+      qs("#last-updated").textContent="Last updated: —";
+      qs("#total-listings").textContent="Listings: —";
     }
   }
 
@@ -48,9 +46,15 @@
 
   function cardHTML(j, applied=false){
     const src=(j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
-    const d=j.daysLeft!=null?j.daysLeft:"—"; const det=esc(j.detailLink||j.applyLink||"#");
-    const lid=j.id||""; const vote=USER_VOTES[lid]?.vote||""; const tick= vote==="right" ? '<span class="chip ok" title="Verified">✓</span>' : "";
-    const verified= vote==="right" ? " verified" : ""; const trust=(j.flags&&j.flags.trusted)?trustedChip():""; const appliedBadge = applied?'<span class="badge-done">Applied</span>':"";
+    const d=j.daysLeft!=null?j.daysLeft:"—";
+    const det=esc(j.detailLink||j.applyLink||"#");
+    const lid=j.id||"";
+    const vote=USER_VOTES[lid]?.vote||"";
+    const tick= vote==="right" ? '<span class="chip ok" title="Verified by user">✓</span>' : "";
+    const verified= vote==="right" ? " verified" : "";
+    const trust = j.flags && j.flags.trusted ? trustedChip() : "";
+    const appliedBadge = applied ? '<span class="badge-done">Applied</span>' : "";
+
     return '<article class="card'+(applied?' applied':'')+verified+'" data-id="'+esc(lid)+'">'+
       '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+src+tick+trust+appliedBadge+'</header>'+
       '<div class="card-body">'+
@@ -59,10 +63,15 @@
         '<div class="rowline"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
         '<div class="rowline"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
       '</div>'+
-      '<div class="actions-row row1"><div class="left"><a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a></div><div class="right"><button class="btn danger" data-act="report">Report</button></div></div>'+
-      '<div class="actions-row row2"><div class="group vote"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div><div class="group interest">'+
-        (applied?'<button class="btn applied" data-act="exam_done">Exam done</button>':'<button class="btn applied" data-act="applied">Applied</button><button class="btn other" data-act="not_interested">Not interested</button>')+
-      '</div></div></article>';
+      '<div class="actions-row row1">'+
+        '<div class="left"><a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a></div>'+
+        '<div class="right"><button class="btn danger" data-act="report">Report</button></div>'+
+      '</div>'+
+      '<div class="actions-row row2">'+
+        '<div class="group vote"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div>'+
+        '<div class="group interest">'+(applied?'<button class="btn applied" data-act="exam_done">Exam done</button>':'<button class="btn applied" data-act="applied">Applied</button><button class="btn other" data-act="not_interested">Not interested</button>')+'</div>'+
+      '</div>'+
+    '</article>';
   }
 
   function sortByDeadline(list){ const parse=(s)=>{ if(!s||s.toUpperCase()==="N/A") return null; const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null; const ms=Date.UTC(+a[2],+a[1]-1,+a[0]); return isNaN(ms)?null:ms; }; return list.slice().sort((a,b)=>{ const da=parse(a.deadline),db=parse(b.deadline); if(da===null&&db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da-db; }); }
@@ -70,28 +79,22 @@
   let TOKEN=0;
   async function render(){
     const my=++TOKEN;
-
     await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); await flushOutbox();
 
-    // Known-good: load data.json from root with no-store
     let data=null;
-    try{
-      const r=await fetch(url("data.json"),{cache:"no-store"}); if(!r.ok) throw 0; data=await r.json();
-    }catch{
-      data=null;
-    }
+    try{ const r=await fetch("data.json"+bust(),{cache:"no-store"}); if(r.ok) data=await r.json(); }catch{}
     if(my!==TOKEN) return;
 
     const rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
 
-    // Never blank: show fallback if data missing
     if(!data || !Array.isArray(data.jobListings)){
-      rootOpen.innerHTML='<div class="empty">No active job listings found (data.json missing or invalid).</div>';
+      rootOpen.innerHTML='<div class="empty">No active job listings found (data unavailable).</div>';
       return;
     }
 
     const list=sortByDeadline(data.jobListings||[]);
     const sections=data.sections||{};
+    qs("#total-listings").textContent="Listings: "+list.length;
 
     const idsApplied=new Set(sections.applied||[]), idsOther=new Set(sections.other||[]);
     Object.entries(USER_STATE).forEach(([jid,s])=>{
@@ -134,7 +137,9 @@
         if(act==="exam_done"){ btn.textContent="Done ✓"; btn.classList.add("disabled"); return; }
       });
 
-      if(applied) fApp.appendChild(card); else if(idsOther.has(job.id)) fOther.appendChild(card); else fOpen.appendChild(card);
+      if(applied) fApp.appendChild(card);
+      else if(idsOther.has(job.id)) fOther.appendChild(card);
+      else fOpen.appendChild(card);
     }
 
     rootOpen.replaceChildren(fOpen);
@@ -160,7 +165,7 @@
 
     qs("#btn-missing")?.addEventListener("click",()=>openModal("#missing-modal"));
 
-    // Report submit
+    // Reliable submits
     qs("#reportForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
       const id=qs("#reportListingId").value.trim();
@@ -173,7 +178,6 @@
       closeModal(e.target); e.target.reset(); toast("Reported.");
     });
 
-    // Missing submit
     const SUBMIT_LOCK=new Set();
     qs("#missingForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
