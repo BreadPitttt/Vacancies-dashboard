@@ -1,4 +1,4 @@
-// app.js v2025-09-23-4 — self-learning, hides action group after Right, opens modals reliably
+// app.js v2025-09-24-2 — strict two-row actions + reliable modals + self-learning
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const bust = () => "?t=" + Date.now();
@@ -9,20 +9,17 @@
   const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s : "N/A";
   const toast=(m)=>{const t=qs("#toast");if(!t)return alert(m);t.textContent=m;t.style.opacity="1";clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity="0",1600);};
 
-  // Tabs
   function activate(tab){ qsa(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===tab)); qsa(".panel").forEach(p=>p.classList.toggle("active",p.id==="panel-"+tab)); }
   document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(t) activate(t.dataset.tab); });
 
-  // State
   let USER_STATE={}, USER_VOTES={};
   async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
   function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({},USER_STATE,j);}catch{} }
-  function setUserStateLocal(id, action){ if(!id) return; if(action==="undo") delete USER_STATE[id]; else USER_STATE[id]={action,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{} }
+  function setUserStateLocal(id,a){ if(!id) return; if(a==="undo") delete USER_STATE[id]; else USER_STATE[id]={action:a,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{} }
   function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
-  function setVoteLocal(id, vote){ USER_VOTES[id]={vote,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
+  function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
-  // Outbox queue for reliability
   let OUTBOX=(function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; }})();
   function saveOutbox(){ try{ localStorage.setItem("vac_outbox",JSON.stringify(OUTBOX)); }catch{} }
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
@@ -30,49 +27,54 @@
 
   async function renderStatus(){ const pill=qs("#health-pill"), last=qs("#last-updated"), total=qs("#total-listings"); try{ const h=await (await fetch("health.json"+bust(),{cache:"no-store"})).json(); pill.textContent=h.ok?"Health: OK":"Health: Not OK"; pill.className="pill "+(h.ok?"ok":"bad"); const ts=h.lastUpdated||""; last.textContent="Last updated: "+(ts?new Date(ts).toLocaleString():"—"); total.textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—"); }catch{ pill.textContent="Health: Unknown"; pill.className="pill"; last.textContent="Last updated: —"; total.textContent="Listings: —"; } }
 
-  function setLocked(btn,label){ btn.textContent=label; btn.classList.add("disabled"); btn.setAttribute("aria-disabled","true"); }
-  function addUndo(container,onUndo,seconds){ const u=document.createElement("button"); u.className="btn ghost tiny"; u.textContent="Undo ("+seconds+"s)"; container.appendChild(u); let left=seconds; const iv=setInterval(()=>{ left--; if(left<=0){ clearInterval(iv); u.remove(); } else { u.textContent="Undo ("+left+"s)"; } },1000); u.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); }); }
-
-  function trustedChip(){ return '<span class="chip trusted">trusted</span>'; } // green, no tick
+  const trustedChip=()=>' <span class="chip trusted">trusted</span>';
 
   function cardHTML(j, applied=false){
-    const srcRibbon=(j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
+    const src=(j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
     const d=j.daysLeft!=null?j.daysLeft:"—";
-    const lid=j.id||"", vote=USER_VOTES[lid]?.vote||"";
-    const voteTick = vote==="right" ? '<span class="chip ok" title="Verified by user">✓</span>' : "";
-    const verifiedClass = vote==="right" ? " verified" : "";
     const det=esc(j.detailLink||j.applyLink||"#");
-    const trusted = j.flags && j.flags.trusted ? trustedChip() : "";
+    const lid=j.id||"";
+    const vote=USER_VOTES[lid]?.vote||"";
+    const voteTick= vote==="right" ? '<span class="chip ok" title="Verified by user">✓</span>' : "";
+    const verifiedClass= vote==="right" ? " verified" : "";
+    const trust = j.flags && j.flags.trusted ? trustedChip() : "";
     const appliedBadge = applied ? '<span class="badge-done">Applied</span>' : "";
+
     return '<article class="card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
-      '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+srcRibbon+voteTick+trusted+appliedBadge+'</header>'+
+      '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+src+voteTick+trust+appliedBadge+'</header>'+
       '<div class="card-body">'+
         '<div class="rowline"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
         '<div class="rowline"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
         '<div class="rowline"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
         '<div class="rowline"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
       '</div>'+
-      '<footer class="card-actions">'+
-        '<span class="hide-on-verified">'+
-          '<button class="btn danger" data-act="report">Report</button>'+
+
+      '<div class="actions-row row1">'+
+        '<div class="left"><a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a></div>'+
+        '<div class="right"><button class="btn danger" data-act="report">Report</button></div>'+
+      '</div>'+
+
+      '<div class="actions-row row2">'+
+        '<div class="group vote">'+
           '<button class="btn ok" data-act="right">Right</button>'+
           '<button class="btn warn" data-act="wrong">Wrong</button>'+
-        '</span>'+
-        '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
-        '<span class="spacer"></span>'+
-        (applied ? '<button class="btn" data-act="exam_done">Exam done</button>'
-                 : '<button class="btn" data-act="applied">Applied</button><button class="btn" data-act="not_interested">Not interested</button>')+
-      '</footer>'+
+        '</div>'+
+        '<div class="group interest">'+
+          (applied ? '<button class="btn applied" data-act="exam_done">Exam done</button>'
+                   : '<button class="btn applied" data-act="applied">Applied</button><button class="btn other" data-act="not_interested">Not interested</button>')+
+        '</div>'+
+      '</div>'+
     '</article>';
   }
 
-  function sortByDeadline(list){ const parse=(s)=>{ if(!s||s.toUpperCase()==="N/A") return null; const t=s.replaceAll("-","/"); const a=t.split("/"); if(a.length!==3) return null; const ms=Date.UTC(+a[2],+a[1]-1,+a[0]); return isNaN(ms)?null:ms; }; return list.slice().sort((a,b)=>{ const da=parse(a.deadline), db=parse(b.deadline); if(da===null && db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da-db; }); }
+  function sortByDeadline(list){ const parse=(s)=>{ if(!s||s.toUpperCase()==="N/A") return null; const t=s.replaceAll("-","/"); const a=t.split("/"); if(a.length!==3) return null; const ms=Date.UTC(+a[2],+a[1]-1,+a[0]); return isNaN(ms)?null:ms; }; return list.slice().sort((a,b)=>{ const da=parse(a.deadline),db=parse(b.deadline); if(da===null&&db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da-db; }); }
 
   let renderToken=0;
   async function render(){
     const myToken=++renderToken;
     await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); await flushOutbox();
-    const data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
+
+    const data=await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
     if(myToken!==renderToken) return;
 
     const rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
@@ -97,39 +99,39 @@
       const card=wrap.firstElementChild;
 
       card.addEventListener("click", async (e)=>{
-        const b=e.target.closest("[data-act]"); if(!b) return;
-        if(b.classList.contains("disabled")) return;
-        const act=b.getAttribute("data-act"), id=card.getAttribute("data-id"),
+        const btn=e.target.closest("[data-act]"); if(!btn) return;
+        if(btn.classList.contains("disabled")) return;
+        const act=btn.getAttribute("data-act"), id=card.getAttribute("data-id"),
               title=(card.querySelector(".title")?.textContent||"").trim().slice(0,240),
-              detailsUrl=(card.querySelector("a.primary")?.href||"");
-        const actions=card.querySelector(".hide-on-verified");
+              detailsUrl=(card.querySelector(".row1 .left a")?.href||"");
 
         if(act==="report"){
-          qs("#reportListingId").value=id; const m=qs("#report-modal"); m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); return;
+          qs("#reportListingId").value=id;
+          const m=qs("#report-modal"); m.classList.remove("hidden"); m.setAttribute("aria-hidden","false");
+          return;
         }
         if(act==="right"){
-          // self-learning: mark right, show tick, hide group
-          setVoteLocal(id,"right"); card.classList.add("verified"); if(actions) actions.style.display="none";
-          const undoFn=async()=>{ clearVoteLocal(id); await postJSON({type:"vote",vote:"undo_right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()}); await render(); };
-          addUndo(card.querySelector(".card-actions"),undoFn,10);
+          setVoteLocal(id,"right"); card.classList.add("verified");
+          const undo=async()=>{ clearVoteLocal(id); await postJSON({type:"vote",vote:"undo_right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()}); await render(); };
+          addUndoInline(card.querySelector(".row2 .interest"),undo,10);
           postJSON({type:"vote",vote:"right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
         if(act==="wrong"){
-          setVoteLocal(id,"wrong"); setLocked(b,"Marked ✖");
-          const undoFn=async()=>{ clearVoteLocal(id); await postJSON({type:"vote",vote:"undo_wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()}); await render(); };
-          addUndo(card.querySelector(".card-actions"),undoFn,10);
+          setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled");
+          const undo=async()=>{ clearVoteLocal(id); await postJSON({type:"vote",vote:"undo_wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()}); await render(); };
+          addUndoInline(card.querySelector(".row2 .interest"),undo,10);
           postJSON({type:"vote",vote:"wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
         if(act==="applied"||act==="not_interested"){
           setUserStateLocal(id,act);
-          const undoFn=async()=>{ setUserStateLocal(id,"undo"); await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}); await render(); };
-          addUndo(card.querySelector(".card-actions"),undoFn,10);
+          const undo=async()=>{ setUserStateLocal(id,"undo"); await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}}); await render(); };
+          addUndoInline(card.querySelector(".row2 .interest"),undo,10);
           postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}});
           await render(); return;
         }
-        if(act==="exam_done"){ setLocked(b,"Done ✓"); return; }
+        if(act==="exam_done"){ btn.textContent="Done ✓"; btn.classList.add("disabled"); return; }
       });
 
       if(isApplied) fApp.appendChild(card);
@@ -143,18 +145,24 @@
     scheduleDeadlineAlerts(list);
   }
 
+  function addUndoInline(container,onUndo,seconds){
+    const u=document.createElement("button");
+    u.className="btn ghost tiny"; u.textContent="Undo ("+seconds+"s)";
+    container.appendChild(u);
+    let left=seconds; const iv=setInterval(()=>{ left--; if(left<=0){ clearInterval(iv); u.remove(); } else { u.textContent="Undo ("+left+"s)"; } },1000);
+    u.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
+  }
+
   function openModal(id){ const m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
   function closeModal(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
   document.addEventListener("click",(e)=>{ if(e.target && e.target.hasAttribute("data-close")) closeModal(e.target); });
 
   document.addEventListener("DOMContentLoaded", async ()=>{
-    // guard CSS load errors
     const css=qs("#main-css"); css&&css.addEventListener("error",()=>toast("Stylesheet failed to load."));
     await renderStatus(); await render();
-
     qs("#btn-missing")?.addEventListener("click",()=>openModal("#missing-modal"));
 
-    // Form submits with preventDefault (keeps modals working after render)
+    // Robust submits: prevent navigation
     qs("#reportForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
       const id=qs("#reportListingId").value.trim();
