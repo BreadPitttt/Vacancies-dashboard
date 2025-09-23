@@ -4,49 +4,52 @@ A lightweight, automated dashboard that shows general-competition government job
 
 [![Data Pipeline Status](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/data-pipeline.yml/badge.svg)](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/data-pipeline.yml) [![GitHub Pages Status](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/pages/pages-build-deployment/badge.svg?branch=main)](https://github.com/BreadPitttt/Vacancies-dashboard/actions/workflows/pages/pages-build-deployment)
 
-## Operations
+# General Vacancy Dashboard
 
-This project uses an aggregators-first discovery with official-first verification approach:
+A static dashboard for tracking government vacancies with fast client-side UX:
+- Sticky actions: Applied / Not interested and Right / Wrong persist locally and sync to a lightweight endpoint.  
+- Deadline awareness: shows days left and sends local notification reminders.  
+- Reports and missing submissions: capture corrections and new postings for the next run.
 
-- Discovery: Primaries (Adda247, sarkariresult.com.cm) for fast detection; backups (SarkariExam, RojgarResult, ResultBharat) for corroboration.
-- Verification: Publish only when either an official-domain link is present or at least two distinct aggregators corroborate the same normalized key.
-- Strict open-window: Only listings with a valid non-expired deadline are published; expired ones are dropped automatically.
+## Live
+GitHub Pages serves the site from the default branch (root or /docs). If Actions are queued, see Troubleshooting.
 
-### Run modes
+## Project layout
+- index.html — UI and client logic (render guard to prevent white flashes, outbox retry for network).  
+- style.css — finalized dark UI/UX with the old layout (Details/Report row, action buttons unchanged).  
+- scraper.py — light scrapers; emits `numberOfPosts` when possible.  
+- qc_and_learn.py — merges updates, normalizes deadlines, learns trust, and preserves user sections.
 
-The GitHub Actions workflow runs on two off-peak schedules (UTC):
-- nightly: 18:17 UTC (≈ 11:47 PM IST), timeout 120 min
-- weekly: 20:28 UTC on Sunday (≈ Monday 02:58 AM IST), timeout 240 min
+## Features
+- Tabs: Open / Applied / Other.  
+- Cards: title, Official/trusted chips, Organization, Qualification, Domicile, Last date, Details/Report.  
+- Actions: Right / Wrong with Undo; Applied / Not interested with Undo; Exam done for applied.  
+- Number of posts: shown when present; forms allow providing it to the pipeline.
 
-Manual runs:
-- From the Actions tab, click “Run workflow”.
-- Optional input force_mode accepts nightly or weekly to test a specific mode.
-- Manual runs do not push to main by default unless they are scheduled; artifacts are always uploaded for inspection.
+## How it persists actions
+- Client writes immediately to `localStorage`:
+  - `vac_user_state` for applied/not_interested  
+  - `vac_user_votes` for right/wrong  
+- A background outbox POSTs to the endpoint and retries later if offline.  
+- On each load, local state overlays server sections to keep selections sticky.
 
-### Artifacts and health
+## Build and deploy (GitHub Pages)
+1. Commit changes to main.  
+2. GitHub Actions runs “Pages build and deployment”.  
+3. If it’s stuck on “Waiting for a runner to pick up this job”:
+   - Cancel the run and click “Re-run all jobs”.  
+   - Push a no‑op commit (e.g., edit README) to retrigger.  
+   - Ensure `runs-on: ubuntu-latest` (no custom labels).  
+   - Check GitHub Status for Actions/Pages incidents.  
+   - Confirm Pages is enabled for the branch in Settings → Pages.  
 
-Each run uploads:
-- data.json
-- health.json
+## Local development
+Open index.html in a browser (no build step). For fresh CSS after deploy, the link includes `?v=…` to bypass cache.
 
-Artifacts are retained for 7 days. The homepage displays a status banner that reads health.json to show Health, Last Updated, and Listings count.
-
-### Configuration knobs
-
-Set optional tunables as Actions → Variables (safe defaults exist in code):
-- MAX_WORKERS, PER_SOURCE_MAX
-- CONNECT_TIMEOUT, READ_TIMEOUT
-- RETRY_TOTAL, RETRY_CONNECT, RETRY_READ, BACKOFF_FACTOR, MAX_BACKOFF_SECONDS
-- PER_HOST_RPM, BASELINE_SLEEP_S, JITTER_MIN, JITTER_MAX
-- CB_FAILURE_THRESHOLD, CB_OPEN_SECONDS, CB_HALF_OPEN_PROBE
-
-Sensitive values:
-- TELEGRAM_RSS_BASE must be set as a Secret (Actions → Secrets and variables → Secrets).
-
-### Verification and filters
-
-- Verified when: official-domain link present (source=official, verifiedBy=official), or 2+ distinct aggregators corroborate (source=aggregator, verifiedBy=multi-aggregator).
-- Education: includes 10th/Matric, 12th/Intermediate, Any Graduate; excludes PG/professional (Master’s, MBA/PGDM, Law, Engineering, MCA/BCA, CA/CFA/CS/CMA, MBBS/BDS/Nursing/Pharm, PhD).
-- Skills allowed: typing/steno, CCC/DOEACC/NIELIT/O-level, basic computer knowledge, PET/PST.
-- Tech/tool exclusion: Python/Java/AutoCAD/Matlab/SAP unless Any Graduate explicitly acceptable.
-- Domicile: includes All India and Bihar-only; excludes other state-only restricted posts.
+## Data pipeline (brief)
+- `scraper.py` collects listings (official in light mode prioritized) and writes `data.json`.  
+- `qc_and_learn.py`:
+  - Merges notice updates and extends deadlines when corrigendums indicate.  
+  - Normalizes `numberOfPosts` from titles/inputs.  
+  - Applies learned trust/demotion from user votes.  
+  - Fills
