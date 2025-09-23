@@ -17,7 +17,7 @@
 .ua-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e6eaf2; }
 .ua-row:last-child { border-bottom:none; }
 
-.ua-bottombar { padding:8px 16px; display:flex; align-items:center; gap:10px; border-top:1px dashed #e6eaf2; background:#fbfcff; }
+.ua-bottombar { padding:8px 16px; display:flex; align-items:center; gap:10px; border-top:1px dashed #e6eaf2; background:#fbfcff; z-index:1; }
 .ua-bottombar .spacer { flex:1; }
 
 .ua-actions2 { padding:10px 16px 14px 16px; display:flex; flex-direction:column; gap:8px; }
@@ -43,21 +43,20 @@
 .applied-pill{ background:#f0f9ff; border-color:#cfe0ff; color:#1e40af; }
 .neutral-pill{ background:#f8fafc; border-color:#e6eaf2; color:#475569; }
 
-#toast{ position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:#0f172a; color:#e9eef9; border:1px solid #1f2740; border-radius:10px; padding:8px 12px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:30; }
-#confirm{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(15,23,42,.35); z-index:25; }
+#toast{ position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:#0f172a; color:#e9eef9; border:1px solid #1f2740; border-radius:10px; padding:8px 12px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:50; }
+#confirm{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(15,23,42,.35); z-index:45; }
 #confirm .box{ width:min(360px,92vw); background:#ffffff; border:1px solid #e6eaf2; border-radius:12px; padding:14px; color:#0f172a; }
 #confirm .row{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; flex-direction: row-reverse; }
-#snackbar{ position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:#0f172a; color:#ffffff; border:1px solid #1f2740; border-radius:12px; padding:10px 12px; font-size:13px; display:none; align-items:center; gap:12px; z-index:35; }
+#snackbar{ position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:#0f172a; color:#ffffff; border:1px solid #1f2740; border-radius:12px; padding:10px 12px; font-size:13px; display:none; align-items:center; gap:12px; z-index:55; }
 #snackbar .count{ color:#c7d2fe; }
 
-.modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:40; }
+/* Modal */
+.modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:60; }
 .modal.flex{ display:flex; }
 .modal-backdrop{ position:absolute; inset:0; background:rgba(15,23,42,.35); }
 .modal .modal-body{ position:relative; width:min(680px, 92vw); background:#ffffff; border:1px solid #e6eaf2; border-radius:12px; padding:16px; color:#0f172a; box-shadow:0 20px 44px rgba(15,23,42,.14); }
 .modal .modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-.modal .form input, .modal .form textarea, .modal .form select{
-  width:100%; background:#ffffff; color:#0f172a; border:1px solid #e6eaf2; border-radius:8px; padding:10px 12px; margin-top:6px; margin-bottom:10px;
-}
+.modal .form input, .modal .form textarea, .modal .form select{ width:100%; background:#ffffff; color:#0f172a; border:1px solid #e6eaf2; border-radius:8px; padding:10px 12px; margin-top:6px; margin-bottom:10px; }
 
 .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .row.end{ display:flex; justify-content:flex-end; gap:10px; }
