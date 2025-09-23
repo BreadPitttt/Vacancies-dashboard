@@ -1,7 +1,6 @@
-// app.js v2025-09-24-locked — fixed alignment + reliable modals + self-learning unchanged
+// app.js v2025-09-24-stable-align — stable JSON loader + fixed two-row layout + reliable modals
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
-  const bust = () => "?t=" + Date.now();
 
   const qs=(s,r)=>(r||document).querySelector(s);
   const qsa=(s,r)=>Array.from((r||document).querySelectorAll(s));
@@ -9,19 +8,21 @@
   const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s : "N/A";
   const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1600); };
 
+  function bust(path){ return path + (path.includes("?")?"&":"?") + "t=" + Date.now(); }
+
   // Tabs
   document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return; qsa(".tab").forEach(x=>x.classList.toggle("active",x===t)); qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab)); });
 
   // Self-learning storage
   let USER_STATE={}, USER_VOTES={};
-  async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
+  async function loadUserStateServer(){ try{ const r=await fetch(bust("user_state.json"),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
   function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({},USER_STATE,j);}catch{} }
   function setUserStateLocal(id,a){ if(!id) return; if(a==="undo") delete USER_STATE[id]; else USER_STATE[id]={action:a,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{} }
   function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
   function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
-  // Outbox for reliability
+  // Outbox with retry
   let OUTBOX=(function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; }})();
   function saveOutbox(){ try{ localStorage.setItem("vac_outbox",JSON.stringify(OUTBOX)); }catch{} }
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
@@ -30,7 +31,8 @@
   // Status
   async function renderStatus(){
     try{
-      const h=await (await fetch("health.json"+bust(),{cache:"no-store"})).json();
+      const r=await fetch(bust("health.json"),{cache:"no-store"}); if(!r.ok) throw 0;
+      const h=await r.json();
       qs("#health-pill").textContent=h.ok?"Health: OK":"Health: Not OK";
       qs("#health-pill").className="pill "+(h.ok?"ok":"bad");
       qs("#last-updated").textContent="Last updated: "+(h.lastUpdated? new Date(h.lastUpdated).toLocaleString():"—");
@@ -82,14 +84,20 @@
     const my=++TOKEN;
     await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); await flushOutbox();
 
+    // Stable data loader from known-good build
     let data=null;
-    try{ const r=await fetch("data.json"+bust(),{cache:"no-store"}); if(r.ok) data=await r.json(); }catch{}
+    try{
+      const r=await fetch(bust("data.json"),{cache:"no-store"}); if(!r.ok) throw 0;
+      data=await r.json();
+    }catch{
+      data=null;
+    }
     if(my!==TOKEN) return;
 
     const rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
 
     if(!data || !Array.isArray(data.jobListings)){
-      rootOpen.innerHTML='<div class="empty">No active job listings found (data unavailable).</div>';
+      rootOpen.innerHTML='<div class="empty">No active job listings found (data.json missing or invalid).</div>';
       return;
     }
 
@@ -166,7 +174,7 @@
 
     qs("#btn-missing")?.addEventListener("click",()=>openModal("#missing-modal"));
 
-    // Reliable submits
+    // Modals submit reliably
     qs("#reportForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
       const id=qs("#reportListingId").value.trim();
