@@ -1,4 +1,4 @@
-# scraper.py — improved light seeds for DSSSB/BSSC/IBPS/RBI + detailLink
+# scraper.py — light seeds + stable id + numberOfPosts extraction + detailLink
 import requests
 from bs4 import BeautifulSoup
 import json, logging, re, os, time, argparse, hashlib, pathlib
@@ -59,7 +59,7 @@ def disallowed(text):
     t=(text or "").lower()
     if any(k in t for k in TEACHER_TERMS): return True
     if any(k in t for k in TECH_TERMS|PG_TERMS):
-        if ("graduate" in t or "12th" in t or "10th" in t) and "only" not in t:
+        if ("graduate" in t or "12th" in t or "10th") and "only" not in t:
             return False
         return True
     return False
@@ -76,12 +76,22 @@ def domicile_ok(title):
         if st=="bihar": continue
         if st in t and any(k in t for k in CLOSE): return False
     return True
-def make_id(prefix, url, title):
+
+def stable_id(url, title):
     p=urlparse(url or "")
     key=f"{p.netloc}{p.path}".lower()
-    return f"{prefix}_" + hashlib.sha1((key+"|"+(title or "")).encode()).hexdigest()[:16]
+    return "src_" + hashlib.sha1((key+"|"+(title or "")).encode()).hexdigest()[:16]
 
-def build_job(prefix, source, base, title, href):
+POSTS_PAT = re.compile(r"(\d{1,6})\s*(posts?|vacanc(?:y|ies)|seats?)", re.I)
+def posts_from_text(txt):
+    if not txt: return None
+    m = POSTS_PAT.search(txt)
+    if m:
+        try: return int(m.group(1))
+        except: return None
+    return None
+
+def build_job(source, base, title, href):
     title=clean(title)
     if not title: return None
     url = href if href and href.startswith("http") else urljoin(base, href or "")
@@ -92,9 +102,8 @@ def build_job(prefix, source, base, title, href):
     edu=education_band(title)
     if edu not in {"10th pass","12th pass","Any graduate"}: return None
     j = {
-        "id": make_id(prefix, url, title),
+        "id": stable_id(url, title),
         "title": title,
-        "organization": "N/A",
         "deadline": "N/A",
         "applyLink": url,
         "slug": re.sub(r"[^a-z0-9]+","-", (title or "job").lower())[:80] or "job",
@@ -105,6 +114,9 @@ def build_job(prefix, source, base, title, href):
         "extractedAt": datetime.utcnow().isoformat()+"Z",
         "meta": {"sourceUrl": base, "sourceSite": source}
     }
+    # Posts quick guess from title
+    p = posts_from_text(title)
+    if p: j["numberOfPosts"]=p
     # detailLink: official in light, aggregator otherwise
     j["detailLink"] = url if source.startswith("hint") else base
     return j
@@ -118,53 +130,52 @@ def parse_generic(content, source, base):
         tl=t.lower()
         if any(x in tl for x in ["admit card","result","answer key","syllabus"]): continue
         if not any(x in (tl+h.lower()) for x in ["recruit","vacan","notific","apply","advert","employment","corrigendum","extension","extended"]): continue
-        j=build_job("src", source, base, t, h)
+        j=build_job(source, base, t, h)
         if j: out.append(j)
     return out
 
-# ---- Domain-specific light seed parsers ----
+# Domain-specific seeds (unchanged logic)
 def parse_dsssb(content, source, base):
-    soup=BeautifulSoup(content,"html.parser")
-    out=[]
-    # Notifications list
+    soup=BeautifulSoup(content,"html.parser"); out=[]
     for a in soup.select('a[href], .view-content a[href]'):
         t=clean(a.get_text()); h=a.get("href","")
         if not t or not h: continue
         if not re.search(r"(advert|advertisement|notice|recruit|vacanc|assistant|superintendent|prison|corrigendum|extension)", t, re.I): continue
-        out.append(build_job("hint", source, base, t, h))
-    return [j for j in out if j]
+        j=build_job(source, base, t, h)
+        if j: out.append(j)
+    return out
 
 def parse_bssc(content, source, base):
-    soup=BeautifulSoup(content,"html.parser")
-    out=[]
+    soup=BeautifulSoup(content,"html.parser"); out=[]
     for a in soup.select('#NoticeBoard a[href], a[href*="Advt"], a[href*="Notice"], a[href*="advert"]'):
         t=clean(a.get_text()); h=a.get("href","")
         if not t or not h: continue
         if not re.search(r"(advt|advertisement|notice|recruit|vacanc|graduate|office attendant|cgl|inter level)", t, re.I): continue
-        out.append(build_job("hint", source, base, t, h))
-    return [j for j in out if j]
+        j=build_job(source, base, t, h)
+        if j: out.append(j)
+    return out
 
 def parse_ibps(content, source, base):
-    soup=BeautifulSoup(content,"html.parser")
-    out=[]
+    soup=BeautifulSoup(content,"html.parser"); out=[]
     for a in soup.select('a[href]'):
         t=clean(a.get_text()); h=a.get("href","")
         if not t or not h: continue
         if not re.search(r"(crp|recruit|vacanc|rrb|po|so|clerk|officer|notification|advert)", t, re.I) and not re.search(r"(crp|recruit|vacanc)", h, re.I):
             continue
-        out.append(build_job("hint", source, base, t, h))
-    return [j for j in out if j]
+        j=build_job(source, base, t, h)
+        if j: out.append(j)
+    return out
 
 def parse_rbi(content, source, base):
-    soup=BeautifulSoup(content,"html.parser")
-    out=[]
+    soup=BeautifulSoup(content,"html.parser"); out=[]
     for tr in soup.select('table tr'):
         a=tr.find('a', href=True)
         if not a: continue
         t=clean(a.get_text()); h=a.get('href')
         if not re.search(r"(recruit|vacanc|officer|grade|advert|notification)", t, re.I): continue
-        out.append(build_job("hint", source, base, t, h))
-    return [j for j in out if j]
+        j=build_job(source, base, t, h)
+        if j: out.append(j)
+    return out
 
 def dispatch_seed(content, source, base):
     host = urlparse(base).netloc.lower()
@@ -203,7 +214,7 @@ def main():
         time.sleep(1.0)
     for j in collected:
         j.setdefault("domicile","All India"); j.setdefault("type","VACANCY")
-    transp={"schemaVersion":"1.4","runMode":RUN_MODE,"totalListings":len(collected),"sourcesTried":used,"lastUpdated":datetime.utcnow().isoformat()+"Z"}
+    transp={"schemaVersion":"1.5","runMode":RUN_MODE,"totalListings":len(collected),"sourcesTried":used,"lastUpdated":datetime.utcnow().isoformat()+"Z"}
     data={"jobListings":collected,"archivedListings":[],"transparencyInfo":transp}
     atomic_write(data)
     json.dump({"ok":bool(collected),**transp}, open("health.json","w",encoding="utf-8"), indent=2)
