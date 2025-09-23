@@ -21,8 +21,11 @@
     #confirm .box{ width:min(360px,92vw); background:linear-gradient(180deg,#141a2e,#0f1528); border:1px solid #1f2740; border-radius:12px; padding:14px; color:#e9eef9; }
     #confirm .row{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; flex-direction: row-reverse; } /* OK left */
     .chip.tick{ border:1px solid #2f6e3a; background:#0f2a18; color:#8EE59E; margin-left:6px; }
-    .hide-on-verified{ display:inline-flex; } /* toggled off when verified */
-    .verified .hide-on-verified{ display:none !important; }
+    .hide-on-verified{ display:inline-flex; } .verified .hide-on-verified{ display:none !important; }
+    /* Global snackbar with Undo */
+    #snackbar{ position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:#0e152b; color:#e9eef9; border:1px solid #223055; border-radius:12px; padding:10px 12px; font-size:13px; display:none; align-items:center; gap:12px; z-index:35; }
+    #snackbar .btn{ padding:6px 10px; }
+    #snackbar .count{ color:#9fb3ff; }
   </style>
 </head>
 <body>
@@ -129,7 +132,7 @@
     </div>
   </div>
 
-  <!-- Custom confirm + toast -->
+  <!-- Custom confirm, toast and global snackbar -->
   <div id="confirm"><div class="box">
     <div id="confirm-text">Confirm?</div>
     <div class="row">
@@ -137,6 +140,11 @@
       <button id="confirm-ok" class="btn primary">OK</button>
     </div>
   </div></div>
+  <div id="snackbar">
+    <span id="snack-text">Saved</span>
+    <span class="count" id="snack-count">(10s)</span>
+    <button id="snack-undo" class="btn ghost">Undo</button>
+  </div>
   <div id="toast"></div>
 
   <script>
@@ -150,6 +158,19 @@
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
       function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
+      // Global snackbar with Undo across tabs
+      var LAST_ACTION = null; // {type, jobId, title, url, payloadForUndo}
+      var SNACK_TIMER = null, SNACK_LEFT = 0;
+      function showSnack(text, seconds, undoFn){
+        var s=qs("#snackbar"); qs("#snack-text").textContent=text; SNACK_LEFT=seconds;
+        qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; s.style.display="flex";
+        clearInterval(SNACK_TIMER);
+        SNACK_TIMER=setInterval(()=>{ SNACK_LEFT--; if(SNACK_LEFT<=0){ hideSnack(); } else { qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; } }, 1000);
+        qs("#snack-undo").onclick = async function(){ hideSnack(); await undoFn(); };
+      }
+      function hideSnack(){ var s=qs("#snackbar"); s.style.display="none"; clearInterval(SNACK_TIMER); SNACK_TIMER=null; }
+
+      // Minimal confirm
       function confirmBox(message){
         return new Promise(res=>{
           var c=qs("#confirm"); qs("#confirm-text").textContent = message || "Confirm?";
@@ -172,8 +193,8 @@
       });
 
       // State
-      var USER_STATE = {};            // applied / not_interested
-      var USER_VOTES = {};            // right / wrong
+      var USER_STATE = {};
+      var USER_VOTES = {};
       async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok){ USER_STATE=await r.json(); } }catch{} }
       function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({}, USER_STATE, j); }catch{} }
       function setUserStateLocal(jobId, action){ if(!jobId) return; if(action==="undo") delete USER_STATE[jobId]; else USER_STATE[jobId]={action, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{} }
@@ -251,7 +272,6 @@
         var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
         rootOpen.innerHTML=rootApp.innerHTML=rootOther.innerHTML="";
 
-        // load user state and votes first
         await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal();
 
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
@@ -289,19 +309,20 @@
               qs("#reportListingId").value=id; document.getElementById("report-modal").classList.remove("hidden"); document.getElementById("report-modal").setAttribute("aria-hidden","false"); return;
             }
 
+            // Right -> verify + hide actions; global + local undo
             if(act==="right"){
               const ok = await confirmBox("Confirm: mark right?");
               if(!ok) return;
-              // mark verified locally
               setVoteLocal(id, "right");
               this.classList.add("verified");
               if(actions) actions.style.display="none";
-              // show undo for 10 seconds
-              addUndo(this.querySelector(".card-actions"), async ()=>{
-                clearVoteLocal(id);
-                await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() });
-                await render();
-              }, 10);
+              // define undo
+              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
+              // per-card undo
+              addUndo(this.querySelector(".card-actions"), undoFn, 10);
+              // global snackbar undo
+              LAST_ACTION = { type:"vote_right", jobId:id, title, url:detailsUrl, undo: undoFn };
+              showSnack("Saved ✓", 10, undoFn);
               // background POST
               postJSON({ type:"vote", vote:"right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
               return;
@@ -312,11 +333,10 @@
               if(!ok) return;
               setVoteLocal(id, "wrong");
               setLocked(b,"Marked ✖");
-              addUndo(this.querySelector(".card-actions"), async ()=>{
-                clearVoteLocal(id);
-                await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() });
-                await render();
-              }, 10);
+              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
+              addUndo(this.querySelector(".card-actions"), undoFn, 10);
+              LAST_ACTION = { type:"vote_wrong", jobId:id, title, url:detailsUrl, undo: undoFn };
+              showSnack("Saved ✖", 10, undoFn);
               postJSON({ type:"vote", vote:"wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
               return;
             }
@@ -325,6 +345,10 @@
               const ok = await confirmBox("Confirm: "+act.replace("_"," ")+"?");
               if(!ok) return;
               setUserStateLocal(id, act);
+              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await render(); };
+              addUndo(this.querySelector(".card-actions"), undoFn, 10);
+              LAST_ACTION = { type:"state_"+act, jobId:id, title, url:detailsUrl, undo: undoFn };
+              showSnack("Saved", 10, undoFn);
               await postJSON({ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
               await render();
               return;
@@ -341,11 +365,49 @@
         rootOpen.appendChild(fOpen);
         rootApp.appendChild(fApp);
         rootOther.appendChild(fOther);
+
+        // After render, run deadline reminders
+        scheduleDeadlineAlerts(list);
       }
 
       function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
       function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
       document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
+
+      // Deadline notification (local)
+      async function scheduleDeadlineAlerts(list){
+        try{
+          // Ask once
+          if(Notification && Notification.permission==="default"){
+            await Notification.requestPermission();
+          }
+        }catch(e){}
+        const notified = JSON.parse(localStorage.getItem("vac_deadline_notified")||"{}");
+        const today = new Date(); today.setHours(0,0,0,0);
+        function parseDDMMYYYY(s){
+          if(!s||s.toUpperCase()==="N/A") return null;
+          const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null;
+          const d=new Date(+a[2], +a[1]-1, +a[0]); d.setHours(0,0,0,0); return isNaN(d.getTime())?null:d;
+        }
+        for(const j of list){
+          const d=parseDDMMYYYY(j.deadline); if(!d) continue;
+          const diffDays = Math.round((d.getTime()-today.getTime())/86400000);
+          if(diffDays<=2 && diffDays>=0){
+            const id=j.id||esc(j.title||"");
+            if(notified[id]) continue;
+            // Try native notification
+            try{
+              if(Notification && Notification.permission==="granted"){
+                new Notification("Vacancy closing soon", { body: (j.title||"") + " ends in "+diffDays+" day(s)." });
+              } else {
+                toast((j.title||"") + " ends in "+diffDays+" day(s).");
+              }
+            }catch(e){ toast((j.title||"") + " ends in "+diffDays+" day(s)."); }
+            notified[id]=true;
+          }
+        }
+        localStorage.setItem("vac_deadline_notified", JSON.stringify(notified));
+      }
 
       document.addEventListener("DOMContentLoaded", async function(){
         await renderStatus();
