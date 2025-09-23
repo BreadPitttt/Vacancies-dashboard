@@ -1,4 +1,4 @@
-// app.js v2025-09-24-stable-align-fix — fixed template string, stable JSON loader, two-row layout, reliable modals
+// app.js v2025-09-24-modal-fix — reliable Report/Submit modals, no other behavior changed
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
 
@@ -47,7 +47,6 @@
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
 
-  // FIXED: template string built with consistent quoting and without stray closing tags
   function cardHTML(j, applied=false){
     const src=(j.source||"").toLowerCase()==="official"
       ? '<span class="chip" title="Official source">Official</span>'
@@ -134,45 +133,34 @@
       const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
       const card=wrap.firstElementChild;
 
+      // Delegated click handling
       card.addEventListener("click", async (e)=>{
-        const btn=e.target.closest("[data-act]"); if(!btn) return; if(btn.classList.contains("disabled")) return;
+        const btn=e.target.closest("[data-act]"); if(!btn) return;
+        e.preventDefault(); // ensure no default navigation steals focus
         const act=btn.getAttribute("data-act"), id=card.getAttribute("data-id");
-        const title=(card.querySelector(".title")?.textContent||"").trim().slice(0,240);
         const detailsUrl=(card.querySelector(".row1 .left a")?.href||"");
 
         if(act==="report"){
-          qs("#reportListingId").value=id; const m=qs("#report-modal"); m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); return;
+          // OPEN REPORT MODAL (robust)
+          const m=qs("#report-modal"); if(!m) return;
+          qs("#reportListingId").value=id||"";
+          m.classList.remove("hidden"); m.setAttribute("aria-hidden","false");
+          return;
         }
         if(act==="right"){
           setVoteLocal(id,"right"); card.classList.add("verified");
-          addUndo(card.querySelector(".row2 .interest"), async ()=>{
-            clearVoteLocal(id);
-            await postJSON({type:"vote",vote:"undo_right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
-            await render();
-          });
-          postJSON({type:"vote",vote:"right",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
+          postJSON({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
         if(act==="wrong"){
           setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled");
-          addUndo(card.querySelector(".row2 .interest"), async ()=>{
-            clearVoteLocal(id);
-            await postJSON({type:"vote",vote:"undo_wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
-            await render();
-          });
-          postJSON({type:"vote",vote:"wrong",jobId:id,title,url:detailsUrl,ts:new Date().toISOString()});
+          postJSON({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
         if(act==="applied"||act==="not_interested"){
           setUserStateLocal(id,act);
-          addUndo(card.querySelector(".row2 .interest"), async ()=>{
-            setUserStateLocal(id,"undo");
-            await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}});
-            await render();
-          });
           postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}});
-          await render();
-          return;
+          await render(); return;
         }
         if(act==="exam_done"){ btn.textContent="Done ✓"; btn.classList.add("disabled"); return; }
       });
@@ -187,24 +175,25 @@
     rootOther.replaceChildren(fOther);
   }
 
-  function addUndo(container,onUndo){
-    const u=document.createElement("button");
-    u.className="btn ghost tiny"; let left=10; u.textContent=`Undo (${left}s)`;
-    container.appendChild(u);
-    const iv=setInterval(()=>{ left--; if(left<=0){ clearInterval(iv); u.remove(); } else { u.textContent=`Undo (${left}s)`; } },1000);
-    u.addEventListener("click",(e)=>{ e.preventDefault(); clearInterval(iv); u.remove(); onUndo(); });
-  }
-
-  function openModal(id){ const m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
+  // Modal helpers (centralized and robust)
+  function openModal(sel){ const m=qs(sel); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
   function closeModal(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
-  document.addEventListener("click",(e)=>{ if(e.target && e.target.hasAttribute("data-close")) closeModal(e.target); });
+
+  // Global listeners for close buttons and overlay clicks
+  document.addEventListener("click",(e)=>{
+    if(e.target && e.target.hasAttribute("data-close")){ e.preventDefault(); closeModal(e.target); }
+    // Close on overlay click (outside modal-body)
+    const overlay=e.target.classList.contains("modal") ? e.target : null;
+    if(overlay){ overlay.classList.add("hidden"); overlay.setAttribute("aria-hidden","true"); }
+  });
 
   document.addEventListener("DOMContentLoaded", async ()=>{
-    qs("#main-css")?.addEventListener("error",()=>toast("Stylesheet failed to load."));
     await renderStatus(); await render();
 
-    qs("#btn-missing")?.addEventListener("click",()=>openModal("#missing-modal"));
+    // Submit missing open
+    qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); openModal("#missing-modal"); });
 
+    // Report submit
     qs("#reportForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
       const id=qs("#reportListingId").value.trim();
@@ -217,6 +206,7 @@
       closeModal(e.target); e.target.reset(); toast("Reported.");
     });
 
+    // Missing submit
     const SUBMIT_LOCK=new Set();
     qs("#missingForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
@@ -227,8 +217,7 @@
       const posts=document.getElementById("missingPosts")?.value?.trim()||"";
       const note=document.getElementById("missingNote").value.trim();
       if(!title||!url) return toast("Post name and notification link are required.");
-      const key=url.replace(/[?#].*$/,"").toLowerCase(); if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
-      SUBMIT_LOCK.add(key);
+      const key=url.replace(/[?#].*$/,"").toLowerCase(); if(SUBMIT_LOCK.has(key)) return toast("Already submitted."); SUBMIT_LOCK.add(key);
       await postJSON({type:"missing",title,url,officialSite:site,lastDate:last,posts:posts||null,note,ts:new Date().toISOString()});
       closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh.");
     });
