@@ -14,14 +14,15 @@
     .panel.active{ display:block; }
     .card-actions{ flex-wrap: wrap; row-gap: 6px; }
     .btn[data-act="report"]{ min-width: 68px; }
-    .applied .card-actions .btn:not([data-act="exam_done"]){ display:none; }
+    .applied .card-actions .btn:not([data-act="exam_done"]):not([data-act="undo_vote"]){ display:none; }
     .badge-done{ padding:2px 8px; border-radius:12px; border:1px solid #2a334f; background:#17203c; color:#99b3ff; margin-left:8px; font-size:12px; }
     #toast{ position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#141b33;color:#e9eef9;border:1px solid #1f2740;border-radius:10px;padding:8px 12px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s ease; z-index: 30; }
     #confirm{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(9,12,23,0.6); z-index:25; }
     #confirm .box{ width:min(360px,92vw); background:linear-gradient(180deg,#141a2e,#0f1528); border:1px solid #1f2740; border-radius:12px; padding:14px; color:#e9eef9; }
-    #confirm .row{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; }
-    /* OK left, Cancel right: reverse order in DOM but use row-reverse for layout */
-    #confirm .row{ flex-direction: row-reverse; }
+    #confirm .row{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; flex-direction: row-reverse; } /* OK left */
+    .chip.tick{ border:1px solid #2f6e3a; background:#0f2a18; color:#8EE59E; margin-left:6px; }
+    .hide-on-verified{ display:inline-flex; } /* toggled off when verified */
+    .verified .hide-on-verified{ display:none !important; }
   </style>
 </head>
 <body>
@@ -128,7 +129,7 @@
     </div>
   </div>
 
-  <!-- Custom confirm (OK left, Cancel right) + toast -->
+  <!-- Custom confirm + toast -->
   <div id="confirm"><div class="box">
     <div id="confirm-text">Confirm?</div>
     <div class="row">
@@ -149,7 +150,6 @@
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
       function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
-      // Minimal confirm
       function confirmBox(message){
         return new Promise(res=>{
           var c=qs("#confirm"); qs("#confirm-text").textContent = message || "Confirm?";
@@ -171,9 +171,9 @@
         activate(t.dataset.tab);
       });
 
-      // User state and votes (server + local)
-      var USER_STATE = {};
-      var USER_VOTES = {};
+      // State
+      var USER_STATE = {};            // applied / not_interested
+      var USER_VOTES = {};            // right / wrong
       async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok){ USER_STATE=await r.json(); } }catch{} }
       function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({}, USER_STATE, j); }catch{} }
       function setUserStateLocal(jobId, action){ if(!jobId) return; if(action==="undo") delete USER_STATE[jobId]; else USER_STATE[jobId]={action, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{} }
@@ -202,24 +202,26 @@
       }
 
       function setLocked(btn, label){ btn.textContent = label; btn.classList.add("disabled"); btn.setAttribute("aria-disabled","true"); }
-      function addUndo(container, onUndo){
-        var u=document.createElement("button"); u.className="btn ghost tiny"; u.textContent="Undo";
-        u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); onUndo(); u.remove(); });
+      function addUndo(container, onUndo, seconds){
+        var u=document.createElement("button");
+        u.className="btn ghost tiny"; u.textContent="Undo ("+seconds+"s)";
         container.appendChild(u);
+        var left=seconds; var iv=setInterval(()=>{ left--; if(left<=0){ clearInterval(iv); u.remove(); } else { u.textContent="Undo ("+left+"s)"; } },1000);
+        u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
       }
 
       function cardHTML(j, applied=false){
-        var b=j.flags&&j.flags.trusted, chip=b?'<span class="chip ok">✓ trusted</span>':"";
+        var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip ok">✓ trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
         var det=esc(j.detailLink||j.applyLink||"#");
         var appliedBadge = applied ? '<span class="badge-done">Applied</span>' : '';
         var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
-        var lid=j.id||"", voteChip="";
-        if(USER_VOTES[lid]?.vote==="right") voteChip='<span class="chip ok" title="Marked right">✓</span>';
-        if(USER_VOTES[lid]?.vote==="wrong") voteChip='<span class="chip" title="Marked wrong">✖</span>';
+        var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
+        var voteTick = vote==="right" ? '<span class="chip tick" title="Verified by user">✓</span>' : "";
+        var verifiedClass = vote==="right" ? " verified" : "";
 
-        return '<article class="card'+(applied?' applied':'')+'" data-id="'+esc(lid)+'">'+
-          '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+srcRibbon+voteChip+chip+appliedBadge+'</header>'+
+        return '<article class="card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
+          '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+srcRibbon+voteTick+chip+appliedBadge+'</header>'+
           '<div class="card-body">'+
             '<div class="rowline"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
             '<div class="rowline"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
@@ -227,11 +229,15 @@
             '<div class="rowline"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
           '</div>'+
           '<footer class="card-actions">'+
-            '<button class="btn danger" data-act="report">Report</button>'+
+            '<span class="hide-on-verified">'+
+              '<button class="btn danger" data-act="report">Report</button>'+
+              '<button class="btn ok" data-act="right">Right</button>'+
+              '<button class="btn warn" data-act="wrong">Wrong</button>'+
+            '</span>'+
             '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
             '<span class="spacer"></span>'+
             (applied ? '<button class="btn" data-act="exam_done">Exam done</button>'
-                     : '<button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button><button class="btn" data-act="applied">Applied</button><button class="btn" data-act="not_interested">Not interested</button>')+
+                     : '<button class="btn" data-act="applied">Applied</button><button class="btn" data-act="not_interested">Not interested</button>')+
           '</footer>'+
         '</article>';
       }
@@ -245,10 +251,8 @@
         var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
         rootOpen.innerHTML=rootApp.innerHTML=rootOther.innerHTML="";
 
-        // NEW: always load and merge user_state first for stability
-        await loadUserStateServer();
-        loadUserStateLocal();
-        loadVotesLocal();
+        // load user state and votes first
+        await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal();
 
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
         var list = sortByDeadline(Array.isArray(data.jobListings)? data.jobListings : []);
@@ -257,7 +261,6 @@
 
         var idsApplied = new Set(sections.applied||[]);
         var idsOther = new Set(sections.other||[]);
-        // merge with user local/server state (local wins for immediacy)
         Object.entries(USER_STATE).forEach(([jid, s])=>{
           if(!s || !s.action) return;
           if(s.action==="applied"){ idsApplied.add(jid); idsOther.delete(jid); }
@@ -280,28 +283,50 @@
             const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
                   title=(this.querySelector(".title")?.textContent||"").trim().slice(0,240),
                   detailsUrl=(this.querySelector("a.primary")?.href||"");
-            if(act==="report"){ qs("#reportListingId").value=id; document.getElementById("report-modal").classList.remove("hidden"); document.getElementById("report-modal").setAttribute("aria-hidden","false"); return; }
+            const actions = this.querySelector(".hide-on-verified");
 
-            if(act==="right"||act==="wrong"){
-              const ok = await confirmBox("Confirm: "+(act==="right"?"mark right":"mark wrong")+"?");
+            if(act==="report"){
+              qs("#reportListingId").value=id; document.getElementById("report-modal").classList.remove("hidden"); document.getElementById("report-modal").setAttribute("aria-hidden","false"); return;
+            }
+
+            if(act==="right"){
+              const ok = await confirmBox("Confirm: mark right?");
               if(!ok) return;
-              setVoteLocal(id, act);
-              setLocked(b, act==="right"?"Marked ✓":"Marked ✖");
-              postJSON({ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
+              // mark verified locally
+              setVoteLocal(id, "right");
+              this.classList.add("verified");
+              if(actions) actions.style.display="none";
+              // show undo for 10 seconds
               addUndo(this.querySelector(".card-actions"), async ()=>{
                 clearVoteLocal(id);
-                await postJSON({ type:"vote", vote:"undo_"+act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() });
+                await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() });
                 await render();
-              });
+              }, 10);
+              // background POST
+              postJSON({ type:"vote", vote:"right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
+              return;
+            }
+
+            if(act==="wrong"){
+              const ok = await confirmBox("Confirm: mark wrong?");
+              if(!ok) return;
+              setVoteLocal(id, "wrong");
+              setLocked(b,"Marked ✖");
+              addUndo(this.querySelector(".card-actions"), async ()=>{
+                clearVoteLocal(id);
+                await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() });
+                await render();
+              }, 10);
+              postJSON({ type:"vote", vote:"wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
               return;
             }
 
             if(act==="applied"||act==="not_interested"){
               const ok = await confirmBox("Confirm: "+act.replace("_"," ")+"?");
               if(!ok) return;
-              setUserStateLocal(id, act);            // local first
+              setUserStateLocal(id, act);
               await postJSON({ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
-              await render();                        // re-render into tabs
+              await render();
               return;
             }
 
