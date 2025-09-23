@@ -1,12 +1,10 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>General Vacancy Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
-  <!-- TailAdmin core (Tailwind v3 CDN build) -->
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -14,98 +12,45 @@
       theme: {
         extend: {
           colors: {
-            surface: '#0b1222',
-            card: '#0f172a',
-            line: '#1f2740',
-            accent: '#3b82f6',
+            brand: { 50:'#eef2ff', 500:'#3b82f6' },
+            surface:'#f7f9fc',
+            line:'#e6eaf2',
+            darkcard:'#0f172a'
+          },
+          boxShadow: {
+            card:'0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10)'
           }
         }
       }
     }
   </script>
-  <!-- TailAdmin typography and icons (optional) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css">
-  <!-- Local overrides should come last -->
   <link rel="stylesheet" href="style.css" />
-  <style>
-    /* Tabs */
-    .tabs{ display:flex; gap:10px; border-bottom:1px solid #1f2740; margin:10px 0 16px; }
-    .tab{ padding:8px 12px; border-radius:8px 8px 0 0; cursor:pointer; color:#bcd2ff; }
-    .tab.active{ background:#131a31; border:1px solid #1f2740; border-bottom-color:transparent; }
-    .panel{ display:none; }
-    .panel.active{ display:block; }
-    /* Card actions */
-    .card-actions{ display:flex; align-items:center; gap:8px; flex-wrap: wrap; row-gap: 6px; }
-    .btn[data-act="report"]{ min-width: 68px; }
-    .applied .card-actions .btn:not([data-act="exam_done"]):not([data-act="undo_vote"]){ display:none; }
-    .badge-done{ padding:2px 8px; border-radius:12px; border:1px solid #2a334f; background:#17203c; color:#99b3ff; margin-left:8px; font-size:12px; }
-    /* Toast */
-    #toast{ position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#141b33;color:#e9eef9;border:1px solid #1f2740;border-radius:10px;padding:8px 12px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s ease; z-index: 30; }
-    /* Confirm */
-    #confirm{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(9,12,23,0.6); z-index:25; }
-    #confirm .box{ width:min(360px,92vw); background:linear-gradient(180deg,#141a2e,#0f1528); border:1px solid #1f2740; border-radius:12px; padding:14px; color:#e9eef9; }
-    #confirm .row{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; flex-direction: row-reverse; } /* OK left */
-    .chip{ display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:12px; border:1px solid #24304d; color:#bcd2ff; font-size:12px; margin-left:6px; }
-    .chip.ok{ color:#8EE59E; border-color:#2f6e3a; background:#0f2a18; }
-    .chip.tick{ border:1px solid #2f6e3a; background:#0f2a18; color:#8EE59E; margin-left:6px; }
-    .hide-on-verified{ display:inline-flex; } .verified .hide-on-verified{ display:none !important; }
-    /* Snackbar */
-    #snackbar{ position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:#0e152b; color:#e9eef9; border:1px solid #223055; border-radius:12px; padding:10px 12px; font-size:13px; display:none; align-items:center; gap:12px; z-index:35; }
-    #snackbar .btn{ padding:6px 10px; }
-    #snackbar .count{ color:#9fb3ff; }
-    /* TailAdmin-like card shell using Tailwind */
-    .ta-card{ background:#0f172a; border:1px solid #1f2740; border-radius:12px; }
-    .ta-head{ padding:14px 14px 0 14px; display:flex; align-items:center; justify-content:space-between; }
-    .ta-title{ font-size:16px; font-weight:600; color:#e8eefc; }
-    .ta-body{ padding:10px 14px 8px 14px; color:#c9d4f0; font-size:14px; }
-    .ta-row{ display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #1f2740; }
-    .ta-row:last-child{ border-bottom:none; }
-    .muted{ color:#8aa0d5; }
-    .cards-grid{ display:grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap:14px; }
-    .cards-grid > article{ grid-column: span 4 / span 4; }
-    @media (max-width: 1024px){ .cards-grid > article{ grid-column: span 6 / span 6; } }
-    @media (max-width: 640px){ .cards-grid > article{ grid-column: span 12 / span 12; } }
-    .btn{ padding:6px 10px; border-radius:10px; background:#111a33; color:#e8eefc; border:1px solid #283356; cursor:pointer; font-size:13px; }
-    .btn.primary{ background:#1e293b; border-color:#2b3b66; }
-    .btn.ok{ background:#0f2a18; border-color:#2f6e3a; color:#8EE59E; }
-    .btn.warn{ background:#2a1b0f; border-color:#6e3a2f; color:#f3c29b; }
-    .btn.danger{ background:#2a0f10; border-color:#6e2f3a; color:#f4aab1; }
-    .btn.ghost{ background:transparent; color:#bcd2ff; border:1px dashed #2a355a; }
-    .btn.tiny{ padding:4px 8px; font-size:12px; }
-    .pill{ padding:2px 8px; border-radius:12px; border:1px solid #2a355a; color:#bcd2ff; font-size:12px; }
-  </style>
 </head>
-
-<body class="bg-surface text-slate-100">
-  <!-- Top navbar -->
-  <header class="w-full border-b border-line bg-card/60 backdrop-blur sticky top-0 z-20">
+<body class="bg-surface text-slate-900">
+  <header class="w-full border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-20">
     <div class="mx-auto max-w-7xl px-4 h-14 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
-          <i class="ti ti-clipboard-text"></i>
+        <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-500">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3h14a2 2 0 0 1 2 2v13.5A2.5 2.5 0 0 1 18.5 21H7a4 4 0 0 1-4-4V5a2 2 0 0 1 2-2Zm2 4v2h10V7H7Z"/></svg>
         </span>
         <h1 class="font-semibold text-lg">General Vacancy Dashboard</h1>
         <span id="health-pill" class="pill ml-3">Health: Unknown</span>
-        <span id="last-updated" class="ml-3 text-slate-400 text-sm">Last updated: —</span>
-        <span id="total-listings" class="ml-2 text-slate-400 text-sm">Listings: —</span>
+        <span id="last-updated" class="ml-3 text-slate-500 text-sm">Last updated: —</span>
+        <span id="total-listings" class="ml-2 text-slate-500 text-sm">Listings: —</span>
       </div>
-      <div>
+      <div class="flex items-center gap-2">
         <button id="btn-missing" class="btn ghost" type="button">Submit missing</button>
       </div>
     </div>
   </header>
 
-  <!-- Content -->
-  <main class="mx-auto max-w-7xl px-4 py-4">
-    <!-- Tabs -->
-    <div class="tabs"></div>
-    <div class="flex gap-2">
+  <main class="mx-auto max-w-7xl px-4 py-6">
+    <nav class="flex gap-2">
       <div class="tab active" data-tab="open">Open</div>
       <div class="tab" data-tab="applied">Applied</div>
       <div class="tab" data-tab="other">Other</div>
-    </div>
+    </nav>
 
-    <!-- Panels -->
     <section id="panel-open" class="panel active mt-4">
       <div id="open-root" class="cards-grid"></div>
     </section>
@@ -203,7 +148,6 @@
   </div>
   <div id="toast"></div>
 
-  <!-- App script (unchanged logic, adapted to TailAdmin classes) -->
   <script>
     (function(){
       var ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
@@ -215,9 +159,8 @@
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
       function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
-      // Global snackbar
-      var LAST_ACTION = null;
-      var SNACK_TIMER = null, SNACK_LEFT = 0;
+      // Snackbar
+      var LAST_ACTION=null, SNACK_TIMER=null, SNACK_LEFT=0;
       function showSnack(text, seconds, undoFn){
         var s=qs("#snackbar"); qs("#snack-text").textContent=text; SNACK_LEFT=seconds;
         qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; s.style.display="flex";
@@ -227,7 +170,7 @@
       }
       function hideSnack(){ var s=qs("#snackbar"); s.style.display="none"; clearInterval(SNACK_TIMER); SNACK_TIMER=null; }
 
-      // Minimal confirm
+      // Confirm
       function confirmBox(message){
         return new Promise(res=>{
           var c=qs("#confirm"); qs("#confirm-text").textContent = message || "Confirm?";
@@ -288,26 +231,38 @@
         u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
       }
 
-      // TailAdmin card markup
+      function chipRowHTML(srcRibbon, voteTick, chip, appliedBadge){
+        // ensure baseline alignment and equal height
+        return '<div class="inline-flex items-center gap-2 align-middle">'+
+               '<span class="align-middle inline-flex">'+srcRibbon+'</span>'+
+               (voteTick?'<span class="align-middle inline-flex">'+voteTick+'</span>':'')+
+               (chip?'<span class="align-middle inline-flex">'+chip+'</span>':'')+
+               (appliedBadge?'<span class="align-middle inline-flex">'+appliedBadge+'</span>':'')+
+               '</div>';
+      }
+
       function cardHTML(j, applied=false){
         var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip ok">✓ trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
         var det=esc(j.detailLink||j.applyLink||"#");
         var appliedBadge = applied ? '<span class="badge-done">Applied</span>' : '';
-        var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
+        var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip">Official</span>' : '<span class="chip">Agg</span>';
         var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
-        var voteTick = vote==="right" ? '<span class="chip tick" title="Verified by user">✓</span>' : "";
+        var voteTick = vote==="right" ? '<span class="chip ok">✓</span>' : "";
         var verifiedClass = vote==="right" ? " verified" : "";
 
-        return '<article class="ta-card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
-          '<header class="ta-head"><h3 class="ta-title">'+esc(j.title||"No Title")+'</h3><div>'+srcRibbon+voteTick+chip+appliedBadge+'</div></header>'+
-          '<div class="ta-body">'+
-            '<div class="ta-row"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
-            '<div class="ta-row"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
-            '<div class="ta-row"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
-            '<div class="ta-row"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
+        return '<article class="bg-white border border-slate-200 rounded-xl shadow-card hover:shadow-md transition-shadow '+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
+          '<header class="px-4 pt-4 pb-1 flex items-start justify-between">'+
+            '<h3 class="font-semibold text-[15px] leading-5">'+esc(j.title||"No Title")+'</h3>'+
+            chipRowHTML(srcRibbon, voteTick, chip, appliedBadge)+
+          '</header>'+
+          '<div class="px-4 py-3 text-[14px] text-slate-700">'+
+            '<div class="flex justify-between py-1 border-b border-dashed border-slate-200"><span class="text-slate-500">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
+            '<div class="flex justify-between py-1 border-b border-dashed border-slate-200"><span class="text-slate-500">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
+            '<div class="flex justify-between py-1 border-b border-dashed border-slate-200"><span class="text-slate-500">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
+            '<div class="flex justify-between py-1"><span class="text-slate-500">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="text-slate-400">('+d+' days)</span></span></div>'+
           '</div>'+
-          '<footer class="p-3 card-actions">'+
+          '<footer class="px-4 pb-4 card-actions">'+
             '<span class="hide-on-verified">'+
               '<button class="btn danger" data-act="report">Report</button>'+
               '<button class="btn ok" data-act="right">Right</button>'+
@@ -359,7 +314,7 @@
             const b=e.target.closest("[data-act]"); if(!b) return;
             if(b.classList.contains("disabled")) return;
             const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
-                  title=(this.querySelector(".ta-title")?.textContent||"").trim().slice(0,240),
+                  title=(this.querySelector("h3")?.textContent||"").trim().slice(0,240),
                   detailsUrl=(this.querySelector("a.primary")?.href||"");
             const actions = this.querySelector(".hide-on-verified");
 
@@ -426,33 +381,17 @@
       function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
       document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
 
-      // Deadline alerts (local)
       async function scheduleDeadlineAlerts(list){
-        try{
-          if(Notification && Notification.permission==="default"){
-            await Notification.requestPermission();
-          }
-        }catch(e){}
+        try{ if(Notification && Notification.permission==="default"){ await Notification.requestPermission(); } }catch(e){}
         const notified = JSON.parse(localStorage.getItem("vac_deadline_notified")||"{}");
         const today = new Date(); today.setHours(0,0,0,0);
-        function parseDDMMYYYY(s){
-          if(!s||s.toUpperCase()==="N/A") return null;
-          const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null;
-          const d=new Date(+a[2], +a[1]-1, +a[0]); d.setHours(0,0,0,0); return isNaN(d.getTime())?null:d;
-        }
+        function parseDDMMYYYY(s){ if(!s||s.toUpperCase()==="N/A") return null; const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null; const d=new Date(+a[2], +a[1]-1, +a[0]); d.setHours(0,0,0,0); return isNaN(d.getTime())?null:d; }
         for(const j of list){
           const d=parseDDMMYYYY(j.deadline); if(!d) continue;
           const diffDays = Math.round((d.getTime()-today.getTime())/86400000);
           if(diffDays<=2 && diffDays>=0){
-            const id=j.id||esc(j.title||"");
-            if(notified[id]) continue;
-            try{
-              if(Notification && Notification.permission==="granted"){
-                new Notification("Vacancy closing soon", { body: (j.title||"") + " ends in "+diffDays+" day(s)." });
-              } else {
-                toast((j.title||"") + " ends in "+diffDays+" day(s).");
-              }
-            }catch(e){ toast((j.title||"") + " ends in "+diffDays+" day(s)."); }
+            const id=j.id||esc(j.title||""); if(notified[id]) continue;
+            try{ if(Notification && Notification.permission==="granted"){ new Notification("Vacancy closing soon",{ body:(j.title||"")+" ends in "+diffDays+" day(s)." }); } else { toast((j.title||"")+" ends in "+diffDays+" day(s)."); } }catch(e){ toast((j.title||"")+" ends in "+diffDays+" day(s)."); }
             notified[id]=true;
           }
         }
@@ -477,7 +416,6 @@
           if(ok){ closeModal(e.target); e.target.reset(); toast("Reported."); }
         });
 
-        // Missing guard
         var SUBMIT_LOCK = new Set();
         qs("#missingForm")?.addEventListener("submit", async function(e){
           e.preventDefault();
