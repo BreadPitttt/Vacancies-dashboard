@@ -1,9 +1,8 @@
 {
   "jobListings": [
     {
-      "id": "user_997016391",
+      "id": "user_964232552",
       "title": "IBPS RRB 14th Recruitment 2025",
-      "organization": "",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
       "deadline": "28/09/2025",
@@ -18,9 +17,8 @@
       "daysLeft": 5
     },
     {
-      "id": "user_745811301",
+      "id": "user_193093225",
       "title": "BSSC Office Attendant Recruitment 2025",
-      "organization": "",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
       "deadline": "24/09/2025",
@@ -35,9 +33,8 @@
       "daysLeft": 1
     },
     {
-      "id": "user_151846913",
+      "id": "user_389113382",
       "title": "RBI Officers Grade B Recruitment 2025",
-      "organization": "",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
       "deadline": "26/09/2025",
@@ -52,9 +49,8 @@
       "daysLeft": 3
     },
     {
-      "id": "user_479807926",
+      "id": "user_978141301",
       "title": "RRB Section Controller Recruitment 2025",
-      "organization": "",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
       "deadline": "14/10/2025",
@@ -69,9 +65,8 @@
       "daysLeft": 21
     },
     {
-      "id": "user_146694882",
+      "id": "user_631928695",
       "title": "BSSC CGL Recruitment 2025",
-      "organization": "",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
       "deadline": "26/09/2025",
@@ -86,9 +81,8 @@
       "daysLeft": 3
     },
     {
-      "id": "user_282210282",
+      "id": "user_863563791",
       "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
-      "organization": "",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
       "deadline": "26/09/2025",
@@ -103,9 +97,8 @@
       "daysLeft": 3
     },
     {
-      "id": "user_510200961",
+      "id": "user_866851933",
       "title": "SSC Delhi Police Recruitment 2025",
-      "organization": "",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
       "deadline": "21-10-2025",
@@ -120,9 +113,8 @@
       "daysLeft": 28
     },
     {
-      "id": "user_616867580",
+      "id": "user_306266415",
       "title": "EMRS Non Teaching Various Post Recruitment 2025",
-      "organization": "",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
       "deadline": "23/10/2025",
@@ -141,7 +133,6 @@
     {
       "id": "src_8cdeeddcddefdd2e",
       "title": "Centralised Employment Notice No. 05/2024 for recruitment of various graduate posts of Non-Technical Popular Categories",
-      "organization": "N/A",
       "deadline": "N/A",
       "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
       "slug": "centralised-employment-notice-no-05-2024-for-recruitment-of-various-graduate-pos",
@@ -149,7 +140,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-23T13:45:13.219365Z",
+      "extractedAt": "2025-09-23T17:38:49.280182Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -163,7 +154,6 @@
     {
       "id": "src_a7e10b91ed5a646f",
       "title": "Centralised Employment Notice No. 06/2024 for recruitment of various undergraduate posts of Non-Technical Popular Categories",
-      "organization": "N/A",
       "deadline": "N/A",
       "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
       "slug": "centralised-employment-notice-no-06-2024-for-recruitment-of-various-undergraduat",
@@ -171,7 +161,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-23T13:45:13.219161Z",
+      "extractedAt": "2025-09-23T17:38:49.279948Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -185,7 +175,6 @@
     {
       "id": "src_ab48ec3436e06f17",
       "title": "Corrigendum-1 for CEN 05-2024 NTPC-Graduate posts",
-      "organization": "N/A",
       "deadline": "N/A",
       "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-1.pdf",
       "slug": "corrigendum-1-for-cen-05-2024-ntpc-graduate-posts",
@@ -193,7 +182,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-23T13:45:13.219301Z",
+      "extractedAt": "2025-09-23T17:38:49.280093Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -207,7 +196,6 @@
     {
       "id": "src_f61bb6c955a40af5",
       "title": "Corrigendum-1 regarding revision of notified vacancies for CEN 06-2024 NTPC-Undergraduate posts",
-      "organization": "N/A",
       "deadline": "N/A",
       "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
       "slug": "corrigendum-1-regarding-revision-of-notified-vacancies-for-cen-06-2024-ntpc-unde",
@@ -215,7 +203,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-23T13:45:13.218505Z",
+      "extractedAt": "2025-09-23T17:38:49.279289Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -229,7 +217,6 @@
     {
       "id": "src_857de82dd19ac693",
       "title": "Corrigendum-2 regarding revision of notified vacancies of CEN 05-2024 NTPC-Graduate posts",
-      "organization": "N/A",
       "deadline": "N/A",
       "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
       "slug": "corrigendum-2-regarding-revision-of-notified-vacancies-of-cen-05-2024-ntpc-gradu",
@@ -237,7 +224,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-23T13:45:13.218667Z",
+      "extractedAt": "2025-09-23T17:38:49.279464Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -253,24 +240,24 @@
     "applied": [],
     "other": [],
     "primary": [
-      "user_997016391",
-      "user_745811301",
-      "user_151846913",
-      "user_479807926",
-      "user_146694882",
-      "user_282210282",
-      "user_510200961",
-      "user_616867580"
+      "user_964232552",
+      "user_193093225",
+      "user_389113382",
+      "user_978141301",
+      "user_631928695",
+      "user_863563791",
+      "user_866851933",
+      "user_306266415"
     ]
   },
   "transparencyInfo": {
-    "schemaVersion": "1.4",
+    "schemaVersion": "1.5",
     "runMode": "nightly",
     "totalListings": 8,
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-23T13:47:19.074792Z",
+    "lastUpdated": "2025-09-23T17:41:28.481086Z",
     "mergedUpdates": 0
   }
 }
