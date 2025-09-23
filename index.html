@@ -1,144 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>General Vacancy Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Cache-Control" content="no-store" />
+<link rel="stylesheet" href="style.css" />
+<style>
+.tabs{ display:flex; gap:10px; border-bottom:1px solid #1f2740; margin:10px 0 16px; }
+.tab{ padding:8px 12px; border-radius:8px 8px 0 0; cursor:pointer; color:#bcd2ff; }
+.tab.active{ background:#131a31; border:1px solid #1f2740; border-bottom-color:transparent; }
+.panel{ display:none; }
+.panel.active{ display:block; }
+.card-actions{ flex-wrap: wrap; row-gap: 6px; }
+.btn[data-act="report"]{ min-width: 68px; }
+.applied .card-actions .btn:not([data-act="exam_done"]):not([data-act="undo_vote"]){ display:none; }
+.badge-done{ padding:2px 8px; border-radius:12px; border:1px solid #2a334f; background:#17203c; color:#99b3ff; margin-left:8px; font-size:12px; }
+#toast{ position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#141b33;color:#e9eef9;border:1px solid #1f2740;border-radius:10px;padding:8px 12px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s ease; z-index: 30; }
+#confirm{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(9,12,23,0.6); z-index:25; }
+#confirm .box{ width:min(360px,92vw); background:linear-gradient(180deg,#141a2e,#0f1528); border:1px solid #1f2740; border-radius:12px; padding:14px; color:#e9eef9; }
+#confirm .row{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; flex-direction: row-reverse; }
+.chip.tick{ border:1px solid #2f6e3a; background:#0f2a18; color:#8EE59E; margin-left:6px; }
+.hide-on-verified{ display:inline-flex; } .verified .hide-on-verified{ display:none !important; }
+#snackbar{ position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:#0e152b; color:#e9eef9; border:1px solid #223055; border-radius:12px; padding:10px 12px; font-size:13px; display:none; align-items:center; gap:12px; z-index:35; }
+#snackbar .btn{ padding:6px 10px; }
+#snackbar .count{ color:#9fb3ff; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <h1>General Vacancy Dashboard</h1>
+    <div class="meta">
+      <span id="health-pill" class="pill">Health: Unknown</span>
+      <span id="last-updated" class="muted">Last updated: —</span>
+      <span id="total-listings" class="muted">Listings: —</span>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="btn-missing" class="btn ghost" type="button">Submit missing</button>
+  </div>
+</header>
+
+<main class="container">
+  <div class="tabs">
+    <div class="tab active" data-tab="open">Open</div>
+    <div class="tab" data-tab="applied">Applied</div>
+    <div class="tab" data-tab="other">Other</div>
+  </div>
+
+  <div id="panel-open" class="panel active">
+    <div id="open-root" class="cards-grid"></div>
+  </div>
+  <div id="panel-applied" class="panel">
+    <div id="applied-root" class="cards-grid"></div>
+  </div>
+  <div id="panel-other" class="panel">
+    <div id="other-root" class="cards-grid"></div>
+  </div>
+</main>
+
+<!-- Missing modal -->
+<div id="missing-modal" class="modal hidden" aria-hidden="true">
+  <div class="modal-body">
+    <div class="modal-head">
+      <h3>Submit Missing Vacancy</h3>
+      <button type="button" class="icon-btn" data-close>&times;</button>
+    </div>
+    <form id="missingForm" class="form">
+      <label>Post name</label>
+      <input id="missingTitle" placeholder="e.g., EMRS Non‑teaching 2025" required />
+      <div class="grid2">
+        <div>
+          <label>Notification link (required)</label>
+          <input id="missingUrl" placeholder="PDF or notice URL" required />
+        </div>
+        <div>
+          <label>Official website (optional)</label>
+          <input id="missingSite" placeholder="https://...gov.in/ or portal home" />
+        </div>
+      </div>
+      <label>Last date (DD-MM-YYYY or N/A)</label>
+      <input id="missingLastDate" placeholder="27-10-2025 or N/A" />
+      <label>Note (optional)</label>
+      <textarea id="missingNote" rows="3" placeholder="Any extra info"></textarea>
+      <div class="row end">
+        <button type="button" class="btn ghost" data-close>Close</button>
+        <button type="submit" class="btn primary">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Report modal -->
+<div id="report-modal" class="modal hidden" aria-hidden="true">
+  <div class="modal-body">
+    <div class="modal-head">
+      <h3>Report listing</h3>
+      <button type="button" class="icon-btn" data-close>&times;</button>
+    </div>
+    <form id="reportForm" class="form">
+      <input type="hidden" id="reportListingId" />
+      <label>Reason</label>
+      <select id="reportReason" class="select">
+        <option value="" disabled selected>Select reason…</option>
+        <option value="not_vacancy">Not a vacancy (result/admit/exam date)</option>
+        <option value="last_date_over">Last date over</option>
+        <option value="wrong_last_date">Wrong last date</option>
+        <option value="wrong_eligibility">Wrong eligibility</option>
+        <option value="wrong_domicile">Wrong domicile</option>
+        <option value="duplicate">Duplicate / Already listed</option>
+        <option value="bad_link">Broken / Unofficial link</option>
+        <option value="other">Other</option>
+      </select>
+      <div class="grid2">
+        <div>
+          <label>Evidence URL (optional)</label>
+          <input id="reportEvidenceUrl" placeholder="Official page" />
+        </div>
+        <div>
+          <label>Note (optional)</label>
+          <input id="reportNote" placeholder="Tell more if needed" />
+        </div>
+      </div>
+      <div class="row end gap">
+        <button type="button" class="btn ghost" data-close>Close</button>
+        <button type="submit" class="btn danger">Report</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Confirm / Snackbar / Toast -->
+<div id="confirm"><div class="box">
+  <div id="confirm-text">Confirm?</div>
+  <div class="row">
+    <button id="confirm-cancel" class="btn ghost">Cancel</button>
+    <button id="confirm-ok" class="btn primary">OK</button>
+  </div>
+</div></div>
+<div id="snackbar">
+  <span id="snack-text">Saved</span>
+  <span class="count" id="snack-count">(10s)</span>
+  <button id="snack-undo" class="btn ghost">Undo</button>
+</div>
+<div id="toast"></div>
+
 <script>
 (function(){
   var ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
-  var bust = ()=>"?t="+Date.now();
+  var bust = function(){ return "?t=" + Date.now(); };
 
   function qs(s, r){ return (r||document).querySelector(s); }
   function qsa(s, r){ return Array.from((r||document).querySelectorAll(s)); }
-  function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, c=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c])); }
+  function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]; }); }
   function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
-  function toast(msg){ var t=qs("#toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1600); }
+  function toast(msg){ var t=qs("#toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; },1600); }
 
-  // local stores + guards
-  const lsOK = (function(){ try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); return true; }catch{ return false; }})();
-  function L(k,d){ if(!lsOK) return d; try{ return JSON.parse(localStorage.getItem(k)||JSON.stringify(d)); }catch{ return d; } }
-  function S(k,v){ if(!lsOK) return; try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
-
-  var USER_STATE=L("vac_user_state",{}), USER_VOTES=L("vac_user_votes",{}), EXAM_DONE=L("vac_exam_done",{}), OUTBOX=L("vac_outbox",[]);
-
-  function saveAll(){ S("vac_user_state",USER_STATE); S("vac_user_votes",USER_VOTES); S("vac_exam_done",EXAM_DONE); S("vac_outbox",OUTBOX); }
-  function purgeExam(){ let now=Date.now(), ch=false; Object.keys(EXAM_DONE).forEach(id=>{ if(now-Date.parse(EXAM_DONE[id])>172800000){ delete EXAM_DONE[id]; ch=true; } }); if(ch) S("vac_exam_done",EXAM_DONE); }
-  async function flushOutbox(){
-    if(!OUTBOX.length) return;
-    let rest=[];
-    for(const p of OUTBOX){
-      try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p); }
-      catch{ rest.push(p); }
-    }
-    OUTBOX=rest; S("vac_outbox",OUTBOX);
+  // Global snackbar
+  var SNACK_TIMER=null, SNACK_LEFT=0;
+  function showSnack(text, seconds, undoFn){
+    var s=qs("#snackbar"); qs("#snack-text").textContent=text; SNACK_LEFT=seconds;
+    qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; s.style.display="flex";
+    clearInterval(SNACK_TIMER);
+    SNACK_TIMER=setInterval(()=>{ SNACK_LEFT--; if(SNACK_LEFT<=0){ hideSnack(); } else { qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; } },1000);
+    qs("#snack-undo").onclick = async function(){ hideSnack(); try{ await undoFn(); }catch(e){} };
   }
-  function enqueue(payload){ OUTBOX.push(payload); S("vac_outbox",OUTBOX); setTimeout(flushOutbox, 1500); }
+  function hideSnack(){ var s=qs("#snackbar"); s.style.display="none"; clearInterval(SNACK_TIMER); SNACK_TIMER=null; }
+
+  function confirmBox(message){
+    return new Promise(res=>{
+      var c=qs("#confirm"); qs("#confirm-text").textContent = message || "Confirm?";
+      c.style.display="flex";
+      function done(v){ c.style.display="none"; ok.removeEventListener("click",okH); cancel.removeEventListener("click",cancelH); res(v); }
+      var ok=qs("#confirm-ok"), cancel=qs("#confirm-cancel");
+      function okH(){ done(true); } function cancelH(){ done(false); }
+      ok.addEventListener("click", okH); cancel.addEventListener("click", cancelH);
+    });
+  }
 
   // Tabs
   function activate(tab){
     qsa(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===tab));
     qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+tab));
   }
-  qs("#tabs").addEventListener("click", (e)=>{
-    const btn=e.target.closest(".tab"); if(!btn) return;
-    activate(btn.dataset.tab);
+  document.addEventListener("click", function(e){
+    var t=e.target.closest(".tab"); if(!t) return; activate(t.dataset.tab);
   });
 
-  // Render single-flight scheduler
-  let RQ = { pending:false, scheduled:false };
-  async function runRender(){
-    if(RQ.pending){ RQ.scheduled=true; return; }
-    RQ.pending=true; try{ await renderReal(); } catch(e){ console.error(e); toast("Display error, retrying…"); }
-    RQ.pending=false;
-    if(RQ.scheduled){ RQ.scheduled=false; requestAnimationFrame(runRender); }
+  // State
+  var USER_STATE = {};
+  var USER_VOTES = {};
+  async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok){ USER_STATE=await r.json(); } }catch{} }
+  function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({}, USER_STATE, j); }catch{} }
+  function setUserStateLocal(jobId, action){ if(!jobId) return; if(action==="undo") delete USER_STATE[jobId]; else USER_STATE[jobId]={action, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{} }
+  function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
+  function setVoteLocal(jobId, vote){ USER_VOTES[jobId]={vote, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
+  function clearVoteLocal(jobId){ delete USER_VOTES[jobId]; try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
+
+  // Robust POST with queue to avoid losses on refresh
+  var OUTBOX = (function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; } })();
+  function saveOutbox(){ try{ localStorage.setItem("vac_outbox", JSON.stringify(OUTBOX)); }catch{} }
+  async function flushOutbox(){
+    if(!OUTBOX.length) return;
+    let rest=[];
+    for(const p of OUTBOX){
+      try{
+        const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});
+        if(!r.ok) rest.push(p);
+      }catch{ rest.push(p); }
+    }
+    OUTBOX = rest; saveOutbox();
   }
-  function requestRender(){ requestAnimationFrame(runRender); }
+  async function postJSON(payload){
+    try{
+      const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      if(!r.ok) throw new Error("net");
+    }catch{
+      OUTBOX.push(payload); saveOutbox(); setTimeout(flushOutbox, 1500);
+    }
+    return true;
+  }
 
   async function renderStatus(){
-    const pill=qs("#health-pill"), last=qs("#last-updated"), total=qs("#total-listings");
+    var pill=qs("#health-pill"), last=qs("#last-updated"), total=qs("#total-listings");
     try{
-      const h=await (await fetch("health.json"+bust(),{cache:"no-store"})).json();
+      var h=await (await fetch("health.json"+bust(),{cache:"no-store"})).json();
       pill.textContent=h.ok?"Health: OK":"Health: Not OK"; pill.className="pill "+(h.ok?"ok":"bad");
-      last.textContent="Last updated: "+(h.lastUpdated?new Date(h.lastUpdated).toLocaleString():"—");
+      var ts=h.lastUpdated||""; last.textContent="Last updated: "+(ts?new Date(ts).toLocaleString():"—");
       total.textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
-    }catch{ pill.textContent="Health: Unknown"; pill.className="pill"; last.textContent="Last updated: —"; total.textContent="Listings: —"; }
+    }catch(e){
+      pill.textContent="Health: Unknown"; pill.className="pill";
+      last.textContent="Last updated: —"; total.textContent="Listings: —";
+    }
   }
 
-  function postsValue(j){ return j.numberOfPosts ?? j.posts ?? j.vacancies ?? "N/A"; }
+  function setLocked(btn, label){ btn.textContent = label; btn.classList.add("disabled"); btn.setAttribute("aria-disabled","true"); }
+  function addUndo(container, onUndo, seconds){
+    var u=document.createElement("button");
+    u.className="btn ghost tiny"; u.textContent="Undo ("+seconds+"s)";
+    container.appendChild(u);
+    var left=seconds; var iv=setInterval(()=>{ left--; if(left<=0){ clearInterval(iv); u.remove(); } else { u.textContent="Undo ("+left+"s)"; } },1000);
+    u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
+  }
 
   function cardHTML(j, applied=false){
-    const trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip trust big">trusted</span>':"";
-    const d=j.daysLeft!=null?j.daysLeft:"—";
-    const det=esc(j.detailLink||j.applyLink||"#");
-    const srcRibbon=(j.source||"").toLowerCase()==="official" ? '<span class="chip big" title="Official source">Official</span>' : '<span class="chip big" title="From aggregator">Agg</span>';
-    const lid=j.id||"", isExamDone=!!EXAM_DONE[lid]; const showVote=!(applied||isExamDone);
-    return '<article class="ua-card'+(applied?' applied':'')+'" data-id="'+esc(lid)+'">'+
-      '<div class="ua-head"><h3 class="ua-title">'+esc(j.title||"No Title")+'</h3><div class="ua-chips">'+srcRibbon+chip+'</div></div>'+
-      '<div class="ua-body">'+
-        '<div class="ua-row"><span class="muted">Number of posts</span><span>'+esc(postsValue(j))+'</span></div>'+
-        '<div class="ua-row"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
-        '<div class="ua-row"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
-        '<div class="ua-row"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
+    var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip ok">✓ trusted</span>':"";
+    var d=j.daysLeft!=null?j.daysLeft:"—";
+    var det=esc(j.detailLink||j.applyLink||"#");
+    var appliedBadge = applied ? '<span class="badge-done">Applied</span>' : '';
+    var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
+    var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
+    var voteTick = vote==="right" ? '<span class="chip tick" title="Verified by user">✓</span>' : "";
+    var verifiedClass = vote==="right" ? " verified" : "";
+
+    return '<article class="card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
+      '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+srcRibbon+voteTick+chip+appliedBadge+'</header>'+
+      '<div class="card-body">'+
+        '<div class="rowline"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
+        '<div class="rowline"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
+        '<div class="rowline"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
+        '<div class="rowline"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
       '</div>'+
-      '<div class="ua-bottombar"><a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a><span class="spacer"></span><button class="btn danger" data-act="report">Report</button></div>'+
-      '<footer class="ua-actions2">'+
-        (isExamDone? '<div class="exam-row"><span class="exam-badge">Exam over</span><button class="btn ghost tiny" data-act="exam_clear">Clear</button></div>' :
-          '<div class="row2">'+
-            (showVote? '<div class="btn-pair"><button class="btn ok" data-act="right">Right</button><button class="btn warn" data-act="wrong">Wrong</button></div>' : '<span></span>')+
-            '<span class="spacer"></span>'+
-            (applied? '<button class="btn applied-pill" data-act="exam_done">Exam done</button>' :
-              '<div class="btn-pair"><button class="btn applied-pill" data-act="applied">Applied</button><button class="btn neutral-pill" data-act="not_interested">Not interested</button></div>')+
-          '</div>')+
-      '</footer></article>';
+      '<footer class="card-actions">'+
+        '<span class="hide-on-verified">'+
+          '<button class="btn danger" data-act="report">Report</button>'+
+          '<button class="btn ok" data-act="right">Right</button>'+
+          '<button class="btn warn" data-act="wrong">Wrong</button>'+
+        '</span>'+
+        '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
+        '<span class="spacer"></span>'+
+        (applied ? '<button class="btn" data-act="exam_done">Exam done</button>'
+                 : '<button class="btn" data-act="applied">Applied</button><button class="btn" data-act="not_interested">Not interested</button>')+
+      '</footer>'+
+    '</article>';
   }
 
   function sortByDeadline(list){
-    const parse=(s)=>{ if(!s||s.toUpperCase()==="N/A") return null; const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null; const ms=Date.UTC(+a[2],+a[1]-1,+a[0]); return isNaN(ms)?null:ms; };
-    return list.slice().sort((a,b)=>{ const da=parse(a.deadline), db=parse(b.deadline); if(da===null && db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da-db; });
+    const parse = (s)=>{ if(!s||s.toUpperCase()==="N/A") return null; const t=s.replaceAll("-","/"); const a=t.split("/"); if(a.length!==3) return null; const ms=Date.UTC(+a[2], +a[1]-1, +a[0]); return isNaN(ms)?null:ms; };
+    return list.slice().sort((a,b)=>{ const da=parse(a.deadline), db=parse(b.deadline); if(da===null && db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da - db; });
   }
 
-  async function renderReal(){
-    const rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
-    rootOpen.innerHTML=rootApp.innerHTML=rootOther.innerHTML="";
-    purgeExam(); await flushOutbox();
+  // Render guard to stop white flash on fast clicks/refresh
+  let renderToken = 0;
+  async function render(){
+    const myToken = ++renderToken;
 
-    const data=await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
-    const list=sortByDeadline(Array.isArray(data.jobListings)? data.jobListings:[]);
-    const sections=data.sections||{};
-    qs("#total-listings").textContent="Listings: "+list.length;
+    var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
+    // Do not clear panels yet; build fragments first to avoid blank
+    await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); await flushOutbox();
 
-    let idsApplied=new Set(sections.applied||[]), idsOther=new Set(sections.other||[]);
-    Object.entries(USER_STATE||{}).forEach(([jid, st])=>{
-      const a=(st||{}).action;
-      if(a==="applied"){ idsApplied.add(jid); idsOther.delete(jid); }
-      if(a==="not_interested"){ idsOther.add(jid); idsApplied.delete(jid); }
-      if(a==="undo"){ idsApplied.delete(jid); idsOther.delete(jid); }
+    var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
+    if (myToken !== renderToken) return; // stale
+
+    var list = sortByDeadline(Array.isArray(data.jobListings)? data.jobListings : []);
+    var sections = data.sections || {};
+    qs("#total-listings").textContent = "Listings: " + list.length;
+
+    var idsApplied = new Set(sections.applied||[]);
+    var idsOther = new Set(sections.other||[]);
+    Object.entries(USER_STATE).forEach(([jid, s])=>{
+      if(!s || !s.action) return;
+      if(s.action==="applied"){ idsApplied.add(jid); idsOther.delete(jid); }
+      if(s.action==="not_interested"){ idsOther.add(jid); idsApplied.delete(jid); }
+      if(s.action==="undo"){ idsApplied.delete(jid); idsOther.delete(jid); }
     });
 
-    const fOpen=document.createDocumentFragment(), fApp=document.createDocumentFragment(), fOther=document.createDocumentFragment();
+    var fOpen=document.createDocumentFragment(), fApp=document.createDocumentFragment(), fOther=document.createDocumentFragment();
     if(list.length===0){ rootOpen.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
 
     for(const job of list){
-      const isApplied=idsApplied.has(job.id);
-      const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job, isApplied); const card=wrap.firstElementChild;
+      const isApplied = idsApplied.has(job.id);
+      const wrap=document.createElement("div");
+      wrap.innerHTML = cardHTML(job, isApplied);
+      const card=wrap.firstElementChild;
 
-      card.addEventListener("click", (e)=>{
-        try{
-          const b=e.target.closest("[data-act]"); if(!b) return;
-          if(b.classList.contains("disabled")) return;
-          const act=b.getAttribute("data-act"), id=card.getAttribute("data-id"),
-                title=(card.querySelector(".ua-title")?.textContent||"").trim().slice(0,240),
-                detailsUrl=(card.querySelector("a.primary")?.href||"");
-          // Persist first, render later
-          if(act==="report"){
-            qs("#reportListingId").value=id; const m=qs("#report-modal"); m.classList.remove("hidden"); m.classList.add("flex"); m.setAttribute("aria-hidden","false"); return;
-          }
-          if(act==="right"){ USER_VOTES[id]={vote:"right", ts:new Date().toISOString()}; S("vac_user_votes",USER_VOTES); OUTBOX.push({type:"vote", vote:"right", jobId:id, title, url:detailsUrl, ts:new Date().toISOString()}); S("vac_outbox",OUTBOX); requestRender(); return; }
-          if(act==="wrong"){ USER_VOTES[id]={vote:"wrong", ts:new Date().toISOString()}; S("vac_user_votes",USER_VOTES); OUTBOX.push({type:"vote", vote:"wrong", jobId:id, title, url:detailsUrl, ts:new Date().toISOString()}); S("vac_outbox",OUTBOX); requestRender(); return; }
-          if(act==="applied"){ USER_STATE[id]={action:"applied", ts:new Date().toISOString()}; S("vac_user_state",USER_STATE); OUTBOX.push({type:"state", payload:{jobId:id, action:"applied", ts:new Date().toISOString()}}); S("vac_outbox",OUTBOX); requestRender(); return; }
-          if(act==="not_interested"){ USER_STATE[id]={action:"not_interested", ts:new Date().toISOString()}; S("vac_user_state",USER_STATE); OUTBOX.push({type:"state", payload:{jobId:id, action:"not_interested", ts:new Date().toISOString()}}); S("vac_outbox",OUTBOX); requestRender(); return; }
-          if(act==="exam_done"){ EXAM_DONE[id]=new Date().toISOString(); S("vac_exam_done",EXAM_DONE); requestRender(); return; }
-          if(act==="exam_clear"){ delete EXAM_DONE[id]; S("vac_exam_done",EXAM_DONE); requestRender(); return; }
-        }catch(err){
-          console.error("click-handler", err);
-          toast("Action saved locally; refreshing view…");
-          requestRender();
+      card.addEventListener("click", async function(e){
+        const b=e.target.closest("[data-act]"); if(!b) return;
+        if(b.classList.contains("disabled")) return;
+        const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
+              title=(this.querySelector(".title")?.textContent||"").trim().slice(0,240),
+              detailsUrl=(this.querySelector("a.primary")?.href||"");
+        const actions = this.querySelector(".hide-on-verified");
+
+        if(act==="report"){
+          qs("#reportListingId").value=id; qs("#report-modal").classList.remove("hidden"); qs("#report-modal").setAttribute("aria-hidden","false"); return;
         }
+
+        if(act==="right"){
+          const ok = await confirmBox("Confirm: mark right?"); if(!ok) return;
+          setVoteLocal(id, "right"); this.classList.add("verified"); if(actions) actions.style.display="none";
+          const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_right", jobId:id, title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
+          addUndo(this.querySelector(".card-actions"), undoFn, 10);
+          showSnack("Saved ✓", 10, undoFn);
+          postJSON({ type:"vote", vote:"right", jobId:id, title, url:detailsUrl, ts:new Date().toISOString() });
+          return;
+        }
+
+        if(act==="wrong"){
+          const ok = await confirmBox("Confirm: mark wrong?"); if(!ok) return;
+          setVoteLocal(id, "wrong"); setLocked(b,"Marked ✖");
+          const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
+          addUndo(this.querySelector(".card-actions"), undoFn, 10);
+          showSnack("Saved ✖", 10, undoFn);
+          postJSON({ type:"vote", vote:"wrong", jobId:id, title, url:detailsUrl, ts:new Date().toISOString() });
+          return;
+        }
+
+        if(act==="applied"||act==="not_interested"){
+          const ok = await confirmBox("Confirm: "+act.replace("_"," ")+"?"); if(!ok) return;
+          setUserStateLocal(id, act); // write first
+          const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await render(); };
+          addUndo(this.querySelector(".card-actions"), undoFn, 10);
+          showSnack("Saved", 10, undoFn);
+          postJSON({ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } });
+          await render(); return;
+        }
+
+        if(act==="exam_done"){ setLocked(b,"Done ✓"); return; }
       });
 
       if(isApplied) fApp.appendChild(card);
@@ -146,57 +365,70 @@
       else fOpen.appendChild(card);
     }
 
-    rootOpen.appendChild(fOpen);
-    rootApp.appendChild(fApp);
-    rootOther.appendChild(fOther);
+    // Now swap DOM content once, preventing white flash
+    rootOpen.replaceChildren(fOpen);
+    rootApp.replaceChildren(fApp);
+    rootOther.replaceChildren(fOther);
+
+    scheduleDeadlineAlerts(list);
   }
 
-  // Modals + forms
-  function openModal(id){ const m=qs(id); if(m){ m.classList.remove("hidden"); m.classList.add('flex'); m.setAttribute("aria-hidden","false"); } }
-  function closeModal(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.classList.remove('flex'); m.setAttribute("aria-hidden","true"); } }
-  document.addEventListener("click", (e)=>{ if(e.target && e.target.hasAttribute("data-close")) closeModal(e.target); });
+  function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
+  function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
+  document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
 
-  document.addEventListener("DOMContentLoaded", async ()=>{
-    await renderStatus(); requestRender();
+  async function scheduleDeadlineAlerts(list){
+    try{ if(Notification && Notification.permission==="default"){ await Notification.requestPermission(); } }catch(e){}
+    const notified = JSON.parse(localStorage.getItem("vac_deadline_notified")||"{}");
+    const today = new Date(); today.setHours(0,0,0,0);
+    function parseDDMMYYYY(s){ if(!s||s.toUpperCase()==="N/A") return null; const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null; const d=new Date(+a[2], +a[1]-1, +a[0]); d.setHours(0,0,0,0); return isNaN(d.getTime())?null:d; }
+    for(const j of list){
+      const d=parseDDMMYYYY(j.deadline); if(!d) continue;
+      const diffDays = Math.round((d.getTime()-today.getTime())/86400000);
+      if(diffDays<=2 && diffDays>=0){
+        const id=j.id||esc(j.title||""); if(notified[id]) continue;
+        try{ if(Notification && Notification.permission==="granted"){ new Notification("Vacancy closing soon", { body: (j.title||"") + " ends in "+diffDays+" day(s)." }); } else { toast((j.title||"") + " ends in "+diffDays+" day(s)."); } }catch(e){ toast((j.title||"") + " ends in "+diffDays+" day(s)."); }
+        notified[id]=true;
+      }
+    }
+    localStorage.setItem("vac_deadline_notified", JSON.stringify(notified));
+  }
 
-    qs("#btn-missing")?.addEventListener("click", ()=>openModal("#missing-modal"));
+  document.addEventListener("DOMContentLoaded", async function(){
+    await renderStatus();
+    await render();
 
-    qs("#reportForm")?.addEventListener("submit", (e)=>{
+    qs("#btn-missing")?.addEventListener("click", function(){ openModal("#missing-modal"); });
+
+    qs("#reportForm")?.addEventListener("submit", async function(e){
       e.preventDefault();
-      try{
-        const id=qs("#reportListingId").value.trim();
-        const rc=qs("#reportReason").value||"";
-        const ev=qs("#reportEvidenceUrl").value.trim();
-        const posts=qs("#reportPosts").value.trim();
-        const note=qs("#reportNote").value.trim();
-        if(!id || !rc) return toast("Please select a reason.");
-        OUTBOX.push({ type:"report", jobId:id, reasonCode:rc, evidenceUrl:ev, posts:posts||null, note, ts:new Date().toISOString() });
-        S("vac_outbox",OUTBOX);
-        closeModal(e.target); e.target.reset(); toast("Reported.");
-        requestRender();
-      }catch(err){ console.error(err); toast("Saved, displaying soon…"); requestRender(); }
+      var id=qs("#reportListingId").value.trim();
+      var rc = document.getElementById("reportReason").value || "";
+      var rtxt = rc.replace(/_/g," ");
+      var ev = document.getElementById("reportEvidenceUrl").value.trim();
+      var note = document.getElementById("reportNote").value.trim();
+      if(!id || !rc) return toast("Please select a reason.");
+      await postJSON({ type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() });
+      closeModal(e.target); e.target.reset(); toast("Reported.");
     });
 
-    const SUBLOCK=new Set();
-    qs("#missingForm")?.addEventListener("submit", (e)=>{
+    var SUBMIT_LOCK = new Set();
+    qs("#missingForm")?.addEventListener("submit", async function(e){
       e.preventDefault();
-      try{
-        const title=qs("#missingTitle").value.trim();
-        const url=qs("#missingUrl").value.trim();
-        const site=qs("#missingSite").value.trim();
-        const last=qs("#missingLastDate").value.trim();
-        const posts=qs("#missingPosts").value.trim();
-        const note=qs("#missingNote").value.trim();
-        if(!title||!url) return toast("Post name and notification link are required.");
-        const key=url.replace(/[?#].*$/,"").toLowerCase();
-        if(SUBLOCK.has(key)) return toast("Already submitted.");
-        SUBLOCK.add(key);
-        OUTBOX.push({ type:"missing", title, url, officialSite:site, lastDate:last, posts:posts||null, note, ts:new Date().toISOString() });
-        S("vac_outbox",OUTBOX);
-        closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh.");
-        requestRender();
-      }catch(err){ console.error(err); toast("Saved, displaying soon…"); requestRender(); }
+      var title=qs("#missingTitle").value.trim();
+      var url=qs("#missingUrl").value.trim();
+      var site=qs("#missingSite").value.trim();
+      var last=qs("#missingLastDate").value.trim();
+      var note=document.getElementById("missingNote").value.trim();
+      if(!title||!url) return toast("Post name and notification link are required.");
+      var key = url.replace(/[?#].*$/,"").toLowerCase();
+      if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
+      SUBMIT_LOCK.add(key);
+      await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, note:note, ts:new Date().toISOString() });
+      closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh.");
     });
   });
 })();
 </script>
+</body>
+</html>
