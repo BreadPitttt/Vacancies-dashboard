@@ -33,7 +33,6 @@
 </head>
 
 <body class="bg-surface text-text">
-  <!-- Top bar -->
   <header class="w-full border-b border-line bg-white sticky top-0 z-20">
     <div class="mx-auto max-w-7xl px-4 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -51,7 +50,6 @@
     </div>
   </header>
 
-  <!-- Content -->
   <main class="mx-auto max-w-7xl px-4 py-5">
     <div class="flex gap-2">
       <div class="tab active" data-tab="open">Open</div>
@@ -252,13 +250,11 @@
         var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
         var verifiedClass = vote==="right" ? " verified" : "";
 
-        // First row: Details (left), Report (right). If verified, first row hides.
-        // Second row: Right/Wrong together, Applied/Not interested together.
         return '<article class="ua-card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
           '<div class="ua-head">'+
             '<h3 class="ua-title">'+esc(j.title||"No Title")+'</h3>'+
             '<div class="ua-chips">'+srcRibbon+chip+appliedBadge+'</div>'+
-          </div>'+
+          '</div>'+
           '<div class="ua-body">'+
             '<div class="ua-row"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
             '<div class="ua-row"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
@@ -271,7 +267,7 @@
               '<span class="spacer"></span>'+
               '<button class="btn danger" data-act="report">Report</button>'+
             '</div>'+
-            <div class="row2">'+
+            '<div class="row2">'+
               '<div class="btn-pair hide-on-verified">'+
                 '<button class="btn ok" data-act="right">Right</button>'+
                 '<button class="btn warn" data-act="wrong">Wrong</button>'+
@@ -393,7 +389,6 @@
       function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.classList.remove('flex'); m.setAttribute("aria-hidden","true"); } }
       document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
 
-      // Deadline alerts
       async function scheduleDeadlineAlerts(list){
         try{ if(Notification && Notification.permission==="default"){ await Notification.requestPermission(); } }catch(e){}
         const notified = JSON.parse(localStorage.getItem("vac_deadline_notified")||"{}");
@@ -429,7 +424,6 @@
           if(ok){ closeModal(e.target); e.target.reset(); toast("Reported."); }
         });
 
-        // Missing guard
         var SUBMIT_LOCK = new Set();
         qs("#missingForm")?.addEventListener("submit", async function(e){
           e.preventDefault();
