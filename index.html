@@ -5,81 +5,121 @@
   <title>General Vacancy Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
-  <!-- TailAdmin core: Tailwind + base styles (CDN build) -->
+  <!-- TailAdmin core (Tailwind v3 CDN build) -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-  <script src="https://cdn.tailwindcss.com/3.4.10"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.12.0/tabler-icons.min.css" />
-  <!-- Minimal TailAdmin palette -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
           colors: {
-            primary: { DEFAULT: '#3C82F6' },
-            surface: '#0b1220',
+            surface: '#0b1222',
             card: '#0f172a',
-            border: '#1e293b',
-            muted: '#94a3b8',
+            line: '#1f2740',
+            accent: '#3b82f6',
           }
         }
       }
     }
   </script>
-  <!-- Local overrides (keep last) -->
+  <!-- TailAdmin typography and icons (optional) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css">
+  <!-- Local overrides should come last -->
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Tabs */
+    .tabs{ display:flex; gap:10px; border-bottom:1px solid #1f2740; margin:10px 0 16px; }
+    .tab{ padding:8px 12px; border-radius:8px 8px 0 0; cursor:pointer; color:#bcd2ff; }
+    .tab.active{ background:#131a31; border:1px solid #1f2740; border-bottom-color:transparent; }
+    .panel{ display:none; }
+    .panel.active{ display:block; }
+    /* Card actions */
+    .card-actions{ display:flex; align-items:center; gap:8px; flex-wrap: wrap; row-gap: 6px; }
+    .btn[data-act="report"]{ min-width: 68px; }
+    .applied .card-actions .btn:not([data-act="exam_done"]):not([data-act="undo_vote"]){ display:none; }
+    .badge-done{ padding:2px 8px; border-radius:12px; border:1px solid #2a334f; background:#17203c; color:#99b3ff; margin-left:8px; font-size:12px; }
+    /* Toast */
+    #toast{ position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#141b33;color:#e9eef9;border:1px solid #1f2740;border-radius:10px;padding:8px 12px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s ease; z-index: 30; }
+    /* Confirm */
+    #confirm{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(9,12,23,0.6); z-index:25; }
+    #confirm .box{ width:min(360px,92vw); background:linear-gradient(180deg,#141a2e,#0f1528); border:1px solid #1f2740; border-radius:12px; padding:14px; color:#e9eef9; }
+    #confirm .row{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; flex-direction: row-reverse; } /* OK left */
+    .chip{ display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:12px; border:1px solid #24304d; color:#bcd2ff; font-size:12px; margin-left:6px; }
+    .chip.ok{ color:#8EE59E; border-color:#2f6e3a; background:#0f2a18; }
+    .chip.tick{ border:1px solid #2f6e3a; background:#0f2a18; color:#8EE59E; margin-left:6px; }
+    .hide-on-verified{ display:inline-flex; } .verified .hide-on-verified{ display:none !important; }
+    /* Snackbar */
+    #snackbar{ position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:#0e152b; color:#e9eef9; border:1px solid #223055; border-radius:12px; padding:10px 12px; font-size:13px; display:none; align-items:center; gap:12px; z-index:35; }
+    #snackbar .btn{ padding:6px 10px; }
+    #snackbar .count{ color:#9fb3ff; }
+    /* TailAdmin-like card shell using Tailwind */
+    .ta-card{ background:#0f172a; border:1px solid #1f2740; border-radius:12px; }
+    .ta-head{ padding:14px 14px 0 14px; display:flex; align-items:center; justify-content:space-between; }
+    .ta-title{ font-size:16px; font-weight:600; color:#e8eefc; }
+    .ta-body{ padding:10px 14px 8px 14px; color:#c9d4f0; font-size:14px; }
+    .ta-row{ display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #1f2740; }
+    .ta-row:last-child{ border-bottom:none; }
+    .muted{ color:#8aa0d5; }
+    .cards-grid{ display:grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap:14px; }
+    .cards-grid > article{ grid-column: span 4 / span 4; }
+    @media (max-width: 1024px){ .cards-grid > article{ grid-column: span 6 / span 6; } }
+    @media (max-width: 640px){ .cards-grid > article{ grid-column: span 12 / span 12; } }
+    .btn{ padding:6px 10px; border-radius:10px; background:#111a33; color:#e8eefc; border:1px solid #283356; cursor:pointer; font-size:13px; }
+    .btn.primary{ background:#1e293b; border-color:#2b3b66; }
+    .btn.ok{ background:#0f2a18; border-color:#2f6e3a; color:#8EE59E; }
+    .btn.warn{ background:#2a1b0f; border-color:#6e3a2f; color:#f3c29b; }
+    .btn.danger{ background:#2a0f10; border-color:#6e2f3a; color:#f4aab1; }
+    .btn.ghost{ background:transparent; color:#bcd2ff; border:1px dashed #2a355a; }
+    .btn.tiny{ padding:4px 8px; font-size:12px; }
+    .pill{ padding:2px 8px; border-radius:12px; border:1px solid #2a355a; color:#bcd2ff; font-size:12px; }
+  </style>
 </head>
-<body class="bg-surface text-slate-200">
-  <!-- Top bar -->
-  <header class="sticky top-0 z-30 backdrop-blur bg-surface/80 border-b border-border">
-    <div class="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
+
+<body class="bg-surface text-slate-100">
+  <!-- Top navbar -->
+  <header class="w-full border-b border-line bg-card/60 backdrop-blur sticky top-0 z-20">
+    <div class="mx-auto max-w-7xl px-4 h-14 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="h-8 w-8 rounded bg-primary/20 flex items-center justify-center text-primary">
+        <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
           <i class="ti ti-clipboard-text"></i>
-        </div>
-        <div>
-          <h1 class="text-lg font-semibold">General Vacancy Dashboard</h1>
-          <div class="text-sm text-muted flex items-center gap-3">
-            <span id="health-pill" class="inline-flex items-center px-2 py-0.5 rounded border border-border">Health: Unknown</span>
-            <span id="last-updated">Last updated: —</span>
-            <span id="total-listings">Listings: —</span>
-          </div>
-        </div>
+        </span>
+        <h1 class="font-semibold text-lg">General Vacancy Dashboard</h1>
+        <span id="health-pill" class="pill ml-3">Health: Unknown</span>
+        <span id="last-updated" class="ml-3 text-slate-400 text-sm">Last updated: —</span>
+        <span id="total-listings" class="ml-2 text-slate-400 text-sm">Listings: —</span>
       </div>
-      <button id="btn-missing" class="px-3 py-1.5 rounded border border-primary/40 text-primary hover:bg-primary/10">Submit missing</button>
+      <div>
+        <button id="btn-missing" class="btn ghost" type="button">Submit missing</button>
+      </div>
     </div>
   </header>
 
-  <!-- Tabs -->
-  <main class="mx-auto max-w-7xl px-4 py-6">
-    <div class="flex items-center gap-2 border-b border-border mb-4">
-      <button class="tab active px-3 py-2 rounded-t bg-card text-slate-100 border border-border border-b-transparent" data-tab="open">Open</button>
-      <button class="tab px-3 py-2 rounded-t text-slate-300 hover:text-white" data-tab="applied">Applied</button>
-      <button class="tab px-3 py-2 rounded-t text-slate-300 hover:text-white" data-tab="other">Other</button>
-      <div class="ml-auto flex items-center gap-2 text-sm text-muted">
-        <span class="hidden md:inline">Dark</span>
-        <label class="relative inline-flex cursor-pointer items-center">
-          <input id="toggle-theme" type="checkbox" class="peer sr-only" checked>
-          <div class="h-5 w-10 rounded-full bg-slate-600 peer-checked:bg-primary/70 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-5"></div>
-        </label>
-      </div>
+  <!-- Content -->
+  <main class="mx-auto max-w-7xl px-4 py-4">
+    <!-- Tabs -->
+    <div class="tabs"></div>
+    <div class="flex gap-2">
+      <div class="tab active" data-tab="open">Open</div>
+      <div class="tab" data-tab="applied">Applied</div>
+      <div class="tab" data-tab="other">Other</div>
     </div>
 
     <!-- Panels -->
-    <section id="panel-open" class="panel active">
-      <div id="open-root" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    <section id="panel-open" class="panel active mt-4">
+      <div id="open-root" class="cards-grid"></div>
     </section>
-    <section id="panel-applied" class="panel">
-      <div id="applied-root" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    <section id="panel-applied" class="panel mt-4">
+      <div id="applied-root" class="cards-grid"></div>
     </section>
-    <section id="panel-other" class="panel">
-      <div id="other-root" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    <section id="panel-other" class="panel mt-4">
+      <div id="other-root" class="cards-grid"></div>
     </section>
   </main>
 
   <!-- Missing modal -->
   <div id="missing-modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-body w-[min(680px,92vw)]">
+    <div class="modal-body">
       <div class="modal-head">
         <h3>Submit Missing Vacancy</h3>
         <button type="button" class="icon-btn" data-close>&times;</button>
@@ -111,7 +151,7 @@
 
   <!-- Report modal -->
   <div id="report-modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-body w-[min(680px,92vw)]">
+    <div class="modal-body">
       <div class="modal-head">
         <h3>Report listing</h3>
         <button type="button" class="icon-btn" data-close>&times;</button>
@@ -149,60 +189,50 @@
   </div>
 
   <!-- Custom confirm + snackbar + toast -->
-  <div id="confirm" class="fixed inset-0 hidden items-center justify-center bg-black/50 z-40">
-    <div class="box bg-card border border-border rounded-xl p-4 w-[min(360px,92vw)] shadow-lg">
-      <div id="confirm-text" class="text-slate-100">Confirm?</div>
-      <div class="mt-3 flex justify-end gap-2 flex-row-reverse">
-        <button id="confirm-cancel" class="px-3 py-1.5 rounded border border-border text-slate-300">Cancel</button>
-        <button id="confirm-ok" class="px-3 py-1.5 rounded bg-primary text-white">OK</button>
-      </div>
+  <div id="confirm"><div class="box">
+    <div id="confirm-text">Confirm?</div>
+    <div class="row">
+      <button id="confirm-cancel" class="btn ghost">Cancel</button>
+      <button id="confirm-ok" class="btn primary">OK</button>
     </div>
-  </div>
-
-  <div id="snackbar" class="hidden fixed left-1/2 -translate-x-1/2 bottom-16 bg-card border border-border rounded-xl px-3 py-2 z-40 items-center gap-3">
+  </div></div>
+  <div id="snackbar">
     <span id="snack-text">Saved</span>
-    <span id="snack-count" class="text-primary/80">(10s)</span>
-    <button id="snack-undo" class="px-2 py-1 rounded border border-border">Undo</button>
+    <span class="count" id="snack-count">(10s)</span>
+    <button id="snack-undo" class="btn ghost">Undo</button>
   </div>
+  <div id="toast"></div>
 
-  <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-4 bg-card border border-border rounded-xl px-3 py-2 z-40 opacity-0 pointer-events-none"></div>
-
-  <!-- App script: identical logic from the latest version (tabs, render, confirm/snackbar, votes, applied persistence) -->
+  <!-- App script (unchanged logic, adapted to TailAdmin classes) -->
   <script>
     (function(){
       var ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
       var bust = function(){ return "?t=" + Date.now(); };
 
-      // Theme toggle (kept minimal)
-      const toggle = document.getElementById('toggle-theme');
-      if (toggle) {
-        toggle.addEventListener('change', () => {
-          document.documentElement.classList.toggle('dark', toggle.checked);
-        });
-      }
-
       function qs(s, r){ return (r||document).querySelector(s); }
       function qsa(s, r){ return Array.from((r||document).querySelectorAll(s)); }
-      function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"" }[c])); }
+      function esc(s){ return (s==null? "": String(s)).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]; }); }
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
-      function toast(msg){ var t=qs("#toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
+      function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
       // Global snackbar
-      var LAST_ACTION = null, SNACK_TIMER=null, SNACK_LEFT=0;
+      var LAST_ACTION = null;
+      var SNACK_TIMER = null, SNACK_LEFT = 0;
       function showSnack(text, seconds, undoFn){
         var s=qs("#snackbar"); qs("#snack-text").textContent=text; SNACK_LEFT=seconds;
-        qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; s.classList.remove('hidden'); s.classList.add('flex');
+        qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; s.style.display="flex";
         clearInterval(SNACK_TIMER);
         SNACK_TIMER=setInterval(()=>{ SNACK_LEFT--; if(SNACK_LEFT<=0){ hideSnack(); } else { qs("#snack-count").textContent="("+SNACK_LEFT+"s)"; } }, 1000);
         qs("#snack-undo").onclick = async function(){ hideSnack(); await undoFn(); };
       }
-      function hideSnack(){ var s=qs("#snackbar"); s.classList.add('hidden'); s.classList.remove('flex'); clearInterval(SNACK_TIMER); SNACK_TIMER=null; }
+      function hideSnack(){ var s=qs("#snackbar"); s.style.display="none"; clearInterval(SNACK_TIMER); SNACK_TIMER=null; }
 
+      // Minimal confirm
       function confirmBox(message){
         return new Promise(res=>{
           var c=qs("#confirm"); qs("#confirm-text").textContent = message || "Confirm?";
-          c.classList.remove('hidden'); c.classList.add('flex');
-          function done(v){ c.classList.add('hidden'); c.classList.remove('flex'); ok.removeEventListener("click",okH); cancel.removeEventListener("click",cancelH); res(v); }
+          c.style.display="flex";
+          function done(v){ c.style.display="none"; ok.removeEventListener("click",okH); cancel.removeEventListener("click",cancelH); res(v); }
           var ok=qs("#confirm-ok"), cancel=qs("#confirm-cancel");
           function okH(){ done(true); } function cancelH(){ done(false); }
           ok.addEventListener("click", okH); cancel.addEventListener("click", cancelH);
@@ -216,16 +246,12 @@
       }
       document.addEventListener("click", function(e){
         var t=e.target.closest(".tab"); if(!t) return;
-        qsa(".tab").forEach(btn=>{
-          btn.classList.remove("bg-card","border","border-border","border-b-transparent","text-slate-100");
-          btn.classList.add("text-slate-300");
-        });
-        t.classList.add("bg-card","border","border-border","border-b-transparent","text-slate-100");
         activate(t.dataset.tab);
       });
 
       // State
-      var USER_STATE={}, USER_VOTES={};
+      var USER_STATE = {};
+      var USER_VOTES = {};
       async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok){ USER_STATE=await r.json(); } }catch{} }
       function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({}, USER_STATE, j); }catch{} }
       function setUserStateLocal(jobId, action){ if(!jobId) return; if(action==="undo") delete USER_STATE[jobId]; else USER_STATE[jobId]={action, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{} }
@@ -234,58 +260,61 @@
       function clearVoteLocal(jobId){ delete USER_VOTES[jobId]; try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
 
       async function postJSON(payload){
-        try{ var res = await fetch(ENDPOINT, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) }); return res.ok; }
-        catch(e){ return false; }
+        try{
+          var res = await fetch(ENDPOINT, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+          return res.ok;
+        }catch(e){ return false; }
       }
 
       async function renderStatus(){
         var pill=qs("#health-pill"), last=qs("#last-updated"), total=qs("#total-listings");
         try{
           var h=await (await fetch("health.json"+bust(),{cache:"no-store"})).json();
-          pill.textContent=h.ok?"Health: OK":"Health: Not OK";
-          pill.className="inline-flex items-center px-2 py-0.5 rounded border "+(h.ok?"border-emerald-500/40 text-emerald-300":"border-red-500/40 text-red-300");
+          pill.textContent=h.ok?"Health: OK":"Health: Not OK"; pill.className="pill "+(h.ok?"ok":"bad");
           var ts=h.lastUpdated||""; last.textContent="Last updated: "+(ts?new Date(ts).toLocaleString():"—");
           total.textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
         }catch(e){
-          pill.textContent="Health: Unknown"; pill.className="inline-flex items-center px-2 py-0.5 rounded border border-border";
+          pill.textContent="Health: Unknown"; pill.className="pill";
           last.textContent="Last updated: —"; total.textContent="Listings: —";
         }
       }
 
+      function setLocked(btn, label){ btn.textContent = label; btn.classList.add("disabled"); btn.setAttribute("aria-disabled","true"); }
       function addUndo(container, onUndo, seconds){
         var u=document.createElement("button");
-        u.className="px-2 py-1 rounded border border-border text-slate-300 text-sm"; u.textContent="Undo ("+seconds+"s)";
+        u.className="btn ghost tiny"; u.textContent="Undo ("+seconds+"s)";
         container.appendChild(u);
         var left=seconds; var iv=setInterval(()=>{ left--; if(left<=0){ clearInterval(iv); u.remove(); } else { u.textContent="Undo ("+left+"s)"; } },1000);
         u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
       }
 
+      // TailAdmin card markup
       function cardHTML(j, applied=false){
-        var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="ml-2 inline-flex items-center text-emerald-300 text-xs border border-emerald-500/40 rounded px-1.5">✓ trusted</span>':"";
+        var trusted=j.flags&&j.flags.trusted, chip=trusted?'<span class="chip ok">✓ trusted</span>':"";
         var d=j.daysLeft!=null?j.daysLeft:"—";
         var det=esc(j.detailLink||j.applyLink||"#");
-        var appliedBadge = applied ? '<span class="ml-2 inline-flex items-center text-primary text-xs border border-primary/40 rounded px-1.5">Applied</span>' : '';
-        var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="ml-2 inline-flex items-center text-primary text-xs border border-primary/40 rounded px-1.5">Official</span>' : '<span class="ml-2 inline-flex items-center text-slate-300 text-xs border border-border rounded px-1.5">Agg</span>';
+        var appliedBadge = applied ? '<span class="badge-done">Applied</span>' : '';
+        var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
         var lid=j.id||"", vote = USER_VOTES[lid]?.vote || "";
-        var voteTick = vote==="right" ? '<span class="ml-2 inline-flex items-center text-emerald-300 text-xs border border-emerald-500/40 rounded px-1.5">✓</span>' : "";
+        var voteTick = vote==="right" ? '<span class="chip tick" title="Verified by user">✓</span>' : "";
         var verifiedClass = vote==="right" ? " verified" : "";
 
-        return '<article class="card '+verifiedClass+' bg-card border border-border rounded-xl p-4" data-id="'+esc(lid)+'">'+
-          '<header class="flex items-start justify-between gap-2 mb-3"><h3 class="title text-base font-semibold text-slate-100">'+esc(j.title||"No Title")+'</h3><div class="flex items-center">'+srcRibbon+voteTick+chip+appliedBadge+'</div></header>'+
-          '<div class="space-y-2 text-sm text-slate-300">'+
-            '<div class="flex items-center justify-between"><span class="text-muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
-            '<div class="flex items-center justify-between"><span class="text-muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
-            '<div class="flex items-center justify-between"><span class="text-muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
-            '<div class="flex items-center justify-between"><span class="text-muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="text-muted">('+d+' days)</span></span></div>'+
+        return '<article class="ta-card'+(applied?' applied':'')+verifiedClass+'" data-id="'+esc(lid)+'">'+
+          '<header class="ta-head"><h3 class="ta-title">'+esc(j.title||"No Title")+'</h3><div>'+srcRibbon+voteTick+chip+appliedBadge+'</div></header>'+
+          '<div class="ta-body">'+
+            '<div class="ta-row"><span class="muted">Organization</span><span>'+esc(j.organization||"N/A")+'</span></div>'+
+            '<div class="ta-row"><span class="muted">Qualification</span><span>'+esc(j.qualificationLevel||"N/A")+'</span></div>'+
+            '<div class="ta-row"><span class="muted">Domicile</span><span>'+esc(j.domicile||"All India")+'</span></div>'+
+            '<div class="ta-row"><span class="muted">Last date</span><span>'+esc(fmtDate(j.deadline))+' <span class="muted">('+d+' days)</span></span></div>'+
           '</div>'+
-          '<footer class="mt-4 flex flex-wrap items-center gap-2">'+
-            '<span class="hide-on-verified inline-flex gap-2">'+
+          '<footer class="p-3 card-actions">'+
+            '<span class="hide-on-verified">'+
               '<button class="btn danger" data-act="report">Report</button>'+
               '<button class="btn ok" data-act="right">Right</button>'+
               '<button class="btn warn" data-act="wrong">Wrong</button>'+
             '</span>'+
             '<a class="btn primary" href="'+det+'" target="_blank" rel="noopener">Details</a>'+
-            '<span class="flex-1"></span>'+
+            '<span class="spacer"></span>'+
             (applied ? '<button class="btn" data-act="exam_done">Exam done</button>'
                      : '<button class="btn" data-act="applied">Applied</button><button class="btn" data-act="not_interested">Not interested</button>')+
           '</footer>'+
@@ -318,7 +347,7 @@
         });
 
         var fOpen=document.createDocumentFragment(), fApp=document.createDocumentFragment(), fOther=document.createDocumentFragment();
-        if(list.length===0){ rootOpen.innerHTML='<div class="text-center text-muted py-12">No active job listings found.</div>'; return; }
+        if(list.length===0){ rootOpen.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
 
         for(const job of list){
           const isApplied = idsApplied.has(job.id);
@@ -330,24 +359,23 @@
             const b=e.target.closest("[data-act]"); if(!b) return;
             if(b.classList.contains("disabled")) return;
             const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
-                  title=(this.querySelector(".title")?.textContent||"").trim().slice(0,240),
-                  detailsUrl=(this.querySelector("a.btn.primary")?.href||"");
+                  title=(this.querySelector(".ta-title")?.textContent||"").trim().slice(0,240),
+                  detailsUrl=(this.querySelector("a.primary")?.href||"");
             const actions = this.querySelector(".hide-on-verified");
 
             if(act==="report"){
-              qs("#reportListingId").value=id; qs("#report-modal").classList.remove("hidden"); return;
+              qs("#reportListingId").value=id; document.getElementById("report-modal").classList.remove("hidden"); document.getElementById("report-modal").setAttribute("aria-hidden","false"); return;
             }
 
             if(act==="right"){
               const ok = await confirmBox("Confirm: mark right?");
               if(!ok) return;
-              // local verify
-              USER_VOTES[id]={vote:"right", ts:new Date().toISOString()};
-              localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES));
-              this.classList.add("verified"); if(actions) actions.style.display="none";
-              const undoFn = async ()=>{ delete USER_VOTES[id]; localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
-              addUndo(this.querySelector("footer"), undoFn, 10);
-              LAST_ACTION = { type:"vote_right", jobId:id, undo:undoFn };
+              setVoteLocal(id, "right");
+              this.classList.add("verified");
+              if(actions) actions.style.display="none";
+              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
+              addUndo(this.querySelector(".card-actions"), undoFn, 10);
+              LAST_ACTION = { type:"vote_right", jobId:id, title, url:detailsUrl, undo: undoFn };
               showSnack("Saved ✓", 10, undoFn);
               postJSON({ type:"vote", vote:"right", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
               return;
@@ -356,10 +384,118 @@
             if(act==="wrong"){
               const ok = await confirmBox("Confirm: mark wrong?");
               if(!ok) return;
-              USER_VOTES[id]={vote:"wrong", ts:new Date().toISOString()};
-              localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES));
-              const undoFn = async ()=>{ delete USER_VOTES[id]; localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
-              addUndo(this.querySelector("footer"), undoFn, 10);
-              LAST_ACTION = { type:"vote_wrong", jobId:id, undo:undoFn };
+              setVoteLocal(id, "wrong");
+              setLocked(b,"Marked ✖");
+              const undoFn = async ()=>{ clearVoteLocal(id); await postJSON({ type:"vote", vote:"undo_wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }); await render(); };
+              addUndo(this.querySelector(".card-actions"), undoFn, 10);
+              LAST_ACTION = { type:"vote_wrong", jobId:id, title, url:detailsUrl, undo: undoFn };
               showSnack("Saved ✖", 10, undoFn);
-              postJSON({ type:"vote", vote:"wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved
+              postJSON({ type:"vote", vote:"wrong", jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
+              return;
+            }
+
+            if(act==="applied"||act==="not_interested"){
+              const ok = await confirmBox("Confirm: "+act.replace("_"," ")+"?");
+              if(!ok) return;
+              setUserStateLocal(id, act);
+              const undoFn = async ()=>{ setUserStateLocal(id,"undo"); await postJSON({ type:"state", payload:{ jobId:id, action:"undo", ts:new Date().toISOString() } }); await render(); };
+              addUndo(this.querySelector(".card-actions"), undoFn, 10);
+              LAST_ACTION = { type:"state_"+act, jobId:id, title, url:detailsUrl, undo: undoFn };
+              showSnack("Saved", 10, undoFn);
+              await postJSON({ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
+              await render();
+              return;
+            }
+
+            if(act==="exam_done"){ setLocked(b,"Done ✓"); return; }
+          });
+
+          if(isApplied) fApp.appendChild(card);
+          else if(idsOther.has(job.id)) fOther.appendChild(card);
+          else fOpen.appendChild(card);
+        }
+
+        rootOpen.appendChild(fOpen);
+        rootApp.appendChild(fApp);
+        rootOther.appendChild(fOther);
+
+        scheduleDeadlineAlerts(list);
+      }
+
+      function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
+      function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
+      document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
+
+      // Deadline alerts (local)
+      async function scheduleDeadlineAlerts(list){
+        try{
+          if(Notification && Notification.permission==="default"){
+            await Notification.requestPermission();
+          }
+        }catch(e){}
+        const notified = JSON.parse(localStorage.getItem("vac_deadline_notified")||"{}");
+        const today = new Date(); today.setHours(0,0,0,0);
+        function parseDDMMYYYY(s){
+          if(!s||s.toUpperCase()==="N/A") return null;
+          const a=s.replaceAll("-","/").split("/"); if(a.length!==3) return null;
+          const d=new Date(+a[2], +a[1]-1, +a[0]); d.setHours(0,0,0,0); return isNaN(d.getTime())?null:d;
+        }
+        for(const j of list){
+          const d=parseDDMMYYYY(j.deadline); if(!d) continue;
+          const diffDays = Math.round((d.getTime()-today.getTime())/86400000);
+          if(diffDays<=2 && diffDays>=0){
+            const id=j.id||esc(j.title||"");
+            if(notified[id]) continue;
+            try{
+              if(Notification && Notification.permission==="granted"){
+                new Notification("Vacancy closing soon", { body: (j.title||"") + " ends in "+diffDays+" day(s)." });
+              } else {
+                toast((j.title||"") + " ends in "+diffDays+" day(s).");
+              }
+            }catch(e){ toast((j.title||"") + " ends in "+diffDays+" day(s)."); }
+            notified[id]=true;
+          }
+        }
+        localStorage.setItem("vac_deadline_notified", JSON.stringify(notified));
+      }
+
+      document.addEventListener("DOMContentLoaded", async function(){
+        await renderStatus();
+        await render();
+
+        qs("#btn-missing")?.addEventListener("click", function(){ openModal("#missing-modal"); });
+
+        qs("#reportForm")?.addEventListener("submit", async function(e){
+          e.preventDefault();
+          var id=qs("#reportListingId").value.trim();
+          var rc = document.getElementById("reportReason").value || "";
+          var rtxt = rc.replace(/_/g," ");
+          var ev = document.getElementById("reportEvidenceUrl").value.trim();
+          var note = document.getElementById("reportNote").value.trim();
+          if(!id || !rc) return toast("Please select a reason.");
+          var ok = await postJSON({ type:"report", jobId:id, reasonCode:rc, reasonText:rtxt, evidenceUrl:ev, note:note, ts:new Date().toISOString() });
+          if(ok){ closeModal(e.target); e.target.reset(); toast("Reported."); }
+        });
+
+        // Missing guard
+        var SUBMIT_LOCK = new Set();
+        qs("#missingForm")?.addEventListener("submit", async function(e){
+          e.preventDefault();
+          var title=qs("#missingTitle").value.trim();
+          var url=qs("#missingUrl").value.trim();
+          var site=qs("#missingSite").value.trim();
+          var last=qs("#missingLastDate").value.trim();
+          var note=document.getElementById("missingNote").value.trim();
+          if(!title||!url) return toast("Post name and notification link are required.");
+          var key = url.replace(/[?#].*$/,"").toLowerCase();
+          if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
+          SUBMIT_LOCK.add(key);
+          var ok = await postJSON({ type:"missing", title:title, url:url, officialSite:site, lastDate:last, note:note, ts:new Date().toISOString() });
+          if(ok){ closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh."); }
+          else { toast("Network problem. Please try again."); SUBMIT_LOCK.delete(key); }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
