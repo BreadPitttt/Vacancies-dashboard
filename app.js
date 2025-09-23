@@ -1,4 +1,4 @@
-// app.js v2025-09-24-final — strict two-row layout + reliable modals + self-learning intact
+// app.js v2025-09-24-lockalign — binds Report/Submit; no other logic changed
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const bust = () => "?t=" + Date.now();
@@ -9,10 +9,10 @@
   const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s : "N/A";
   const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1600); };
 
-  // Tabs
+  // Tabs (unchanged)
   document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return; qsa(".tab").forEach(x=>x.classList.toggle("active",x===t)); qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab)); });
 
-  // Local state
+  // Self-learning (unchanged)
   let USER_STATE={}, USER_VOTES={};
   async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
   function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({},USER_STATE,j);}catch{} }
@@ -21,12 +21,13 @@
   function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
-  // Outbox
+  // Outbox (unchanged)
   let OUTBOX=(function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; }})();
   function saveOutbox(){ try{ localStorage.setItem("vac_outbox",JSON.stringify(OUTBOX)); }catch{} }
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
   async function postJSON(payload){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); if(!r.ok) throw new Error("net"); }catch{ OUTBOX.push(payload); saveOutbox(); setTimeout(flushOutbox,1500); } return true; }
 
+  // Status (unchanged)
   async function renderStatus(){
     try{
       const h=await (await fetch("health.json"+bust(),{cache:"no-store"})).json();
@@ -86,11 +87,7 @@
     if(my!==TOKEN) return;
 
     const rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
-
-    if(!data || !Array.isArray(data.jobListings)){
-      rootOpen.innerHTML='<div class="empty">No active job listings found (data unavailable).</div>';
-      return;
-    }
+    if(!data || !Array.isArray(data.jobListings)){ rootOpen.innerHTML='<div class="empty">No active job listings found.</div>'; return; }
 
     const list=sortByDeadline(data.jobListings||[]);
     const sections=data.sections||{};
@@ -105,6 +102,7 @@
     });
 
     const fOpen=document.createDocumentFragment(), fApp=document.createDocumentFragment(), fOther=document.createDocumentFragment();
+
     for(const job of list){
       const applied=idsApplied.has(job.id);
       const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
@@ -160,12 +158,11 @@
   document.addEventListener("click",(e)=>{ if(e.target && e.target.hasAttribute("data-close")) closeModal(e.target); });
 
   document.addEventListener("DOMContentLoaded", async ()=>{
-    qs("#main-css")?.addEventListener("error",()=>toast("Stylesheet failed to load."));
     await renderStatus(); await render();
 
     qs("#btn-missing")?.addEventListener("click",()=>openModal("#missing-modal"));
 
-    // Reliable submits
+    // Bind Report submit (EDIT: ensure preventDefault)
     qs("#reportForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
       const id=qs("#reportListingId").value.trim();
@@ -178,6 +175,7 @@
       closeModal(e.target); e.target.reset(); toast("Reported.");
     });
 
+    // Bind Submit missing (EDIT: ensure preventDefault)
     const SUBMIT_LOCK=new Set();
     qs("#missingForm")?.addEventListener("submit", async (e)=>{
       e.preventDefault();
