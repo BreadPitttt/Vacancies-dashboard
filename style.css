@@ -1,4 +1,3 @@
-/* Warm, blue-light friendly palette */
 :root{
   --bg:#f7f9fc; --panel:#ffffff; --line:#e6eaf2; --text:#0f172a; --muted:#64748b;
   --chip:#eef2ff; --chip-line:#cfe0ff; --chip-text:#1e40af;
@@ -12,6 +11,7 @@
 }
 html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0}
 
+/* Header */
 .topbar{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 14px;display:flex;justify-content:space-between;align-items:center}
 .brand h1{font-size:18px;margin:0 0 4px 0}
 .meta{display:flex;gap:10px;align-items:center}
@@ -42,16 +42,16 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .rowline .muted{color:var(--muted)}
 .rowline:last-child{border-bottom:none}
 
-/* Two action rows with strict alignment */
-.actions-row{display:flex;align-items:center;padding:10px 12px;border-top:1px dashed var(--line)}
-.actions-row.row1{gap:10px}
-.actions-row.row1 .left{flex:1;display:flex;align-items:center}
-.actions-row.row1 .right{display:flex;gap:10px}
-.actions-row.row2{justify-content:space-between;gap:16px}
-.group{display:flex;align-items:center;gap:10px}
+/* Action rows: strictly aligned using CSS grid to remove wrap jitter */
+.actions-row{border-top:1px dashed var(--line);padding:10px 12px}
+.actions-row.row1{display:grid;grid-template-columns:1fr 1fr;align-items:center}
+.actions-row.row1 .left{justify-self:start}
+.actions-row.row1 .right{justify-self:end}
+.actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:16px}
+.group{display:flex;gap:10px;align-items:center}
 
-/* Keep consistent button sizing to avoid wrap jitter */
-.actions-row .btn{min-width:88px}
+/* Consistent button sizes */
+.actions-row .btn{min-width:96px}
 
 /* Chips and badges */
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
@@ -72,7 +72,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.disabled{opacity:.6;pointer-events:none}
 
 /* Behavior parity */
-.verified .row2 .group.vote{display:none}
+.verified .row2 .group.vote{visibility:hidden} /* keep cell width to prevent misalignment */
 
 /* Modal */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20}
