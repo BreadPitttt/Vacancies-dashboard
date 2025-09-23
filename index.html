@@ -16,12 +16,12 @@
     .btn[data-act="report"]{ min-width: 68px; }
     .applied .card-actions .btn:not([data-act="exam_done"]){ display:none; }
     .badge-done{ padding:2px 8px; border-radius:12px; border:1px solid #2a334f; background:#17203c; color:#99b3ff; margin-left:8px; font-size:12px; }
-    /* Toast */
     #toast{ position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#141b33;color:#e9eef9;border:1px solid #1f2740;border-radius:10px;padding:8px 12px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s ease; z-index: 30; }
-    /* Minimal confirm modal */
     #confirm{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(9,12,23,0.6); z-index:25; }
     #confirm .box{ width:min(360px,92vw); background:linear-gradient(180deg,#141a2e,#0f1528); border:1px solid #1f2740; border-radius:12px; padding:14px; color:#e9eef9; }
     #confirm .row{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; }
+    /* OK left, Cancel right: reverse order in DOM but use row-reverse for layout */
+    #confirm .row{ flex-direction: row-reverse; }
   </style>
 </head>
 <body>
@@ -128,7 +128,7 @@
     </div>
   </div>
 
-  <!-- Custom confirm + toast -->
+  <!-- Custom confirm (OK left, Cancel right) + toast -->
   <div id="confirm"><div class="box">
     <div id="confirm-text">Confirm?</div>
     <div class="row">
@@ -149,7 +149,7 @@
       function fmtDate(s){ return s && s.toUpperCase()!=="N/A" ? s : "N/A"; }
       function toast(msg){ var t=document.getElementById("toast"); if(!t) return alert(msg); t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 1600); }
 
-      // Minimal confirm (replaces window.confirm)
+      // Minimal confirm
       function confirmBox(message){
         return new Promise(res=>{
           var c=qs("#confirm"); qs("#confirm-text").textContent = message || "Confirm?";
@@ -171,34 +171,14 @@
         activate(t.dataset.tab);
       });
 
-      // User state cache (server + local)
+      // User state and votes (server + local)
       var USER_STATE = {};
-      async function loadUserState(){
-        try{
-          var res = await fetch("user_state.json"+bust(), { cache:"no-store" });
-          if(res.ok) USER_STATE = await res.json();
-        }catch{}
-        try{
-          var local = JSON.parse(localStorage.getItem("vac_user_state")||"{}");
-          if(local && typeof local==="object") USER_STATE = Object.assign({}, USER_STATE, local);
-        }catch{}
-      }
-      function setUserState(jobId, action){
-        if(!jobId) return;
-        if(action==="undo") delete USER_STATE[jobId];
-        else USER_STATE[jobId] = { action: action, ts: new Date().toISOString() };
-        try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{}
-      }
-
-      // Persist votes locally too so Right/Wrong is not lost on refresh
       var USER_VOTES = {};
-      function loadVotesLocal(){
-        try{ USER_VOTES = JSON.parse(localStorage.getItem("vac_user_votes")||"{}") || {}; }catch{ USER_VOTES={}; }
-      }
-      function setVoteLocal(jobId, vote){
-        USER_VOTES[jobId] = { vote: vote, ts: new Date().toISOString() };
-        try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{}
-      }
+      async function loadUserStateServer(){ try{ const r=await fetch("user_state.json"+bust(),{cache:"no-store"}); if(r.ok){ USER_STATE=await r.json(); } }catch{} }
+      function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({}, USER_STATE, j); }catch{} }
+      function setUserStateLocal(jobId, action){ if(!jobId) return; if(action==="undo") delete USER_STATE[jobId]; else USER_STATE[jobId]={action, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state", JSON.stringify(USER_STATE)); }catch{} }
+      function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
+      function setVoteLocal(jobId, vote){ USER_VOTES[jobId]={vote, ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
       function clearVoteLocal(jobId){ delete USER_VOTES[jobId]; try{ localStorage.setItem("vac_user_votes", JSON.stringify(USER_VOTES)); }catch{} }
 
       async function postJSON(payload){
@@ -221,9 +201,7 @@
         }
       }
 
-      function setLocked(btn, label){
-        btn.textContent = label; btn.classList.add("disabled"); btn.setAttribute("aria-disabled","true");
-      }
+      function setLocked(btn, label){ btn.textContent = label; btn.classList.add("disabled"); btn.setAttribute("aria-disabled","true"); }
       function addUndo(container, onUndo){
         var u=document.createElement("button"); u.className="btn ghost tiny"; u.textContent="Undo";
         u.addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); onUndo(); u.remove(); });
@@ -235,15 +213,10 @@
         var d=j.daysLeft!=null?j.daysLeft:"—";
         var det=esc(j.detailLink||j.applyLink||"#");
         var appliedBadge = applied ? '<span class="badge-done">Applied</span>' : '';
-        var srcRibbon = (j.source||"").toLowerCase()==="official"
-          ? '<span class="chip" title="Official source">Official</span>'
-          : '<span class="chip" title="From aggregator">Agg</span>';
-
-        // Indicate local vote
-        var lid = j.id||"";
-        var voteChip = "";
-        if(USER_VOTES[lid]?.vote==="right") voteChip = '<span class="chip ok" title="Marked right">✓</span>';
-        if(USER_VOTES[lid]?.vote==="wrong") voteChip = '<span class="chip" title="Marked wrong">✖</span>';
+        var srcRibbon = (j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
+        var lid=j.id||"", voteChip="";
+        if(USER_VOTES[lid]?.vote==="right") voteChip='<span class="chip ok" title="Marked right">✓</span>';
+        if(USER_VOTES[lid]?.vote==="wrong") voteChip='<span class="chip" title="Marked wrong">✖</span>';
 
         return '<article class="card'+(applied?' applied':'')+'" data-id="'+esc(lid)+'">'+
           '<header class="card-head"><h3 class="title">'+esc(j.title||"No Title")+'</h3>'+srcRibbon+voteChip+chip+appliedBadge+'</header>'+
@@ -264,21 +237,18 @@
       }
 
       function sortByDeadline(list){
-        const parse = (s)=>{
-          if(!s||s.toUpperCase()==="N/A") return null;
-          const t=s.replaceAll("-","/"); const a=t.split("/"); if(a.length!==3) return null;
-          const ms = Date.UTC(+a[2], +a[1]-1, +a[0]); return isNaN(ms)?null:ms;
-        };
-        return list.slice().sort((a,b)=>{
-          const da=parse(a.deadline), db=parse(b.deadline);
-          if(da===null && db===null) return (a.title||"").localeCompare(b.title||"");
-          if(da===null) return 1; if(db===null) return -1; return da - db;
-        });
+        const parse = (s)=>{ if(!s||s.toUpperCase()==="N/A") return null; const t=s.replaceAll("-","/"); const a=t.split("/"); if(a.length!==3) return null; const ms=Date.UTC(+a[2], +a[1]-1, +a[0]); return isNaN(ms)?null:ms; };
+        return list.slice().sort((a,b)=>{ const da=parse(a.deadline), db=parse(b.deadline); if(da===null && db===null) return (a.title||"").localeCompare(b.title||""); if(da===null) return 1; if(db===null) return -1; return da - db; });
       }
 
       async function render(){
         var rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
         rootOpen.innerHTML=rootApp.innerHTML=rootOther.innerHTML="";
+
+        // NEW: always load and merge user_state first for stability
+        await loadUserStateServer();
+        loadUserStateLocal();
+        loadVotesLocal();
 
         var data = await (await fetch("data.json"+bust(),{cache:"no-store"})).json();
         var list = sortByDeadline(Array.isArray(data.jobListings)? data.jobListings : []);
@@ -287,6 +257,7 @@
 
         var idsApplied = new Set(sections.applied||[]);
         var idsOther = new Set(sections.other||[]);
+        // merge with user local/server state (local wins for immediacy)
         Object.entries(USER_STATE).forEach(([jid, s])=>{
           if(!s || !s.action) return;
           if(s.action==="applied"){ idsApplied.add(jid); idsOther.delete(jid); }
@@ -309,39 +280,32 @@
             const act=b.getAttribute("data-act"), id=this.getAttribute("data-id"),
                   title=(this.querySelector(".title")?.textContent||"").trim().slice(0,240),
                   detailsUrl=(this.querySelector("a.primary")?.href||"");
-            let payload=null, labelAfter="";
+            if(act==="report"){ qs("#reportListingId").value=id; document.getElementById("report-modal").classList.remove("hidden"); document.getElementById("report-modal").setAttribute("aria-hidden","false"); return; }
+
             if(act==="right"||act==="wrong"){
-              const okDialog = await confirmBox("Confirm: "+(act==="right"?"mark right":"mark wrong")+"?");
-              if(!okDialog) return;
-              // write local votes immediately so refresh keeps state
+              const ok = await confirmBox("Confirm: "+(act==="right"?"mark right":"mark wrong")+"?");
+              if(!ok) return;
               setVoteLocal(id, act);
-              payload={ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() };
-              labelAfter= act==="right"?"Marked ✓":"Marked ✖";
-              const ok=await postJSON(payload);
-              if(!ok){ toast("Network problem. Saved locally."); }
-              setLocked(b,labelAfter);
+              setLocked(b, act==="right"?"Marked ✓":"Marked ✖");
+              postJSON({ type:"vote", vote:act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
               addUndo(this.querySelector(".card-actions"), async ()=>{
                 clearVoteLocal(id);
-                const undo={ type:"vote", vote:"undo_"+act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() };
-                await postJSON(undo);
+                await postJSON({ type:"vote", vote:"undo_"+act, jobId:id, title:title, url:detailsUrl, ts:new Date().toISOString() });
                 await render();
               });
               return;
-            }else if(act==="report"){
-              qs("#reportListingId").value=id; document.getElementById("report-modal").classList.remove("hidden"); document.getElementById("report-modal").setAttribute("aria-hidden","false"); return;
-            }else if(act==="applied"||act==="not_interested"){
-              const okDialog = await confirmBox("Confirm: "+act.replace("_"," ")+"?");
-              if(!okDialog) return;
-              // write state locally first for immediate persistence
-              setUserState(id, act);
-              payload={ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } };
-              const ok=await postJSON(payload);
-              if(!ok){ toast("Network problem. Saved locally."); }
-              await render(); // reflow into tabs
-              return;
-            }else if(act==="exam_done"){
-              setLocked(b,"Done ✓"); return;
             }
+
+            if(act==="applied"||act==="not_interested"){
+              const ok = await confirmBox("Confirm: "+act.replace("_"," ")+"?");
+              if(!ok) return;
+              setUserStateLocal(id, act);            // local first
+              await postJSON({ type:"state", payload:{ jobId:id, action:act, ts:new Date().toISOString() } }).then(r=>{ if(!r) toast("Network problem. Saved locally."); });
+              await render();                        // re-render into tabs
+              return;
+            }
+
+            if(act==="exam_done"){ setLocked(b,"Done ✓"); return; }
           });
 
           if(isApplied) fApp.appendChild(card);
@@ -356,12 +320,9 @@
 
       function openModal(id){ var m=qs(id); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
       function closeModal(el){ var m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
-
       document.addEventListener("click", function(e){ if(e.target && e.target.hasAttribute("data-close")){ closeModal(e.target); } });
 
       document.addEventListener("DOMContentLoaded", async function(){
-        loadVotesLocal();
-        await loadUserState();           // ensure state is present before first render
         await renderStatus();
         await render();
 
