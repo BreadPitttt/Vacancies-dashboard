@@ -1,7 +1,7 @@
 {
   "jobListings": [
     {
-      "id": "user_208609019",
+      "id": "user_78587181",
       "title": "IBPS RRB 14th Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -18,7 +18,7 @@
       "daysLeft": 5
     },
     {
-      "id": "user_270982924",
+      "id": "user_938476802",
       "title": "BSSC Office Attendant Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -35,7 +35,7 @@
       "daysLeft": 1
     },
     {
-      "id": "user_321983877",
+      "id": "user_316194454",
       "title": "RBI Officers Grade B Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -52,7 +52,7 @@
       "daysLeft": 3
     },
     {
-      "id": "user_515112059",
+      "id": "user_291365196",
       "title": "RRB Section Controller Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -69,7 +69,7 @@
       "daysLeft": 21
     },
     {
-      "id": "user_367427625",
+      "id": "user_570217970",
       "title": "BSSC CGL Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -86,7 +86,7 @@
       "daysLeft": 3
     },
     {
-      "id": "user_156684221",
+      "id": "user_472241763",
       "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -103,7 +103,7 @@
       "daysLeft": 3
     },
     {
-      "id": "user_669025257",
+      "id": "user_554918607",
       "title": "SSC Delhi Police Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -120,7 +120,7 @@
       "daysLeft": 28
     },
     {
-      "id": "user_190781721",
+      "id": "user_251033373",
       "title": "EMRS Non Teaching Various Post Recruitment 2025",
       "organization": "",
       "qualificationLevel": "Any graduate",
@@ -149,7 +149,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-23T03:11:53.142661Z",
+      "extractedAt": "2025-09-23T12:07:55.216194Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -171,7 +171,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-23T03:11:53.142463Z",
+      "extractedAt": "2025-09-23T12:07:55.215995Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -193,7 +193,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-23T03:11:53.142598Z",
+      "extractedAt": "2025-09-23T12:07:55.216130Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -215,7 +215,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-23T03:11:53.141822Z",
+      "extractedAt": "2025-09-23T12:07:55.215355Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -237,7 +237,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-23T03:11:53.141984Z",
+      "extractedAt": "2025-09-23T12:07:55.215514Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -253,14 +253,14 @@
     "applied": [],
     "other": [],
     "primary": [
-      "user_208609019",
-      "user_270982924",
-      "user_321983877",
-      "user_515112059",
-      "user_367427625",
-      "user_156684221",
-      "user_669025257",
-      "user_190781721"
+      "user_78587181",
+      "user_938476802",
+      "user_316194454",
+      "user_291365196",
+      "user_570217970",
+      "user_472241763",
+      "user_554918607",
+      "user_251033373"
     ]
   },
   "transparencyInfo": {
@@ -270,7 +270,7 @@
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-23T03:14:27.626535Z",
+    "lastUpdated": "2025-09-23T12:10:24.782138Z",
     "mergedUpdates": 0
   }
 }
