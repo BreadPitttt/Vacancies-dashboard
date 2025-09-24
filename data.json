@@ -1,7 +1,7 @@
 {
   "jobListings": [
     {
-      "id": "user_704910757",
+      "id": "user_146359533",
       "title": "IBPS RRB 14th Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -17,7 +17,7 @@
       "daysLeft": 4
     },
     {
-      "id": "user_339128164",
+      "id": "user_67367676",
       "title": "BSSC Office Attendant Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -33,7 +33,7 @@
       "daysLeft": 0
     },
     {
-      "id": "user_369962864",
+      "id": "user_961380183",
       "title": "RBI Officers Grade B Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -49,7 +49,7 @@
       "daysLeft": 2
     },
     {
-      "id": "user_822441820",
+      "id": "user_297933965",
       "title": "RRB Section Controller Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -65,7 +65,7 @@
       "daysLeft": 20
     },
     {
-      "id": "user_19630572",
+      "id": "user_517349213",
       "title": "BSSC CGL Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -81,7 +81,7 @@
       "daysLeft": 2
     },
     {
-      "id": "user_861412327",
+      "id": "user_919785582",
       "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -97,7 +97,7 @@
       "daysLeft": 2
     },
     {
-      "id": "user_838837715",
+      "id": "user_564271981",
       "title": "SSC Delhi Police Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -113,7 +113,7 @@
       "daysLeft": 27
     },
     {
-      "id": "user_278314437",
+      "id": "user_193277887",
       "title": "EMRS Non Teaching Various Post Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -129,135 +129,27 @@
       "daysLeft": 29
     }
   ],
-  "archivedListings": [
-    {
-      "id": "src_8cdeeddcddefdd2e",
-      "title": "Centralised Employment Notice No. 05/2024 for recruitment of various graduate posts of Non-Technical Popular Categories",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
-      "slug": "centralised-employment-notice-no-05-2024-for-recruitment-of-various-graduate-pos",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-24T03:21:48.881054Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Detailed CEN 05-2024 NTPC.pdf",
-      "flags": {
-        "no_parent_found": true,
-        "removed_reason": "reported_hard"
-      }
-    },
-    {
-      "id": "src_a7e10b91ed5a646f",
-      "title": "Centralised Employment Notice No. 06/2024 for recruitment of various undergraduate posts of Non-Technical Popular Categories",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
-      "slug": "centralised-employment-notice-no-06-2024-for-recruitment-of-various-undergraduat",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-24T03:21:48.880837Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Detailed CEN 06-2024 NTPC.pdf",
-      "flags": {
-        "no_parent_found": true,
-        "removed_reason": "reported_hard"
-      }
-    },
-    {
-      "id": "src_ab48ec3436e06f17",
-      "title": "Corrigendum-1 for CEN 05-2024 NTPC-Graduate posts",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-1.pdf",
-      "slug": "corrigendum-1-for-cen-05-2024-ntpc-graduate-posts",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-24T03:21:48.880985Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-1.pdf",
-      "flags": {
-        "no_parent_found": true,
-        "removed_reason": "reported_hard"
-      }
-    },
-    {
-      "id": "src_f61bb6c955a40af5",
-      "title": "Corrigendum-1 regarding revision of notified vacancies for CEN 06-2024 NTPC-Undergraduate posts",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
-      "slug": "corrigendum-1-regarding-revision-of-notified-vacancies-for-cen-06-2024-ntpc-unde",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-24T03:21:48.880156Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/06-NTPCUG/Corrigendum-1.pdf",
-      "flags": {
-        "no_parent_found": true,
-        "removed_reason": "reported_hard"
-      }
-    },
-    {
-      "id": "src_857de82dd19ac693",
-      "title": "Corrigendum-2 regarding revision of notified vacancies of CEN 05-2024 NTPC-Graduate posts",
-      "deadline": "N/A",
-      "applyLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
-      "slug": "corrigendum-2-regarding-revision-of-notified-vacancies-of-cen-05-2024-ntpc-gradu",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "source": "official",
-      "type": "UPDATE",
-      "extractedAt": "2025-09-24T03:21:48.880331Z",
-      "meta": {
-        "sourceUrl": "https://rrbcdg.gov.in/",
-        "sourceSite": "hint4"
-      },
-      "detailLink": "https://rrbcdg.gov.in/uploads/2024/05-NTPCG/Corrigendum-2.pdf",
-      "flags": {
-        "no_parent_found": true,
-        "removed_reason": "reported_hard"
-      }
-    }
-  ],
+  "archivedListings": [],
   "sections": {
     "applied": [],
     "other": [],
     "primary": [
-      "user_704910757",
-      "user_339128164",
-      "user_369962864",
-      "user_822441820",
-      "user_19630572",
-      "user_861412327",
-      "user_838837715",
-      "user_278314437"
+      "user_146359533",
+      "user_67367676",
+      "user_961380183",
+      "user_297933965",
+      "user_517349213",
+      "user_919785582",
+      "user_564271981",
+      "user_193277887"
     ]
   },
   "transparencyInfo": {
     "schemaVersion": "1.5",
     "runMode": "nightly",
     "totalListings": 8,
-    "sourcesTried": [
-      "hint4"
-    ],
-    "lastUpdated": "2025-09-24T03:24:15.117682Z",
+    "sourcesTried": [],
+    "lastUpdated": "2025-09-24T13:46:40.877026Z",
     "mergedUpdates": 0
   }
 }
