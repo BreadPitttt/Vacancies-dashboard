@@ -3,7 +3,9 @@
   "schemaVersion": "1.5",
   "runMode": "nightly",
   "totalListings": 8,
-  "sourcesTried": [],
-  "lastUpdated": "2025-09-24T13:46:40.877026Z",
+  "sourcesTried": [
+    "hint4"
+  ],
+  "lastUpdated": "2025-09-24T17:45:53.276049Z",
   "mergedUpdates": 0
 }
