@@ -5,8 +5,7 @@
   <title>General Vacancy Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
-  <link rel="stylesheet" href="style.css" />
-  <link id="main-css" rel="stylesheet" href="style.css?v=2025-09-25-voteicons" />
+  <link rel="stylesheet" href="style.css?v=2025-09-25-pro3" />
 </head>
 <body class="u-bg">
   <header class="topbar">
@@ -42,11 +41,12 @@
   </main>
 
   <!-- Missing modal -->
-  <div id="missing-modal" class="modal hidden" aria-hidden="true">
+  <div id="missing-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="missing-title">
     <div class="modal-body">
       <div class="modal-head">
-        <h3>Submit Missing Vacancy</h3>
-        <button type="button" class="icon-btn" data-close>&times;</button>
+        <button type="button" class="close-top" data-close aria-label="Close">Close</button>
+        <h3 id="missing-title">Submit Missing Vacancy</h3>
+        <span aria-hidden="true"></span>
       </div>
       <form id="missingForm" class="form" novalidate>
         <label>Post name</label>
@@ -73,20 +73,26 @@
         </div>
         <label>Note (optional)</label>
         <textarea id="missingNote" rows="3" placeholder="Any extra info"></textarea>
-        <div class="row end modal-actions">
-          <button type="button" class="btn danger" data-close>Close</button>
-          <button type="submit" class="btn primary">Submit</button>
+        <div class="modal-actions">
+          <div class="slot-left">
+            <button type="button" class="btn" data-close>Close</button>
+          </div>
+          <div class="slot-middle">
+            <button type="submit" class="btn primary">Submit</button>
+          </div>
+          <div class="slot-right"></div>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Report modal -->
-  <div id="report-modal" class="modal hidden" aria-hidden="true">
+  <div id="report-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="report-title">
     <div class="modal-body">
       <div class="modal-head">
-        <h3>Report listing</h3>
-        <button type="button" class="icon-btn" data-close>&times;</button>
+        <button type="button" class="close-top" data-close aria-label="Close">Close</button>
+        <h3 id="report-title">Report listing</h3>
+        <span aria-hidden="true"></span>
       </div>
       <form id="reportForm" class="form" novalidate>
         <input type="hidden" id="reportListingId" />
@@ -116,9 +122,14 @@
           <label>Note (optional)</label>
           <input id="reportNote" placeholder="Tell more if needed" />
         </div>
-        <div class="row end modal-actions">
-          <button type="button" class="btn danger" data-close>Close</button>
-          <button type="submit" class="btn primary">Report</button>
+        <div class="modal-actions">
+          <div class="slot-left">
+            <button type="button" class="btn" data-close>Close</button>
+          </div>
+          <div class="slot-middle">
+            <button type="submit" class="btn primary">Report</button>
+          </div>
+          <div class="slot-right"></div>
         </div>
       </form>
     </div>
@@ -139,6 +150,6 @@
   </div>
   <div id="toast"></div>
 
-  <script src="app.js?v=2025-09-25-voteicons" defer></script>
+  <script src="app.js?v=2025-09-25-pro3" defer></script>
 </body>
 </html>
