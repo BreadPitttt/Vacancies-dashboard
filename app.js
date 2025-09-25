@@ -1,4 +1,4 @@
-// app.js v2025-09-26-stable — Worker-aware state load (tiny change), keeps all features
+// app.js v2025-09-26-stable2 — KV-first state, 10s deferred move, top-only tick, red ✗ close, report sends lastDate/evidence
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
@@ -34,20 +34,17 @@
 
   let USER_STATE={}, USER_VOTES={};
 
-  // Worker-aware: try Worker GET ?state=1 first, then fall back to repo file
+  // KV-first, then repo file
   async function loadUserStateServer(){
-    // 1) Worker KV (reliable cross-device)
     try{
       const wr=await fetch(ENDPOINT+"?state=1",{mode:"cors"});
       if(wr.ok){
         const wj=await wr.json();
         if(wj && wj.ok && wj.state && typeof wj.state==="object"){
-          USER_STATE={...wj.state};
-          return;
+          USER_STATE={...wj.state}; return;
         }
       }
     }catch{}
-    // 2) Repo user_state.json (fallback)
     try{
       const r=await fetch(bust("user_state.json"),{cache:"no-store"});
       if(!r.ok) throw 0;
@@ -62,30 +59,21 @@
   function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
-  function confirmAction(message="Proceed?"){
-    return new Promise((resolve)=>{
-      const box=qs("#confirm");
-      qs("#confirm-text").textContent=message;
-      box.style.display="flex";
-      const ok=qs("#confirm-ok"), cancel=qs("#confirm-cancel");
-      const cleanup=()=>{ box.style.display="none"; ok.onclick=null; cancel.onclick=null; };
-      ok.onclick=()=>{ cleanup(); resolve(true); };
-      cancel.onclick=()=>{ cleanup(); resolve(false); };
-    });
-  }
+  function confirmAction(message="Proceed?"){ return new Promise((resolve)=>{ const ok=confirm(message); resolve(ok); }); }
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
-  const verifyTop=()=>' <span class="verify-top" title="Verified Right">✓</span>';
+  const topVerify=()=>' <span class="verify-top" title="Verified Right">✓</span>';
   const corroboratedChip=()=>' <span class="chip" title="Multiple sources">x2</span>';
 
-  function renderInlineUndo(slot, label, onUndo, seconds=8){
+  // Inline Undo with 10s and deferred apply/move
+  function renderInlineUndo(slot, label, onUndo, onCommit, seconds=10){
     if(!slot) return;
     const wrap=document.createElement("div");
     wrap.className="group";
     const b=document.createElement("button");
     b.className="btn ghost tiny";
     let left=seconds;
-    const tick=setInterval(()=>{ left--; if(left<=0){ clearInterval(tick); if(wrap.parentNode) wrap.remove(); } else { b.textContent=`Undo ${label} (${left}s)`; } },1000);
+    const tick=setInterval(()=>{ left--; if(left<=0){ clearInterval(tick); b.disabled=true; wrap.remove(); onCommit(); } else { b.textContent=`Undo ${label} (${left}s)`; } },1000);
     b.textContent=`Undo ${label} (${left}s)`;
     b.onclick=(ev)=>{ ev.preventDefault(); clearInterval(tick); wrap.remove(); onUndo(); };
     wrap.appendChild(b);
@@ -99,9 +87,10 @@
     const lid=j.id||"";
     const vote=USER_VOTES[lid]?.vote||"";
     const verified= vote==="right";
+    // Only show the top verify chip; hide bottom icons on verified
     const trust = j.flags && j.flags.trusted ? trustedChip() : "";
     const corr = j.flags && j.flags.corroborated ? corroboratedChip() : "";
-    const topVerify = verified ? verifyTop() : "";
+    const tVerify = verified ? topVerify() : "";
     const appliedBadge = applied ? '<span class="badge-done">Applied</span>' : "";
     const posts = (j.numberOfPosts!=null && j.numberOfPosts!=="")
                   ? String(j.numberOfPosts)
@@ -109,7 +98,7 @@
 
     return [
       '<article class="card', (applied?' applied':''), (verified?' verified':''), '" data-id="', esc(lid), '">',
-        '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, trust, corr, topVerify, appliedBadge, '</header>',
+        '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, trust, corr, tVerify, appliedBadge, '</header>',
         '<div class="card-body">',
           '<div class="rowline"><span class="muted">Posts</span><span>', esc(posts), '</span></div>',
           '<div class="rowline"><span class="muted">Qualification</span><span>', esc(j.qualificationLevel||"N/A"), '</span></div>',
@@ -199,40 +188,55 @@
         if(act==="right"){
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"right"); card.classList.add("verified");
-          renderInlineUndo(voteCell, "vote", async ()=>{
-            if(prev==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
-            await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-            await render();
-          });
-          fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
+          renderInlineUndo(voteCell, "vote",
+            async ()=>{ // onUndo
+              if(prev==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
+              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
+              await render();
+            },
+            async ()=>{ // onCommit
+              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
+              await render();
+            },
+            10);
           return;
         }
 
         if(act==="wrong"){
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"wrong");
-          renderInlineUndo(voteCell, "vote", async ()=>{
-            if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
-            await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-            await render();
-          });
-          fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
+          renderInlineUndo(voteCell, "vote",
+            async ()=>{
+              if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
+              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
+              await render();
+            },
+            async ()=>{
+              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
+              await render();
+            },
+            10);
           return;
         }
 
         if(act==="applied"||act==="not_interested"){
-          const confirmMsg = act==="applied" ? "Mark as Applied?" : "Move to Other (Not interested)?";
-          const ok = await new Promise((res)=>{ const b=confirm(confirmMsg); res(b); });
+          const ok = await confirmAction(act==="applied" ? "Mark as Applied?" : "Move to Other (Not interested)?");
           if(!ok) return;
           const prev=USER_STATE[id]?.action||"";
           setUserStateLocal(id,act);
-          renderInlineUndo(interestCell, act==="applied"?"applied":"choice", async ()=>{
-            if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); }
-            await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}})});
-            await render();
-          });
-          await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}})});
-          await render(); return;
+          renderInlineUndo(interestCell, act==="applied"?"applied":"choice",
+            async ()=>{ // Undo
+              if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); }
+              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}})});
+              await render();
+            },
+            async ()=>{ // Commit after 10s, then re-render
+              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}})});
+              await persistUserStateServer();
+              await render();
+            },
+            10);
+          return;
         }
 
         if(act==="exam_done"){ btn.textContent="Done ✓"; btn.classList.add("disabled"); return; }
@@ -248,6 +252,7 @@
     rootOther.replaceChildren(fOther);
   }
 
+  // Modal open/close and red ✗ top-right
   function openModal(sel){
     const m=qs(sel); if(!m) return;
     m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
@@ -257,7 +262,7 @@
     const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); m.style.display="none"; }
   }
   document.addEventListener("click",(e)=>{
-    if(e.target && e.target.hasAttribute("data-close")){ e.preventDefault(); closeModalEl(e.target); }
+    if(e.target && (e.target.hasAttribute("data-close") || e.target.classList.contains("close-top"))){ e.preventDefault(); closeModalEl(e.target); }
     if(e.target && e.target.classList.contains("modal")){ e.preventDefault(); e.target.classList.add("hidden"); e.target.setAttribute("aria-hidden","true"); e.target.style.display="none"; }
   });
 
@@ -266,9 +271,11 @@
     persistUserStateServer();
     await renderStatus();
     await render();
+
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
 
     const SUBMIT_LOCK=(window.__SUBMIT_LOCK__ ||= new Set());
+
     document.addEventListener("submit", async (e)=>{
       const f=e.target;
       if(f && f.id==="reportForm"){
@@ -278,8 +285,9 @@
         const ev=document.getElementById("reportEvidenceUrl")?.value?.trim()||"";
         const posts=document.getElementById("reportPosts")?.value?.trim()||"";
         const note=document.getElementById("reportNote")?.value?.trim()||"";
+        const last=document.getElementById("reportLastDate")?.value?.trim()||""; // optional input (add a hidden if not present)
         if(!id||!rc) return toast("Please select a reason.");
-        await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,note,ts:new Date().toISOString()})});
+        await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,lastDate:last||"",note,ts:new Date().toISOString()})});
         closeModalEl(f); f.reset(); toast("Reported.");
       }
       if(f && f.id==="missingForm"){
