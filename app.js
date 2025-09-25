@@ -1,4 +1,4 @@
-// app.js v2025-09-25-final — same logic; ensures modals show and buttons stay within layout
+// app.js v2025-09-25-patch2 — layout unchanged; modal open/close and actions as previously fixed
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
