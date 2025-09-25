@@ -1,4 +1,4 @@
-// app.js v2025-09-25-patch2 — layout unchanged; modal open/close and actions as previously fixed
+// app.js v2025-09-25-vote-icons — vote row uses ☑/☒; Right collapses; Wrong keeps report visible
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
@@ -43,6 +43,7 @@
   }
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
+
   function addInlineUndo(container,onUndo,seconds=10){
     if(!container) return;
     const u=document.createElement("button");
@@ -63,13 +64,13 @@
     });
   }
 
+  // Card template: vote icons (☑/☒) + spacing to interest group; Organization removed
   function cardHTML(j, applied=false){
     const src=(j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
     const d=(j.daysLeft!=null && j.daysLeft!=="")?j.daysLeft:"—";
     const det=esc(j.detailLink||j.applyLink||"#");
     const lid=j.id||"";
     const vote=USER_VOTES[lid]?.vote||"";
-    const tick= vote==="right" ? '<span class="chip ok" title="Verified by user">✓</span>' : "";
     const verified= vote==="right" ? " verified" : "";
     const trust = j.flags && j.flags.trusted ? trustedChip() : "";
     const appliedBadge = applied ? '<span class="badge-done">Applied</span>' : "";
@@ -79,7 +80,7 @@
 
     return [
       '<article class="card', (applied?' applied':''), verified, '" data-id="', esc(lid), '">',
-        '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, tick, trust, appliedBadge, '</header>',
+        '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, trust, appliedBadge, '</header>',
         '<div class="card-body">',
           '<div class="rowline"><span class="muted">Posts</span><span>', esc(posts), '</span></div>',
           '<div class="rowline"><span class="muted">Qualification</span><span>', esc(j.qualificationLevel||"N/A"), '</span></div>',
@@ -92,8 +93,8 @@
         '</div>',
         '<div class="actions-row row2">',
           '<div class="group vote">',
-            '<button class="btn ok" data-act="right" type="button">Right</button>',
-            '<button class="btn warn" data-act="wrong" type="button">Wrong</button>',
+            '<button class="vote-btn right" data-act="right" type="button">☑</button>',
+            '<button class="vote-btn wrong" data-act="wrong" type="button">☒</button>',
           '</div>',
           '<div class="group interest">',
             applied
@@ -163,7 +164,7 @@
           m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
           return;
         }
-        if(act==="right"){
+        if(act==="right"){ // instant; collapse vote group and show inline undo
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"right"); card.classList.add("verified");
           addInlineUndo(interestCell, async ()=>{
@@ -174,9 +175,9 @@
           postJSON({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
-        if(act==="wrong"){
+        if(act==="wrong"){ // instant; keep vote icons visible; add inline undo
           const prev=USER_VOTES[id]?.vote||"";
-          setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled");
+          setVoteLocal(id,"wrong");
           addInlineUndo(interestCell, async ()=>{
             if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
             await postJSON({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
