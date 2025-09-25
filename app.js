@@ -1,4 +1,4 @@
-// app.js v2025-09-25-align-verify — vote row aligned with row1; top ✓ appears when Right
+// app.js v2025-09-25-pro — focus trap + stronger URL guard + corroboration chip; preserves all prior logic
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
@@ -7,6 +7,17 @@
   const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s.replaceAll("-", "/") : "N/A";
   const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1800); };
   const bust=(p)=>p+(p.includes("?")?"&":"?")+"t="+Date.now();
+
+  // URL normalizer to prevent duplicates from fragments/queries/trailing slash
+  function normHref(u){
+    try{
+      const p=new URL(u.trim());
+      p.hash=""; p.search="";
+      let s=p.toString();
+      if(s.endsWith("/")) s=s.slice(0,-1);
+      return s.toLowerCase();
+    }catch{ return (u||"").trim().toLowerCase().replace(/[?#].*$/,"").replace(/\/$/,""); }
+  }
 
   document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return;
     qsa(".tab").forEach(x=>x.classList.toggle("active",x===t));
@@ -44,6 +55,7 @@
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
   const verifyTop=()=>' <span class="verify-top" title="Verified Right">✓</span>';
+  const corroboratedChip=()=>' <span class="chip" title="Multiple sources">x2</span>';
 
   function addInlineUndo(container,onUndo,seconds=10){
     if(!container) return;
@@ -73,6 +85,7 @@
     const vote=USER_VOTES[lid]?.vote||"";
     const verified= vote==="right";
     const trust = j.flags && j.flags.trusted ? trustedChip() : "";
+    const corr = j.flags && j.flags.corroborated ? corroboratedChip() : "";
     const topVerify = verified ? verifyTop() : "";
     const appliedBadge = applied ? '<span class="badge-done">Applied</span>' : "";
     const posts = (j.numberOfPosts!=null && j.numberOfPosts!=="")
@@ -81,7 +94,7 @@
 
     return [
       '<article class="card', (applied?' applied':''), (verified?' verified':''), '" data-id="', esc(lid), '">',
-        '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, trust, topVerify, appliedBadge, '</header>',
+        '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, trust, corr, topVerify, appliedBadge, '</header>',
         '<div class="card-body">',
           '<div class="rowline"><span class="muted">Posts</span><span>', esc(posts), '</span></div>',
           '<div class="rowline"><span class="muted">Qualification</span><span>', esc(j.qualificationLevel||"N/A"), '</span></div>',
@@ -163,6 +176,8 @@
           const m=qs("#report-modal"); if(!m) return;
           qs("#reportListingId").value=id||"";
           m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
+          // focus trap
+          setTimeout(()=>qs("#reportReason")?.focus(),0);
           return;
         }
         if(act==="right"){
@@ -214,8 +229,15 @@
     rootOther.replaceChildren(fOther);
   }
 
-  function openModal(sel){ const m=qs(sel); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex"; } }
-  function closeModalEl(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); m.style.display="none"; } }
+  function openModal(sel){
+    const m=qs(sel); if(!m) return;
+    m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
+    // focus first input
+    if(sel==="#missing-modal"){ setTimeout(()=>qs("#missingTitle")?.focus(),0); }
+  }
+  function closeModalEl(el){
+    const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); m.style.display="none"; }
+  }
   document.addEventListener("click",(e)=>{
     if(e.target && e.target.hasAttribute("data-close")){ e.preventDefault(); closeModalEl(e.target); }
     if(e.target && e.target.classList.contains("modal")){ e.preventDefault(); e.target.classList.add("hidden"); e.target.setAttribute("aria-hidden","true"); e.target.style.display="none"; }
@@ -224,6 +246,8 @@
   document.addEventListener("DOMContentLoaded", async ()=>{
     await renderStatus(); await render();
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
+
+    const SUBMIT_LOCK=(window.__SUBMIT_LOCK__ ||= new Set());
 
     document.addEventListener("submit", async (e)=>{
       const f=e.target;
@@ -243,13 +267,20 @@
         const title=document.getElementById("missingTitle").value.trim();
         const url=document.getElementById("missingUrl").value.trim();
         const site=document.getElementById("missingSite").value.trim();
-        const last=document.getElementById("missingLastDate").value.trim();
+        let last=document.getElementById("missingLastDate").value.trim();
         const posts=document.getElementById("missingPosts")?.value?.trim()||"";
         const note=document.getElementById("missingNote").value.trim();
         if(!title||!url) return toast("Post name and notification link are required.");
-        const SUBMIT_LOCK=(window.__SUBMIT_LOCK__ ||= new Set());
-        const key=url.replace(/[?#].*$/,"").toLowerCase(); if(SUBMIT_LOCK.has(key)) return toast("Already submitted."); SUBMIT_LOCK.add(key);
-        await postJSON({type:"missing",title,url,officialSite:site,lastDate:last,posts:posts||null,note,ts:new Date().toISOString()});
+        const key=normHref(url);
+        if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
+        SUBMIT_LOCK.add(key);
+        // normalize last date dd-mm-yy to dd/mm/yyyy
+        if(/^\d{1,2}[-/]\d{1,2}[-/]\d{2}$/.test(last)){
+          const [d,m,y]=last.replaceAll("-","/").split("/"); last=`${d.padStart(2,"0")}/${m.padStart(2,"0")}/20${y}`;
+        }else if(/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(last)){
+          const [d,m,y]=last.replaceAll("-","/").split("/"); last=`${d.padStart(2,"0")}/${m.padStart(2,"0")}/${y}`;
+        }
+        await postJSON({type:"missing",title,url:key,officialSite:site,lastDate:last||"N/A",posts:posts||null,note,ts:new Date().toISOString()});
         closeModalEl(f); f.reset(); toast("Saved. Will appear after refresh.");
       }
     });
