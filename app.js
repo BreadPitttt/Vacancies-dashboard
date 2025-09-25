@@ -1,4 +1,4 @@
-// app.js v2025-09-25-modal-open-posts — reliable modals + posts field + stable alignment, all else unchanged
+// app.js v2025-09-25-align-modals-posts — reliable modals, fixed alignment, Posts field
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
 
@@ -10,7 +10,10 @@
   const bust=(p)=>p+(p.includes("?")?"&":"?")+"t="+Date.now();
 
   // Tabs
-  document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return; qsa(".tab").forEach(x=>x.classList.toggle("active",x===t)); qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab)); });
+  document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return;
+    qsa(".tab").forEach(x=>x.classList.toggle("active",x===t));
+    qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab));
+  });
 
   // State
   let USER_STATE={}, USER_VOTES={};
@@ -27,7 +30,7 @@
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
   async function postJSON(payload){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); if(!r.ok) throw new Error("net"); }catch{ OUTBOX.push(payload); saveOutbox(); setTimeout(flushOutbox,1500); } return true; }
 
-  // Status
+  // Status header
   async function renderStatus(){
     try{
       const r=await fetch(bust("health.json"),{cache:"no-store"}); if(!r.ok) throw 0;
@@ -46,7 +49,7 @@
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
 
-  // Card template: Organization row replaced by No. of posts
+  // Card: Organization row replaced by Posts
   function cardHTML(j, applied=false){
     const src=(j.source||"").toLowerCase()==="official"
       ? '<span class="chip" title="Official source">Official</span>'
@@ -59,30 +62,30 @@
     const verified= vote==="right" ? " verified" : "";
     const trust = j.flags && j.flags.trusted ? trustedChip() : "";
     const appliedBadge = applied ? '<span class="badge-done">Applied</span>' : "";
-    const posts = (j.posts!=null && j.posts!=="") ? String(j.posts) : "N/A";
+    const postsText = (j.posts!=null && j.posts!=="") ? esc(String(j.posts)) : "N/A";
 
     return [
       '<article class="card', (applied?' applied':''), verified, '" data-id="', esc(lid), '">',
         '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, tick, trust, appliedBadge, '</header>',
         '<div class="card-body">',
-          '<div class="rowline"><span class="muted">No. of posts</span><span>', esc(posts), '</span></div>',
+          '<div class="rowline"><span class="muted">Posts</span><span>', postsText, '</span></div>',
           '<div class="rowline"><span class="muted">Qualification</span><span>', esc(j.qualificationLevel||"N/A"), '</span></div>',
           '<div class="rowline"><span class="muted">Domicile</span><span>', esc(j.domicile||"All India"), '</span></div>',
           '<div class="rowline"><span class="muted">Last date</span><span>', esc(fmtDate(j.deadline)), ' <span class="muted">(', d, ' days)</span></span></div>',
         '</div>',
         '<div class="actions-row row1">',
-          '<div class="left"><a class="btn primary" href="', det, '" target="_blank" rel="noopener" role="button">Details</a></div>',
-          '<div class="right"><button class="btn danger" type="button" data-act="report" data-open="#report-modal">Report</button></div>',
+          '<div class="left"><a class="btn primary" href="', det, '" target="_blank" rel="noopener">Details</a></div>',
+          '<div class="right"><button class="btn danger" data-act="report" type="button">Report</button></div>',
         '</div>',
         '<div class="actions-row row2">',
           '<div class="group vote">',
-            '<button class="btn ok" type="button" data-act="right">Right</button>',
-            '<button class="btn warn" type="button" data-act="wrong">Wrong</button>',
+            '<button class="btn ok" data-act="right" type="button">Right</button>',
+            '<button class="btn warn" data-act="wrong" type="button">Wrong</button>',
           '</div>',
           '<div class="group interest">',
             applied
-              ? '<button class="btn applied" type="button" data-act="exam_done">Exam done</button>'
-              : '<button class="btn applied" type="button" data-act="applied">Applied</button><button class="btn other ni" type="button" data-act="not_interested"><span class="ni-text">Not&nbsp;interested</span></button>',
+              ? '<button class="btn applied" data-act="exam_done" type="button">Exam done</button>'
+              : '<button class="btn applied" data-act="applied" type="button">Applied</button><button class="btn other" data-act="not_interested" type="button">Not interested</button>',
           '</div>',
         '</div>',
       '</article>'
@@ -134,17 +137,18 @@
       const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
       const card=wrap.firstElementChild;
 
-      // Delegated actions
+      // Delegated clicks with robust defaults
       card.addEventListener("click", async (e)=>{
-        const opener=e.target.closest("[data-open]"); if(opener){ e.preventDefault(); openModal(opener.getAttribute("data-open")); return; }
-        const btn=e.target.closest("[data-act]"); if(!btn) return; e.preventDefault();
-
+        const btn=e.target.closest("[data-act]"); if(!btn) return;
+        e.preventDefault(); e.stopPropagation();
         const act=btn.getAttribute("data-act"), id=card.getAttribute("data-id");
         const detailsUrl=(card.querySelector(".row1 .left a")?.href||"");
 
         if(act==="report"){
+          const m=qs("#report-modal"); if(!m) return;
           qs("#reportListingId").value=id||"";
-          openModal("#report-modal"); return;
+          m.classList.remove("hidden"); m.setAttribute("aria-hidden","false");
+          return;
         }
         if(act==="right"){
           setVoteLocal(id,"right"); card.classList.add("verified");
@@ -174,11 +178,11 @@
     rootOther.replaceChildren(fOther);
   }
 
-  // Modals
+  // Modal helpers
   function openModal(sel){ const m=qs(sel); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
   function closeModal(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
 
-  // Global close (X button and overlay)
+  // Global close hooks
   document.addEventListener("click",(e)=>{
     if(e.target && e.target.hasAttribute("data-close")){ e.preventDefault(); closeModal(e.target); }
     if(e.target && e.target.classList.contains("modal")){ e.preventDefault(); e.target.classList.add("hidden"); e.target.setAttribute("aria-hidden","true"); }
@@ -187,12 +191,12 @@
   document.addEventListener("DOMContentLoaded", async ()=>{
     await renderStatus(); await render();
 
-    // Top-right submit opener (also has data-open in HTML)
-    qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); openModal("#missing-modal"); });
+    // Open Missing modal
+    qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
 
     // Report submit
     qs("#reportForm")?.addEventListener("submit", async (e)=>{
-      e.preventDefault();
+      e.preventDefault(); e.stopPropagation();
       const id=qs("#reportListingId").value.trim();
       const rc=document.getElementById("reportReason").value||"";
       const ev=document.getElementById("reportEvidenceUrl")?.value?.trim()||"";
@@ -206,7 +210,7 @@
     // Missing submit
     const SUBMIT_LOCK=new Set();
     qs("#missingForm")?.addEventListener("submit", async (e)=>{
-      e.preventDefault();
+      e.preventDefault(); e.stopPropagation();
       const title=document.getElementById("missingTitle").value.trim();
       const url=document.getElementById("missingUrl").value.trim();
       const site=document.getElementById("missingSite").value.trim();
