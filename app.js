@@ -1,4 +1,4 @@
-// app.js v2025-09-25-fixes — modal open reliability, posts on cards, 10s Undo with confirm for state changes, layout guard
+// app.js v2025-09-25-ui-fit — no logic changes except ensuring modals open and keeping version string updated
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
 
@@ -49,7 +49,6 @@
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
 
-  // Inline 10s Undo helper (reused across actions)
   function addInlineUndo(container,onUndo,seconds=10){
     if(!container) return;
     const u=document.createElement("button");
@@ -59,7 +58,6 @@
     u.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
   }
 
-  // Global confirm dialog for state changes (not for votes)
   function confirmAction(message="Proceed?"){
     return new Promise((resolve)=>{
       const box=qs("#confirm");
@@ -72,7 +70,6 @@
     });
   }
 
-  // Card template: Organization removed; Posts added (uses numberOfPosts | flags.posts | N/A)
   function cardHTML(j, applied=false){
     const src=(j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
     const d=(j.daysLeft!=null && j.daysLeft!=="")?j.daysLeft:"—";
@@ -160,7 +157,6 @@
       const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
       const card=wrap.firstElementChild;
 
-      // Button handler (modal opening fixed)
       card.addEventListener("click", async (e)=>{
         const btn=e.target.closest("[data-act]"); if(!btn) return;
         e.preventDefault(); e.stopPropagation();
@@ -171,10 +167,10 @@
         if(act==="report"){
           const m=qs("#report-modal"); if(!m) return;
           qs("#reportListingId").value=id||"";
-          m.classList.remove("hidden"); m.setAttribute("aria-hidden","false");
+          m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
           return;
         }
-        if(act==="right"){ // no confirm for votes
+        if(act==="right"){
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"right"); card.classList.add("verified");
           addInlineUndo(interestCell, async ()=>{
@@ -185,7 +181,7 @@
           postJSON({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
-        if(act==="wrong"){ // no confirm for votes
+        if(act==="wrong"){
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled");
           addInlineUndo(interestCell, async ()=>{
@@ -223,7 +219,6 @@
     rootOther.replaceChildren(fOther);
   }
 
-  // Modal open/close (fixes: ensure display toggles correctly and overlay click closes)
   function openModal(sel){ const m=qs(sel); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex"; } }
   function closeModalEl(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); m.style.display="none"; } }
   document.addEventListener("click",(e)=>{
@@ -233,11 +228,8 @@
 
   document.addEventListener("DOMContentLoaded", async ()=>{
     await renderStatus(); await render();
-
-    // Submit missing open button
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
 
-    // Delegate form submissions
     document.addEventListener("submit", async (e)=>{
       const f=e.target;
       if(f && f.id==="reportForm"){
