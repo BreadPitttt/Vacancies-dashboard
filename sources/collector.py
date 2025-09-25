@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
-# Hybrid collector v3: official + scored aggregators + cross-verification. (Hardened official filters)
+# Hybrid collector v3.1 — posts extraction from title + nearby text + PDF filenames (official-first)
 import requests, json, sys, re, time, os, hashlib, pathlib
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 
 UA = {"User-Agent":"Mozilla/5.0"}
-
-# Load rules for aggregator scores if available
-def load_rules():
-    try:
-        return json.loads(pathlib.Path("rules.json").read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-RULES = load_rules()
-AGG_SCORES = RULES.get("aggregatorScores", {})  # {"domain": 0.0..1.0}
+RULES = {}
+try:
+    RULES = json.loads(pathlib.Path("rules.json").read_text(encoding="utf-8"))
+except Exception:
+    RULES = {}
+AGG_SCORES = RULES.get("aggregatorScores", {})
 
 OFFICIAL_SITES = [
     ("https://ssc.gov.in/", "a[href]", "SSC", "All India"),
@@ -26,20 +23,12 @@ OFFICIAL_SITES = [
     ("https://examinationservices.nic.in/recSys2025/root/Home.aspx?enc=Ei4cajBkK1gZSfgr53ImFZ5JDNNIP7I8JbNwGOl976uPeIvr9X7G7iVESmo7y1L6", "a[href]", "EMRS/NESTS", "All India"),
 ]
 
-# Candidate aggregators to test; kept with scoring and cross-verification
 AGGREGATORS = [
-    ("https://www.sarkariexam.com/", "a[href]"),
-    ("https://sarkariresult.com.cm/", "a[href]"),
-    ("https://sarkariresult.com.im/", "a[href]"),
-    ("https://sarkariresultinfos.com/", "a[href]"),
-    ("https://www.dailysarkariresults.com/", "a[href]"),
-    ("https://www.rojgarresult.com/", "a[href]"),
-    ("https://www.careerpower.in/government-jobs.html", "a[href]"),
-    ("https://www.adda247.com/jobs/", "a[href]"),
-    ("https://www.shiksha.com/sarkari-exams/articles-st-21", "a[href]"),
-    # original ones we already used:
     ("https://www.freejobalert.com/", "a[href]"),
     ("https://sarkarijobfind.com/", "a[href]"),
+    ("https://www.resultbharat.com/", "a[href]"),
+    ("https://www.rojgarresult.com/", "a[href]"),
+    ("https://www.adda247.com/jobs/", "a[href]"),
 ]
 
 NEG_TOK = re.compile(r"\b(result|cutoff|exam\s*date|admit\s*card|syllabus|answer\s*key)\b", re.I)
@@ -51,7 +40,10 @@ SKILL_BAD = re.compile(r"(steno|shorthand|trade\s+test|cad|sap|oracle|aws|azure|
 
 DATE_PAT = re.compile(r"(\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b)", re.I)
 LAST_DATE_PAT = re.compile(r"(last\s*date|apply\s*by|closing\s*date)", re.I)
-POSTS_PAT = re.compile(r"(\b(\d{1,6})\s*(posts?|vacancies)\b|\((\d{1,6})\s*(posts?|vacancies)\))", re.I)
+
+# Improved posts patterns
+POSTS_PAT = re.compile(r"(\d{1,6})\s*(posts?|vacanc(?:y|ies)|seats?)", re.I)
+POSTS_HINT_NEAR = re.compile(r"(total|overall|aggregate)\s*(\d{1,6})\s*(posts?|vacanc(?:y|ies)|seats?)", re.I)
 
 CONSTABLE_HINT = re.compile(r"\b(constable|gd|chsl|12th)\b", re.I)
 TEN_HINT = re.compile(r"\b(10th|matric|ssc\s*exam|mts)\b", re.I)
@@ -62,7 +54,6 @@ def host(u):
     try: return urlparse(u or "").netloc.lower()
     except: return ""
 
-# STRICT official host list (suffixes) + allowlist domains
 OFFICIAL_SUFFIXES = (".gov.in",".nic.in",".gov",".go.in")
 ALLOW_HOSTS = set([
     "rbi.org.in","ibps.in","bpsc.bihar.gov.in","bssc.bihar.gov.in","ssc.gov.in",
@@ -79,16 +70,9 @@ def is_official(url):
     except:
         return False
 
-# Extra guard: reject likely aggregator/self-hosted pages as "official"
 BAD_OFFICIAL_HINTS = re.compile(r"(sarkari|adda247|careerpower|testbook|rojgar|freejobalert|shiksha|blog|news)", re.I)
 
 def is_strict_official_link(base_site, url):
-    """
-    Accept only if:
-    - is_official(url) AND
-    - host(url) is the same as base host or a trusted government host, AND
-    - url does not contain aggregator/news hints.
-    """
     h = host(url)
     if not is_official(url): return False
     if BAD_OFFICIAL_HINTS.search(url): return False
@@ -122,12 +106,25 @@ def extract_last_date(title):
     m = DATE_PAT.search(title)
     return m.group(1).replace("-", "/") if m else "N/A"
 
-def extract_posts(title):
-    m = POSTS_PAT.search(title)
-    if not m: return None
-    for g in (m.group(2), m.group(4)):
-        if g and g.isdigit(): return int(g)
+def posts_from_text(txt):
+    if not txt: return None
+    m = POSTS_PAT.search(txt)
+    if m:
+        try: return int(m.group(1))
+        except: return None
+    m2 = POSTS_HINT_NEAR.search(txt)
+    if m2:
+        try: return int(m2.group(2))
+        except: return None
     return None
+
+def posts_from_pdf_filename(url):
+    # e.g., .../CEN_03_2025_1206_Posts.pdf or .../Notice_420_Vacancies.pdf
+    try:
+        fn=urlparse(url).path.rsplit("/",1)[-1]
+        return posts_from_text(fn.replace("_"," ").replace("-"," "))
+    except:
+        return None
 
 def mk(title, url, org, dom, source="official"):
     title = clean(title)
@@ -135,7 +132,7 @@ def mk(title, url, org, dom, source="official"):
     last = extract_last_date(title)
     rec = {
         "title": title,
-        "organization": org or "",
+        "organization": "",  # keep blank; UI will not show it
         "qualificationLevel": q,
         "domicile": dom or ("All India" if is_official(url) else "All India"),
         "deadline": last,
@@ -145,8 +142,8 @@ def mk(title, url, org, dom, source="official"):
         "type": "VACANCY",
         "flags": { "trusted": source=="official" }
     }
-    posts = extract_posts(title)
-    if posts: rec["flags"]["posts"] = posts
+    p = posts_from_text(title) or posts_from_pdf_filename(url)
+    if p: rec["numberOfPosts"]=p
     return rec
 
 def fetch(base, selector):
@@ -161,7 +158,6 @@ def fetch(base, selector):
             if not re.search(r"(advert|recruit|vacanc|notice|notification|exam|cgl|chsl|mts|rrb|officer|grade|constable|clerk|po|so|assistant)", t, re.I):
                 continue
             url = h if h.startswith("http") else urljoin(base, h)
-            # HARDEN: only keep links that are strictly official relative to the base
             if not is_strict_official_link(base, url):
                 continue
             out.append((t, url))
@@ -178,56 +174,63 @@ def run(out_jsonl):
     for base, sel, org, dom in OFFICIAL_SITES:
         for t, u in fetch(base, sel):
             if not eligible_title(t): continue
-            official.append(mk(t, u, org, dom, "official"))
-        time.sleep(0.5)
+            rec = mk(t, u, org, dom, "official")
+            # Try to fetch surrounding text for posts if still missing and same host
+            if "numberOfPosts" not in rec:
+                try:
+                    rr = requests.get(u, timeout=20, headers=UA)
+                    if rr.ok:
+                        txt = BeautifulSoup(rr.text, "html.parser").get_text(" ", strip=True)
+                        pp = posts_from_text(txt)
+                        if pp: rec["numberOfPosts"]=pp
+                except: pass
+            official.append(rec)
+        time.sleep(0.4)
 
+    # Aggregators (kept conservative; prefer official links or strong signals)
     agg_pairs=[]
     for base, sel in AGGREGATORS:
         agg_pairs.extend(fetch(base, sel))
-        time.sleep(0.4)
+        time.sleep(0.3)
 
-    # Group aggregator hits
     group = {}
     for t,u in agg_pairs:
         if not eligible_title(t): continue
         k = key_from(t,u)
         group.setdefault(k, []).append((t,u))
 
-    # Keep aggregator record if:
-    # - any strict official link, or
-    # - 2+ aggregators agree on same title+url, or
-    # - score(host)>=0.75 AND link seems like an official PDF/notice path
     def score_domain(u):
-        return AGG_SCORES.get(host(u), 0.0)
+        try: return AGG_SCORES.get(host(u), 0.0)
+        except: return 0.0
 
     agg_kept=[]
     for k, items in group.items():
-        items = list({(t,u) for (t,u) in items})  # unique
+        items = list({(t,u) for (t,u) in items})
         kept=None
         for t,u in items:
             if is_official(u): kept=(t,u); break
         if kept and is_official(kept[1]):
-            agg_kept.append(mk(kept[0], kept[1], "N/A", "All India", "aggregator")); continue
+            rec = mk(kept[0], kept[1], "", "All India", "aggregator")
+            agg_kept.append(rec); continue
         if len(items) >= 2:
-            t,u = items[0]; agg_kept.append(mk(t,u,"N/A","All India","aggregator")); continue
+            t,u = items[0]; agg_kept.append(mk(t,u,"","All India","aggregator")); continue
         t,u = items[0]
         if score_domain(u) >= 0.75 and (u.lower().endswith(".pdf") or "/notice" in u.lower() or "/advert" in u.lower()) and is_official(u):
-            agg_kept.append(mk(t,u,"N/A","All India","aggregator"))
+            agg_kept.append(mk(t,u,"","All India","aggregator"))
 
-    # Deduplicate; prefer official
     by_sig={}
     for rec in official + agg_kept:
         sig = key_from(rec["title"], rec["detailLink"] or rec["applyLink"])
         if sig in by_sig:
             base = by_sig[sig]
-            if rec["source"]=="official" and base["source"]!="official":
-                rec["flags"] = { **base.get("flags",{}), **rec.get("flags",{}) }
-                by_sig[sig] = rec
-            else:
-                for f in ("organization","qualificationLevel","domicile","deadline","applyLink","detailLink"):
-                    if (not base.get(f) or base.get(f)=="N/A") and rec.get(f):
-                        base[f]=rec[f]
-                base["flags"] = { **base.get("flags",{}), **rec.get("flags",{}) }
+            # prefer integer numberOfPosts if present
+            if rec.get("numberOfPosts") and not base.get("numberOfPosts"):
+                base["numberOfPosts"]=rec["numberOfPosts"]
+            # merge flags minimally
+            base["flags"] = { **(base.get("flags") or {}), **(rec.get("flags") or {}) }
+            for f in ("qualificationLevel","domicile","deadline","applyLink","detailLink","source","type"):
+                if (not base.get(f) or base.get(f)=="N/A") and rec.get(f):
+                    base[f]=rec[f]
         else:
             by_sig[sig]=rec
 
