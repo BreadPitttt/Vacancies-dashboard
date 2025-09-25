@@ -1,4 +1,4 @@
-// app.js v2025-09-25-align-modals-posts — reliable modals, fixed alignment, Posts field
+// app.js v2025-09-25-undo-modals — undo restored, robust modals, Posts field, alignment intact
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
 
@@ -38,7 +38,7 @@
       qs("#health-pill").textContent=h.ok?"Health: OK":"Health: Not OK";
       qs("#health-pill").className="pill "+(h.ok?"ok":"bad");
       qs("#last-updated").textContent="Last updated: "+(h.lastUpdated? new Date(h.lastUpdated).toLocaleString() : "—");
-      qs("#total-listings").textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
+      qs("#total-listings").textContent="Listings: "+(typeof h.totalListings==="number)?h.totalListings:"—");
     }catch{
       qs("#health-pill").textContent="Health: Unknown";
       qs("#health-pill").className="pill";
@@ -49,11 +49,18 @@
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
 
-  // Card: Organization row replaced by Posts
+  // Add inline undo button for any action
+  function addUndo(container,onUndo,seconds=10){
+    const u=document.createElement("button");
+    u.className="btn ghost tiny"; let left=seconds; u.textContent=`Undo (${left}s)`;
+    container.appendChild(u);
+    const iv=setInterval(()=>{ left--; if(left<=0){ clearInterval(iv); u.remove(); } else { u.textContent=`Undo (${left}s)`; } },1000);
+    u.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
+  }
+
+  // Card with Posts instead of Organization
   function cardHTML(j, applied=false){
-    const src=(j.source||"").toLowerCase()==="official"
-      ? '<span class="chip" title="Official source">Official</span>'
-      : '<span class="chip" title="From aggregator">Agg</span>';
+    const src=(j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
     const d=j.daysLeft!=null?j.daysLeft:"—";
     const det=esc(j.detailLink||j.applyLink||"#");
     const lid=j.id||"";
@@ -137,12 +144,12 @@
       const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
       const card=wrap.firstElementChild;
 
-      // Delegated clicks with robust defaults
       card.addEventListener("click", async (e)=>{
         const btn=e.target.closest("[data-act]"); if(!btn) return;
         e.preventDefault(); e.stopPropagation();
         const act=btn.getAttribute("data-act"), id=card.getAttribute("data-id");
         const detailsUrl=(card.querySelector(".row1 .left a")?.href||"");
+        const interestCell=card.querySelector(".row2 .interest");
 
         if(act==="report"){
           const m=qs("#report-modal"); if(!m) return;
@@ -151,17 +158,35 @@
           return;
         }
         if(act==="right"){
+          const prevVote=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"right"); card.classList.add("verified");
+          addUndo(interestCell, async ()=>{
+            if(prevVote==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prevVote||""); }
+            await postJSON({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
+            await render();
+          });
           postJSON({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
         if(act==="wrong"){
+          const prevVote=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled");
+          addUndo(interestCell, async ()=>{
+            if(prevVote==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prevVote||""); }
+            await postJSON({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
+            await render();
+          });
           postJSON({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
         if(act==="applied"||act==="not_interested"){
+          const prev=USER_STATE[id]?.action||"";
           setUserStateLocal(id,act);
+          addUndo(interestCell, async ()=>{
+            if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); }
+            await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}});
+            await render();
+          });
           postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}});
           await render(); return;
         }
@@ -178,11 +203,9 @@
     rootOther.replaceChildren(fOther);
   }
 
-  // Modal helpers
+  // Modal helpers and global close
   function openModal(sel){ const m=qs(sel); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
   function closeModal(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
-
-  // Global close hooks
   document.addEventListener("click",(e)=>{
     if(e.target && e.target.hasAttribute("data-close")){ e.preventDefault(); closeModal(e.target); }
     if(e.target && e.target.classList.contains("modal")){ e.preventDefault(); e.target.classList.add("hidden"); e.target.setAttribute("aria-hidden","true"); }
@@ -191,36 +214,42 @@
   document.addEventListener("DOMContentLoaded", async ()=>{
     await renderStatus(); await render();
 
-    // Open Missing modal
+    // Always open Missing modal
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
 
     // Report submit
-    qs("#reportForm")?.addEventListener("submit", async (e)=>{
-      e.preventDefault(); e.stopPropagation();
-      const id=qs("#reportListingId").value.trim();
-      const rc=document.getElementById("reportReason").value||"";
-      const ev=document.getElementById("reportEvidenceUrl")?.value?.trim()||"";
-      const posts=document.getElementById("reportPosts")?.value?.trim()||"";
-      const note=document.getElementById("reportNote")?.value?.trim()||"";
-      if(!id||!rc) return toast("Please select a reason.");
-      await postJSON({type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,note,ts:new Date().toISOString()});
-      closeModal(e.target); e.target.reset(); toast("Reported.");
+    document.addEventListener("submit", async (e)=>{
+      const f=e.target;
+      if(f && f.id==="reportForm"){
+        e.preventDefault(); e.stopPropagation();
+        const id=qs("#reportListingId").value.trim();
+        const rc=document.getElementById("reportReason").value||"";
+        const ev=document.getElementById("reportEvidenceUrl")?.value?.trim()||"";
+        const posts=document.getElementById("reportPosts")?.value?.trim()||"";
+        const note=document.getElementById("reportNote")?.value?.trim()||"";
+        if(!id||!rc) return toast("Please select a reason.");
+        await postJSON({type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,note,ts:new Date().toISOString()});
+        closeModal(f); f.reset(); toast("Reported.");
+      }
     });
 
     // Missing submit
     const SUBMIT_LOCK=new Set();
-    qs("#missingForm")?.addEventListener("submit", async (e)=>{
-      e.preventDefault(); e.stopPropagation();
-      const title=document.getElementById("missingTitle").value.trim();
-      const url=document.getElementById("missingUrl").value.trim();
-      const site=document.getElementById("missingSite").value.trim();
-      const last=document.getElementById("missingLastDate").value.trim();
-      const posts=document.getElementById("missingPosts")?.value?.trim()||"";
-      const note=document.getElementById("missingNote").value.trim();
-      if(!title||!url) return toast("Post name and notification link are required.");
-      const key=url.replace(/[?#].*$/,"").toLowerCase(); if(SUBMIT_LOCK.has(key)) return toast("Already submitted."); SUBMIT_LOCK.add(key);
-      await postJSON({type:"missing",title,url,officialSite:site,lastDate:last,posts:posts||null,note,ts:new Date().toISOString()});
-      closeModal(e.target); e.target.reset(); toast("Saved. Will appear after refresh.");
+    document.addEventListener("submit", async (e)=>{
+      const f=e.target;
+      if(f && f.id==="missingForm"){
+        e.preventDefault(); e.stopPropagation();
+        const title=document.getElementById("missingTitle").value.trim();
+        const url=document.getElementById("missingUrl").value.trim();
+        const site=document.getElementById("missingSite").value.trim();
+        const last=document.getElementById("missingLastDate").value.trim();
+        const posts=document.getElementById("missingPosts")?.value?.trim()||"";
+        const note=document.getElementById("missingNote").value.trim();
+        if(!title||!url) return toast("Post name and notification link are required.");
+        const key=url.replace(/[?#].*$/,"").toLowerCase(); if(SUBMIT_LOCK.has(key)) return toast("Already submitted."); SUBMIT_LOCK.add(key);
+        await postJSON({type:"missing",title,url,officialSite:site,lastDate:last,posts:posts||null,note,ts:new Date().toISOString()});
+        closeModal(f); f.reset(); toast("Saved. Will appear after refresh.");
+      }
     });
   });
 })();
