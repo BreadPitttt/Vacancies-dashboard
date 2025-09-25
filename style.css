@@ -70,7 +70,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
   min-width:0;
 }
 
-/* Vote icons left; Interest buttons right — keep both on one line */
+/* Vote icons left; Interest buttons right — one line */
 .group.vote{gap:10px;flex-wrap:nowrap}
 .group.interest{
   gap:10px;
@@ -135,7 +135,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
   line-height:1;
 }
 
-/* Top verification chip */
+/* Top verification chip + corroboration chip style */
 .verify-top{
   display:inline-flex;
   align-items:center;
