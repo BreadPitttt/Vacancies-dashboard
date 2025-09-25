@@ -1,4 +1,4 @@
-// app.js v2025-09-26-stable2 — KV-first state, 10s deferred move, top-only tick, red ✗ close, report sends lastDate/evidence
+// app.js v2025-09-26-stable3 — icon-only close, 10s deferred move, KV-first sync, richer report payload
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
@@ -34,14 +34,15 @@
 
   let USER_STATE={}, USER_VOTES={};
 
-  // KV-first, then repo file
+  // KV-first state load, fallback to repo file; then merge local
   async function loadUserStateServer(){
     try{
       const wr=await fetch(ENDPOINT+"?state=1",{mode:"cors"});
       if(wr.ok){
         const wj=await wr.json();
         if(wj && wj.ok && wj.state && typeof wj.state==="object"){
-          USER_STATE={...wj.state}; return;
+          USER_STATE={...wj.state};
+          return;
         }
       }
     }catch{}
@@ -59,13 +60,13 @@
   function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
-  function confirmAction(message="Proceed?"){ return new Promise((resolve)=>{ const ok=confirm(message); resolve(ok); }); }
+  function confirmAction(message="Proceed?"){ return Promise.resolve(confirm(message)); }
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
   const topVerify=()=>' <span class="verify-top" title="Verified Right">✓</span>';
   const corroboratedChip=()=>' <span class="chip" title="Multiple sources">x2</span>';
 
-  // Inline Undo with 10s and deferred apply/move
+  // Inline Undo (10s) with deferred commit
   function renderInlineUndo(slot, label, onUndo, onCommit, seconds=10){
     if(!slot) return;
     const wrap=document.createElement("div");
@@ -87,7 +88,6 @@
     const lid=j.id||"";
     const vote=USER_VOTES[lid]?.vote||"";
     const verified= vote==="right";
-    // Only show the top verify chip; hide bottom icons on verified
     const trust = j.flags && j.flags.trusted ? trustedChip() : "";
     const corr = j.flags && j.flags.corroborated ? corroboratedChip() : "";
     const tVerify = verified ? topVerify() : "";
@@ -192,11 +192,11 @@
             async ()=>{ // onUndo
               if(prev==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
               await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await render();
+              await persistUserStateServer(); await render();
             },
-            async ()=>{ // onCommit
+            async ()=>{ // onCommit after 10s
               await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await render();
+              await persistUserStateServer(); await render();
             },
             10);
           return;
@@ -209,11 +209,11 @@
             async ()=>{
               if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
               await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await render();
+              await persistUserStateServer(); await render();
             },
             async ()=>{
               await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await render();
+              await persistUserStateServer(); await render();
             },
             10);
           return;
@@ -223,17 +223,16 @@
           const ok = await confirmAction(act==="applied" ? "Mark as Applied?" : "Move to Other (Not interested)?");
           if(!ok) return;
           const prev=USER_STATE[id]?.action||"";
-          setUserStateLocal(id,act);
+          setUserStateLocal(id,act); // local mark immediately for user feedback
           renderInlineUndo(interestCell, act==="applied"?"applied":"choice",
-            async ()=>{ // Undo
+            async ()=>{ // Undo path
               if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); }
               await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}})});
-              await render();
+              await persistUserStateServer(); await render();
             },
-            async ()=>{ // Commit after 10s, then re-render
+            async ()=>{ // Commit after 10s, then re-render (move sections now)
               await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}})});
-              await persistUserStateServer();
-              await render();
+              await persistUserStateServer(); await render();
             },
             10);
           return;
@@ -252,7 +251,6 @@
     rootOther.replaceChildren(fOther);
   }
 
-  // Modal open/close and red ✗ top-right
   function openModal(sel){
     const m=qs(sel); if(!m) return;
     m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
@@ -268,9 +266,8 @@
 
   document.addEventListener("DOMContentLoaded", async ()=>{
     await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal();
-    persistUserStateServer();
-    await renderStatus();
-    await render();
+    await persistUserStateServer(); // push merged snapshot up-front
+    await renderStatus(); await render();
 
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
 
@@ -285,9 +282,12 @@
         const ev=document.getElementById("reportEvidenceUrl")?.value?.trim()||"";
         const posts=document.getElementById("reportPosts")?.value?.trim()||"";
         const note=document.getElementById("reportNote")?.value?.trim()||"";
-        const last=document.getElementById("reportLastDate")?.value?.trim()||""; // optional input (add a hidden if not present)
+        const last=document.getElementById("reportLastDate")?.value?.trim()||"";
+        const elig=document.getElementById("reportEligibility")?.value?.trim()||"";
         if(!id||!rc) return toast("Please select a reason.");
-        await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,lastDate:last||"",note,ts:new Date().toISOString()})});
+        await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+          type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,lastDate:last||"",eligibility:elig||"",note,ts:new Date().toISOString()
+        })});
         closeModalEl(f); f.reset(); toast("Reported.");
       }
       if(f && f.id==="missingForm"){
@@ -306,7 +306,9 @@
         }else if(/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(last)){
           const [d,m,y]=last.replaceAll("-","/").split("/"); last=`${d.padStart(2,"0")}/${m.padStart(2,"0")}/${y}`;
         }
-        await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"missing",title,url:key,officialSite:site,lastDate:last||"N/A",posts:posts||null,note,ts:new Date().toISOString()})});
+        await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+          type:"missing",title,url:key,officialSite:site,lastDate:last||"N/A",posts:posts||null,note,ts:new Date().toISOString()
+        })});
         closeModalEl(f); f.reset(); toast("Saved. Will appear after refresh.");
       }
     });
