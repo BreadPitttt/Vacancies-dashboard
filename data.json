@@ -1,7 +1,7 @@
 {
   "jobListings": [
     {
-      "id": "user_549791088",
+      "id": "user_987233351",
       "title": "IBPS RRB 14th Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -17,7 +17,7 @@
       "daysLeft": 3
     },
     {
-      "id": "user_623694143",
+      "id": "user_586934739",
       "title": "RBI Officers Grade B Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -33,7 +33,7 @@
       "daysLeft": 1
     },
     {
-      "id": "user_353685563",
+      "id": "user_323437950",
       "title": "RRB Section Controller Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -49,7 +49,7 @@
       "daysLeft": 19
     },
     {
-      "id": "user_527326877",
+      "id": "user_737402954",
       "title": "BSSC CGL Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -65,7 +65,7 @@
       "daysLeft": 1
     },
     {
-      "id": "user_17854670",
+      "id": "user_976711151",
       "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -81,7 +81,7 @@
       "daysLeft": 1
     },
     {
-      "id": "user_826216366",
+      "id": "user_784115541",
       "title": "SSC Delhi Police Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -97,7 +97,7 @@
       "daysLeft": 26
     },
     {
-      "id": "user_863439509",
+      "id": "user_1548035",
       "title": "EMRS Non Teaching Various Post Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -113,7 +113,7 @@
       "daysLeft": 28
     },
     {
-      "id": "user_10629249",
+      "id": "user_653012180",
       "title": "BSSC Office Attendant Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -133,16 +133,16 @@
   "sections": {
     "applied": [],
     "other": [
-      "user_10629249"
+      "user_653012180"
     ],
     "primary": [
-      "user_549791088",
-      "user_623694143",
-      "user_353685563",
-      "user_527326877",
-      "user_17854670",
-      "user_826216366",
-      "user_863439509"
+      "user_987233351",
+      "user_586934739",
+      "user_323437950",
+      "user_737402954",
+      "user_976711151",
+      "user_784115541",
+      "user_1548035"
     ]
   },
   "transparencyInfo": {
@@ -150,7 +150,7 @@
     "runMode": "nightly",
     "totalListings": 8,
     "sourcesTried": [],
-    "lastUpdated": "2025-09-25T03:27:56.596913Z",
+    "lastUpdated": "2025-09-25T13:47:13.419385Z",
     "mergedUpdates": 0
   }
 }
