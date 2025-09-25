@@ -1,4 +1,5 @@
-# scraper.py — light seeds + stable id + numberOfPosts extraction + detailLink
+#!/usr/bin/env python3
+# scraper.py — official-first + reopened detector + aggregator tie-breaks (keeps original two at top)
 import requests
 from bs4 import BeautifulSoup
 import json, logging, re, os, time, argparse, hashlib, pathlib
@@ -28,25 +29,26 @@ TTL = 0 if RUN_MODE=="nightly" else (6*3600 if RUN_MODE=="light" else 72*3600)
 
 def load_rules(path="rules.json"):
     try: return json.load(open(path,"r",encoding="utf-8"))
-    except: return {"captureHints":[]}
+    except: return {"captureHints":[], "aggregatorScores":{}}
 RULES = load_rules()
 HINTS = RULES.get("captureHints", [])
+AGG_SCORES = RULES.get("aggregatorScores", {})
 
+# Keep original two aggregators at the top positions
 BASE = [
   {"name":"freejobalert","url":"https://www.freejobalert.com/","parser":"parse_generic"},
   {"name":"sarkarijobfind","url":"https://sarkarijobfind.com/","parser":"parse_generic"},
   {"name":"resultbharat","url":"https://www.resultbharat.com/","parser":"parse_generic"},
+  {"name":"rojgarresult","url":"https://www.rojgarresult.com/","parser":"parse_generic"},
   {"name":"adda247","url":"https://www.adda247.com/jobs/","parser":"parse_generic"}
 ]
-SEEDS = [{"name":f"hint{i+1}", "url":u, "parser":"dispatch_seed"} for i,u in enumerate(HINTS[:40])]
+SEEDS = [{"name":f"hint{i+1}", "url":u, "parser":"dispatch_seed"} for i,u in enumerate(HINTS[:100])]
 SOURCES = SEEDS if IS_LIGHT else (SEEDS + BASE)
 
 TEACHER_TERMS = {"teacher","tgt","pgt","prt","faculty","lecturer","assistant professor","professor","b.ed","ctet","tet "}
-TECH_TERMS = {"b.tech","btech","b.e","m.tech","m.e","mca","bca","engineer","developer","scientist","architect","analyst","devops","cloud","ml","ai","research"}
+TECH_TERMS = {"b.tech","btech","b.e","m.tech","m.e","mca","bca","developer","architect","analyst","devops","cloud","ml","ai","research"}
 PG_TERMS = {"mba","pg ","post graduate","postgraduate","phd","m.phil","mcom","m.com","ma ","m.a","msc","m.sc"}
-STATE_NAMES = ["andhra pradesh","arunachal pradesh","assam","bihar","chhattisgarh","goa","gujarat","haryana","himachal pradesh","jharkhand","karnataka","kerala","madhya pradesh","maharashtra","manipur","meghalaya","mizoram","nagaland","odisha","punjab","rajasthan","sikkim","tamil nadu","telangana","tripura","uttar pradesh","uttarakhand","west bengal","jammu","kashmir","ladakh","delhi","puducherry","chandigarh","andaman","nicobar","dadra","nagar haveli","daman","diu","lakshadweep"]
-OPEN = ["all india","any state","open to all","pan india","indian citizens","across india","from any state","other state candidates"]
-CLOSE = ["domicile","resident","locals only","local candidates","state quota","only for domicile"]
+REOPEN_TOK = re.compile(r"\b(re-?open|re-?opened|reopening|corrigendum|extension|extended|last\s*date|addendum|amendment)\b", re.I)
 
 def clean(s): return re.sub(r"\s+"," ", (s or "").strip())
 def education_band(text):
@@ -58,38 +60,15 @@ def education_band(text):
 def disallowed(text):
     t=(text or "").lower()
     if any(k in t for k in TEACHER_TERMS): return True
+    # allow “assistant” generic posts if qualification band fits
     if any(k in t for k in TECH_TERMS|PG_TERMS):
         if ("graduate" in t or "12th" in t or "10th") and "only" not in t:
             return False
         return True
     return False
-def skill_ok(text):
-    t=(text or "").lower()
-    ok = any(x in t for x in ["typing","type test","wpm","ms office","computer knowledge","basic computer","pet","pst"])
-    bad = any(x in t for x in ["steno","shorthand","trade test","technical interview"])
-    return ok or not bad
-def domicile_ok(title):
-    t=(title or "").lower()
-    if any(k in t for k in OPEN): return True
-    if "bihar" in t and not any(k in t for k in CLOSE): return True
-    for st in STATE_NAMES:
-        if st=="bihar": continue
-        if st in t and any(k in t for k in CLOSE): return False
-    return True
-
 def stable_id(url, title):
     p=urlparse(url or "")
-    key=f"{p.netloc}{p.path}".lower()
-    return "src_" + hashlib.sha1((key+"|"+(title or "")).encode()).hexdigest()[:16]
-
-POSTS_PAT = re.compile(r"(\d{1,6})\s*(posts?|vacanc(?:y|ies)|seats?)", re.I)
-def posts_from_text(txt):
-    if not txt: return None
-    m = POSTS_PAT.search(txt)
-    if m:
-        try: return int(m.group(1))
-        except: return None
-    return None
+    return "src_" + hashlib.sha1((f"{p.netloc}{p.path}|{title or ''}".lower()).encode()).hexdigest()[:16]
 
 def build_job(source, base, title, href):
     title=clean(title)
@@ -97,8 +76,6 @@ def build_job(source, base, title, href):
     url = href if href and href.startswith("http") else urljoin(base, href or "")
     if not url: return None
     if disallowed(title): return None
-    if not skill_ok(title): return None
-    if not domicile_ok(title): return None
     edu=education_band(title)
     if edu not in {"10th pass","12th pass","Any graduate"}: return None
     j = {
@@ -106,84 +83,47 @@ def build_job(source, base, title, href):
         "title": title,
         "deadline": "N/A",
         "applyLink": url,
-        "slug": re.sub(r"[^a-z0-9]+","-", (title or "job").lower())[:80] or "job",
+        "detailLink": url,
         "qualificationLevel": edu,
         "domicile": "All India",
         "source": "official" if source.startswith("hint") else "aggregator",
-        "type": "VACANCY",
+        "type": "UPDATE" if REOPEN_TOK.search(title) else "VACANCY",
         "extractedAt": datetime.utcnow().isoformat()+"Z",
         "meta": {"sourceUrl": base, "sourceSite": source}
     }
-    # Posts quick guess from title
-    p = posts_from_text(title)
-    if p: j["numberOfPosts"]=p
-    # detailLink: official in light, aggregator otherwise
-    j["detailLink"] = url if source.startswith("hint") else base
     return j
 
+def allow_link_text(t, h):
+    tl=t.lower(); hl=(h or "").lower()
+    # allow vacancies and reopened/extension notices
+    if any(x in tl for x in ["recruit","vacan","notific","apply","advert","employment","assistant","officer","constable","clerk"]): return True
+    if REOPEN_TOK.search(tl) or REOPEN_TOK.search(hl): return True
+    return False
+
 def parse_generic(content, source, base):
-    soup=BeautifulSoup(content,"html.parser")
-    out=[]
+    soup=BeautifulSoup(content,"html.parser"); out=[]
     for a in soup.select("table a[href], main a[href], .entry-content a[href], a[href]"):
         t=clean(a.get_text()); h=a.get("href","")
         if not t or not h: continue
-        tl=t.lower()
-        if any(x in tl for x in ["admit card","result","answer key","syllabus"]): continue
-        if not any(x in (tl+h.lower()) for x in ["recruit","vacan","notific","apply","advert","employment","corrigendum","extension","extended"]): continue
+        if not allow_link_text(t,h): continue
         j=build_job(source, base, t, h)
         if j: out.append(j)
     return out
 
-# Domain-specific seeds (unchanged logic)
-def parse_dsssb(content, source, base):
-    soup=BeautifulSoup(content,"html.parser"); out=[]
-    for a in soup.select('a[href], .view-content a[href]'):
-        t=clean(a.get_text()); h=a.get("href","")
-        if not t or not h: continue
-        if not re.search(r"(advert|advertisement|notice|recruit|vacanc|assistant|superintendent|prison|corrigendum|extension)", t, re.I): continue
-        j=build_job(source, base, t, h)
-        if j: out.append(j)
-    return out
-
-def parse_bssc(content, source, base):
-    soup=BeautifulSoup(content,"html.parser"); out=[]
-    for a in soup.select('#NoticeBoard a[href], a[href*="Advt"], a[href*="Notice"], a[href*="advert"]'):
-        t=clean(a.get_text()); h=a.get("href","")
-        if not t or not h: continue
-        if not re.search(r"(advt|advertisement|notice|recruit|vacanc|graduate|office attendant|cgl|inter level)", t, re.I): continue
-        j=build_job(source, base, t, h)
-        if j: out.append(j)
-    return out
-
-def parse_ibps(content, source, base):
+def parse_official_like(content, source, base):
     soup=BeautifulSoup(content,"html.parser"); out=[]
     for a in soup.select('a[href]'):
         t=clean(a.get_text()); h=a.get("href","")
         if not t or not h: continue
-        if not re.search(r"(crp|recruit|vacanc|rrb|po|so|clerk|officer|notification|advert)", t, re.I) and not re.search(r"(crp|recruit|vacanc)", h, re.I):
-            continue
-        j=build_job(source, base, t, h)
-        if j: out.append(j)
-    return out
-
-def parse_rbi(content, source, base):
-    soup=BeautifulSoup(content,"html.parser"); out=[]
-    for tr in soup.select('table tr'):
-        a=tr.find('a', href=True)
-        if not a: continue
-        t=clean(a.get_text()); h=a.get('href')
-        if not re.search(r"(recruit|vacanc|officer|grade|advert|notification)", t, re.I): continue
+        if not allow_link_text(t,h): continue
         j=build_job(source, base, t, h)
         if j: out.append(j)
     return out
 
 def dispatch_seed(content, source, base):
-    host = urlparse(base).netloc.lower()
-    if 'dsssb.delhi.gov.in' in host: return parse_dsssb(content, source, base)
-    if 'bssc.bihar.gov.in' in host or 'onlinebssc.com' in host: return parse_bssc(content, source, base)
-    if 'ibps.in' in host: return parse_ibps(content, source, base)
-    if 'opportunities.rbi.org.in' in host: return parse_rbi(content, source, base)
-    return parse_generic(content, source, base)
+    host=urlparse(base).netloc.lower()
+    # generic handler is fine; sites with tables/notice boards also work here
+    return parse_official_like(content, source, base)
 
 PARSERS={"parse_generic":parse_generic,"dispatch_seed":dispatch_seed}
 
@@ -211,12 +151,27 @@ def main():
         if items:
             collected.extend(items); used.append(s["name"])
         if not IS_LIGHT and (len(collected)>=N_MIN or (time.time()-start)>T_MAX): break
-        time.sleep(1.0)
+        time.sleep(0.8)
+    # Prefer official; if aggregator duplicates exist, pick the one with higher aggregatorScores
+    seen={}
     for j in collected:
-        j.setdefault("domicile","All India"); j.setdefault("type","VACANCY")
-    transp={"schemaVersion":"1.5","runMode":RUN_MODE,"totalListings":len(collected),"sourcesTried":used,"lastUpdated":datetime.utcnow().isoformat()+"Z"}
-    data={"jobListings":collected,"archivedListings":[],"transparencyInfo":transp}
+        k = (j["title"].lower(), urlparse(j["applyLink"]).path.lower())
+        if k not in seen:
+            seen[k]=j
+        else:
+            a=seen[k]; b=j
+            if a["source"]=="official" and b["source"]!="official": continue
+            if b["source"]=="official" and a["source"]!="official": seen[k]=b; continue
+            # both aggregators: prefer higher score; original two keep higher defaults via rules.json
+            sa=AGG_SCORES.get(urlparse(a["meta"]["sourceUrl"]).netloc, 0.5)
+            sb=AGG_SCORES.get(urlparse(b["meta"]["sourceUrl"]).netloc, 0.5)
+            if sb>sa: seen[k]=b
+    final=list(seen.values())
+    for j in final:
+        j.setdefault("domicile","All India")
+    transp={"schemaVersion":"1.5","runMode":RUN_MODE,"totalListings":len(final),"sourcesTried":used,"lastUpdated":datetime.utcnow().isoformat()+"Z"}
+    data={"jobListings":final,"archivedListings":[],"transparencyInfo":transp}
     atomic_write(data)
-    json.dump({"ok":bool(collected),**transp}, open("health.json","w",encoding="utf-8"), indent=2)
+    json.dump({"ok":bool(final),**transp}, open("health.json","w",encoding="utf-8"), indent=2)
 
 if __name__=="__main__": main()
