@@ -38,7 +38,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .rowline .muted{color:var(--muted)}
 .rowline:last-child{border-bottom:none}
 
-/* Fixed two-column action rows */
+/* Two fixed columns for action rows */
 .actions-row{border-top:1px dashed var(--line);padding:10px 12px}
 .actions-row.row1{display:grid;grid-template-columns:1fr 1fr;align-items:center}
 .actions-row.row1 .left{justify-self:start}
@@ -46,7 +46,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:8px}
 .group{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
 
-/* Button geometry: keep pairs on one line; allow slight shrink */
+/* Buttons: compact and allowed to shrink in-pair to keep on one line */
 .actions-row .btn{
   min-width:92px;
   max-width:140px;
@@ -73,10 +73,10 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.tiny{padding:6px 8px;font-size:12px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
-/* Preserve left column width after Right */
+/* Keep left width after Right to preserve alignment */
 .verified .row2 .group.vote{visibility:hidden}
 
-/* Modal */
+/* Modal styles (unchanged) */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20}
 .modal .modal-body{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;width:min(640px,94vw);box-shadow:0 20px 44px rgba(15,23,42,.12)}
 .modal .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
