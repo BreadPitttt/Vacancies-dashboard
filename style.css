@@ -46,13 +46,13 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:8px}
 .group{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
 
-/* Fit both buttons on one line on all cards, remain aligned after clicks */
+/* Button geometry: keep pairs on one line; allow slight shrink */
 .actions-row .btn{
-  min-width:92px;        /* tighter fit */
+  min-width:92px;
   max-width:140px;
-  flex:0 1 auto;         /* allow controlled shrink */
-  font-size:12px;        /* slightly smaller for fit */
-  padding:7px 10px;      /* balanced height */
+  flex:0 1 auto;
+  font-size:12px;
+  padding:7px 10px;
 }
 
 /* Chips and badges */
@@ -61,7 +61,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .badge-done{padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
 .trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 
-/* Base button skins */
+/* Button skins */
 .btn{border-radius:10px;background:var(--btn);border:1px solid var(--btn-line);color:var(--text);cursor:pointer}
 .btn.primary{background:var(--primary-bg);border-color:var(--primary-line);color:var(--primary)}
 .btn.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
@@ -73,7 +73,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.tiny{padding:6px 8px;font-size:12px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
-/* Preserve left column width after Right to keep alignment locked */
+/* Preserve left column width after Right */
 .verified .row2 .group.vote{visibility:hidden}
 
 /* Modal */
