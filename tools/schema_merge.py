@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Adds robust numberOfPosts propagation and normalizes deadline format
 import json, sys, re, hashlib
 from datetime import datetime
 
@@ -37,6 +38,15 @@ def compute_days_left(deadline_ddmmyyyy):
     except Exception:
         return None
 
+POSTS_PAT = re.compile(r"(\d{1,6})\s*(posts?|vacanc(?:y|ies)|seats?)", re.I)
+def posts_from_text(txt):
+    if not txt: return None
+    m = POSTS_PAT.search(txt)
+    if m:
+        try: return int(m.group(1))
+        except: return None
+    return None
+
 def validate(i):
     out = {
         "id": i.get("id") or ("src_" + make_key(i)),
@@ -51,9 +61,14 @@ def validate(i):
         "type": i.get("type") or "VACANCY",
         "flags": i.get("flags") or {},
     }
+    # Promote canonical numberOfPosts when present or derivable
+    n=i.get("numberOfPosts")
+    if isinstance(n,str) and n.isdigit(): n=int(n)
+    if isinstance(n,int) and n>0: out["numberOfPosts"]=n
+    elif posts_from_text(out["title"]): out["numberOfPosts"]=posts_from_text(out["title"])
+    # Derive daysLeft
     dl = compute_days_left(out["deadline"])
-    if dl is not None:
-        out["daysLeft"] = dl
+    if dl is not None: out["daysLeft"] = dl
     return out
 
 def merge(existing, candidates):
@@ -64,14 +79,18 @@ def merge(existing, candidates):
         k = make_key(v)
         if k in idx:
             ex = idx[k]
-            for f in ["organization","qualificationLevel","domicile","deadline","applyLink","detailLink","source","type"]:
+            for f in ["qualificationLevel","domicile","deadline","applyLink","detailLink","source","type"]:
                 if v.get(f) and (not ex.get(f) or ex.get(f)=="N/A"):
                     ex[f] = v[f]
+            # numberOfPosts prefers explicit integer; fallback to title parse
+            if v.get("numberOfPosts") and not ex.get("numberOfPosts"):
+                ex["numberOfPosts"]=v["numberOfPosts"]
+            # merge flags and daysLeft
             ex["flags"] = { **(ex.get("flags") or {}), **(v.get("flags") or {}) }
-            if v.get("daysLeft") is not None:
-                ex["daysLeft"] = v["daysLeft"]
+            if v.get("daysLeft") is not None: ex["daysLeft"] = v["daysLeft"]
         else:
             existing.append(v); idx[k]=v; added += 1
+    # Sort by deadline then title
     def sort_key(it):
         dd = it.get("deadline","N/A")
         try:
