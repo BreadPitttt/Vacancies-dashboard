@@ -5,7 +5,7 @@
   <title>General Vacancy Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
-  <link rel="stylesheet" href="style.css?v=2025-09-26-stable" />
+  <link rel="stylesheet" href="style.css?v=2025-09-26-stable4" />
 </head>
 <body>
   <header class="topbar">
@@ -44,9 +44,8 @@
   <div id="missing-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="missing-title">
     <div class="modal-body">
       <div class="modal-head">
-        <button type="button" class="close-top" data-close aria-label="Close">Close</button>
-        <h3 id="missing-title">Submit Missing Vacancy</h3>
-        <span aria-hidden="true"></span>
+        <button type="button" class="close-top" data-close aria-label="Close"></button>
+        <h3 id="missing-title" class="hidden">Submit Missing Vacancy</h3>
       </div>
       <form id="missingForm" class="form" novalidate>
         <label>Post name</label>
@@ -88,9 +87,8 @@
   <div id="report-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="report-title">
     <div class="modal-body">
       <div class="modal-head">
-        <button type="button" class="close-top" data-close aria-label="Close">Close</button>
-        <h3 id="report-title">Report listing</h3>
-        <span aria-hidden="true"></span>
+        <button type="button" class="close-top" data-close aria-label="Close"></button>
+        <h3 id="report-title" class="hidden">Report listing</h3>
       </div>
       <form id="reportForm" class="form" novalidate>
         <input type="hidden" id="reportListingId" />
@@ -101,10 +99,8 @@
           <option value="last_date_over">Last date over</option>
           <option value="wrong_last_date">Wrong last date</option>
           <option value="wrong_eligibility">Wrong eligibility</option>
-          <option value="wrong_domicile">Wrong domicile</option>
           <option value="duplicate">Duplicate / Already listed</option>
           <option value="bad_link">Broken / Unofficial link</option>
-          <option value="other">Other</option>
         </select>
         <div class="grid2">
           <div>
@@ -114,6 +110,16 @@
           <div>
             <label>Number of posts (optional)</label>
             <input id="reportPosts" placeholder="e.g., 420" />
+          </div>
+        </div>
+        <div class="grid2">
+          <div>
+            <label>Correct last date (optional)</label>
+            <input id="reportLastDate" placeholder="dd/mm/yyyy" />
+          </div>
+          <div>
+            <label>Correct eligibility (optional)</label>
+            <input id="reportEligibility" placeholder="e.g., Any graduate" />
           </div>
         </div>
         <div>
@@ -131,6 +137,7 @@
     </div>
   </div>
 
+  <!-- Confirm/snackbar/toast (unchanged) -->
   <div id="confirm"><div class="box">
     <div id="confirm-text">Confirm?</div>
     <div class="row">
@@ -145,6 +152,6 @@
   </div>
   <div id="toast"></div>
 
-  <script src="app.js?v=2025-09-26-stable" defer></script>
+  <script src="app.js?v=2025-09-26-stable3" defer></script>
 </body>
 </html>
