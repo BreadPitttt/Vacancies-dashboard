@@ -20,7 +20,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 
 .container{max-width:1140px;margin:0 auto;padding:12px}
 
-/* Slightly wider minimum card to keep actions on one line more often */
+/* Grid: slightly wider minimum to help action rows fit */
 .cards-grid{
   display:grid;
   grid-template-columns:repeat(3,minmax(340px,1fr));
@@ -40,7 +40,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .title{font-size:15px;font-weight:600;margin-right:auto}
 .card-body{padding:12px}
 
-/* Narrower label column to free space for values and actions */
+/* Narrower label column to free space */
 .rowline{
   display:grid;
   grid-template-columns:120px 1fr;
@@ -51,31 +51,36 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .rowline .muted{color:var(--muted)}
 .rowline:last-child{border-bottom:none}
 
-/* Row1 unchanged */
+/* Actions rows */
 .actions-row{border-top:1px dashed var(--line);padding:10px 12px}
 .actions-row.row1{display:grid;grid-template-columns:1fr 1fr;align-items:center}
 .actions-row.row1 .left{justify-self:start}
 .actions-row.row1 .right{justify-self:end}
 
-/* Row2 wraps but prefers single-line when space allows */
-.actions-row.row2{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+/* Row2: vote icons + interest buttons; keep them aligned and within card */
+.actions-row.row2{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px 14px;          /* separates vote icons from interest buttons */
+  align-items:center;
+}
 .group{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
 
-/* Tighter, chip-like buttons: slightly smaller font and padding */
+/* Chip-like buttons for interest (applied/not interested) */
 .btn{
   border-radius:999px;
   background:#fff;
   border:1px solid var(--btn-line);
   color:var(--text);
   cursor:pointer;
-  font-size:11.5px;          /* was 12px */
-  padding:5px 9px;           /* was 6px 10px */
+  font-size:11.5px;
+  padding:5px 9px;
   line-height:1.2;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
   flex:0 1 auto;
-  min-width:84px;            /* was 88px */
+  min-width:84px;
   max-width:160px;
 }
 .btn.primary{background:var(--primary-bg);border-color:var(--primary-line);color:var(--primary)}
@@ -88,8 +93,45 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.tiny{padding:4px 7px;font-size:11.5px;min-width:0;max-width:118px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
-/* After Right, hide votes but keep layout */
-.verified .row2 .group.vote{visibility:hidden}
+/* Vote icons: ☑ and ☒ */
+.group.vote{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex:0 0 auto;         /* prevent stretching */
+  min-width:0;
+}
+.vote-btn{
+  border-radius:999px;
+  border:1px solid var(--btn-line);
+  background:#fff;
+  color:var(--text);
+  font-size:13px;
+  line-height:1;
+  padding:6px 10px;
+  cursor:pointer;
+  user-select:none;
+}
+.vote-btn.right{ background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok); }
+.vote-btn.wrong{ background:var(--danger-bg); border-color:var(--danger-line); color:var(--danger); }
+
+/* Interest group spacing from vote icons */
+.group.interest{ margin-left:6px }
+
+/* After Right, collapse vote icons to a single ✓ chip; no leftover gap */
+.card.verified .group.vote{ gap:0 }
+.card.verified .group.vote .vote-btn{ display:none }
+.card.verified .group.vote::before{
+  content:"✓";
+  display:inline-block;
+  font-weight:600;
+  color:var(--ok);
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid var(--ok-line);
+  background:var(--ok-bg);
+  line-height:1;
+}
 
 /* Chips */
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
@@ -97,7 +139,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .badge-done{padding:2px 8px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
 .trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 
-/* Modals: footer containment and red Close (kept) */
+/* Modals: footer containment and red Close */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20}
 .modal.hidden{display:none}
 .modal:not(.hidden){display:flex}
