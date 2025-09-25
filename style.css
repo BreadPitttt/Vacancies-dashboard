@@ -64,19 +64,9 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 }
 
 /* Groups */
-.group{
-  display:flex;
-  align-items:center;
-  min-width:0;
-}
-
-/* Vote icons left; Interest buttons right — one line */
+.group{display:flex;align-items:center;min-width:0}
 .group.vote{gap:10px;flex-wrap:nowrap}
-.group.interest{
-  gap:10px;
-  flex-wrap:nowrap;
-  justify-content:flex-end;
-}
+.group.interest{gap:10px;flex-wrap:nowrap;justify-content:flex-end}
 
 /* Interest chips */
 .btn{
@@ -107,45 +97,22 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 
 /* Vote icons */
 .vote-btn{
-  border-radius:999px;
-  border:1px solid var(--btn-line);
-  background:#fff;
-  color:var(--text);
-  font-size:15px;
-  line-height:1;
-  padding:6px 12px;
-  cursor:pointer;
-  user-select:none;
+  border-radius:999px;border:1px solid var(--btn-line);background:#fff;color:var(--text);
+  font-size:15px;line-height:1;padding:6px 12px;cursor:pointer;user-select:none
 }
-.vote-btn.right{ background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok); }
-.vote-btn.wrong{ background:var(--danger-bg); border-color:var(--danger-line); color:var(--danger); }
+.vote-btn.right{ background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok) }
+.vote-btn.wrong{ background:var(--danger-bg); border-color:var(--danger-line); color:var(--danger) }
 
-/* Collapse vote icons on verified, and show ✓ up top */
+/* Verified visuals */
 .card.verified .group.vote{ gap:0 }
 .card.verified .group.vote .vote-btn{ display:none }
 .card.verified .group.vote::before{
-  content:"✓";
-  display:inline-block;
-  font-weight:600;
-  color:var(--ok);
-  padding:6px 12px;
-  border-radius:999px;
-  border:1px solid var(--ok-line);
-  background:var(--ok-bg);
-  line-height:1;
+  content:"✓";display:inline-block;font-weight:600;color:var(--ok);
+  padding:6px 12px;border-radius:999px;border:1px solid var(--ok-line);background:var(--ok-bg);line-height:1
 }
 
-/* Top verification chip + corroboration chip style */
-.verify-top{
-  display:inline-flex;
-  align-items:center;
-  padding:4px 8px;
-  border-radius:999px;
-  border:1px solid var(--ok-line);
-  background:var(--ok-bg);
-  color:var(--ok);
-  font-size:12px;
-}
+/* Top verification chip */
+.verify-top{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;border:1px solid var(--ok-line);background:var(--ok-bg);color:var(--ok);font-size:12px}
 
 /* Chips */
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
@@ -153,49 +120,37 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .badge-done{padding:2px 8px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
 .trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 
-/* Modals — fixed overflow & professional footer */
-.modal{
-  position:fixed; inset:0; display:none; align-items:center; justify-content:center;
-  background:rgba(15,23,42,.35); z-index:20; padding:16px;
-}
+/* Modals — fixed overflow, red top-left Close, centered primary button */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20;padding:16px}
 .modal.hidden{display:none}
 .modal:not(.hidden){display:flex}
 .modal .modal-body{
-  background:var(--panel); border:1px solid var(--line); border-radius:12px;
-  padding:14px; box-shadow:0 20px 44px rgba(15,23,42,.12);
-  width:clamp(320px, 92vw, 640px); max-width:640px;
-  box-sizing:border-box; overflow:hidden;
-  display:flex; flex-direction:column;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 20px 44px rgba(15,23,42,.12);
+  width:clamp(320px,92vw,640px);max-width:640px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;position:relative
 }
-.modal .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.modal .modal-head{
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;margin-bottom:8px
+}
+.modal .modal-head .close-top{
+  border-radius:8px;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-line);padding:6px 10px;cursor:pointer;line-height:1
+}
+.modal .modal-head h3{margin:0}
 .modal .form{display:flex;flex-direction:column}
 .modal .form input,.modal .form textarea,.modal .form select{
-  width:100%; background:#fff; color:var(--text); border:1px solid var(--line);
-  border-radius:10px; padding:10px 12px; margin-top:6px; margin-bottom:10px; box-sizing:border-box;
+  width:100%;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px;margin-bottom:10px;box-sizing:border-box
 }
-
-/* Footer as responsive grid; buttons never overflow */
-.modal-actions{
-  display:grid;
-  grid-auto-flow:column;
-  grid-auto-columns:minmax(0,1fr);
-  gap:10px;
-  justify-items:end;
-  align-items:center;
-  margin-top:4px;
-}
+/* Footer as 3-area layout: left Close, center Primary, right spacer */
+.modal-actions{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin-top:4px}
+.modal-actions .slot-left{justify-self:start}
+.modal-actions .slot-middle{justify-self:center}
+.modal-actions .slot-right{justify-self:end}
+.modal-actions .btn{min-width:120px}
 @media(max-width:480px){
-  .modal-actions{ grid-auto-flow:row; justify-items:stretch }
+  .modal-actions{grid-template-columns:1fr}
+  .modal-actions .slot-left,.modal-actions .slot-middle,.modal-actions .slot-right{justify-self:stretch}
+  .modal-actions .btn{width:100%}
 }
-.modal-actions .btn{
-  max-width:42%;
-  flex:0 1 42%;
-}
-@media(max-width:480px){
-  .modal-actions .btn{ max-width:100%; flex:1 1 auto }
-}
-
-/* Make Close red */
+/* Keep Close buttons red across header and footer */
 .modal .form .btn[data-close]{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
 
 .icon-btn{background:#fff;color:var(--muted);border:1px dashed var(--line);padding:4px 8px;border-radius:8px;cursor:pointer}
