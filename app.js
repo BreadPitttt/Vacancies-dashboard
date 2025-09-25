@@ -1,4 +1,4 @@
-// app.js v2025-09-25-pro — focus trap + stronger URL guard + corroboration chip; preserves all prior logic
+// app.js v2025-09-25-pro3 — top-left Close, centered primary, inline Undo + persistent state
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
@@ -7,64 +7,47 @@
   const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s.replaceAll("-", "/") : "N/A";
   const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1800); };
   const bust=(p)=>p+(p.includes("?")?"&":"?")+"t="+Date.now();
+  function normHref(u){ try{ const p=new URL(u.trim()); p.hash=""; p.search=""; let s=p.toString(); if(s.endsWith("/")) s=s.slice(0,-1); return s.toLowerCase(); }catch{ return (u||"").trim().toLowerCase().replace(/[?#].*$/,"").replace(/\/$/,""); } }
 
-  // URL normalizer to prevent duplicates from fragments/queries/trailing slash
-  function normHref(u){
+  // --- State persistence: merge server + local and never lose local flags ---
+  let USER_STATE={}, USER_VOTES={};
+
+  async function loadUserStateServer(){
     try{
-      const p=new URL(u.trim());
-      p.hash=""; p.search="";
-      let s=p.toString();
-      if(s.endsWith("/")) s=s.slice(0,-1);
-      return s.toLowerCase();
-    }catch{ return (u||"").trim().toLowerCase().replace(/[?#].*$/,"").replace(/\/$/,""); }
+      const r=await fetch(bust("user_state.json"),{cache:"no-store"});
+      if(!r.ok) throw 0;
+      const remote=await r.json();
+      if(remote && typeof remote==="object"){ USER_STATE={...remote}; }
+    }catch{ USER_STATE={}; }
   }
+  function loadUserStateLocal(){
+    try{
+      const local=JSON.parse(localStorage.getItem("vac_user_state")||"{}");
+      if(local && typeof local==="object"){ USER_STATE={...USER_STATE, ...local}; }
+    }catch{}
+  }
+  function setUserStateLocal(id,a){
+    if(!id) return;
+    if(a==="undo") delete USER_STATE[id];
+    else USER_STATE[id]={action:a,ts:new Date().toISOString()};
+    try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{}
+  }
+  async function persistUserStateServer(){
+    try{
+      await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({type:"user_state_sync", payload:USER_STATE, ts:new Date().toISOString()})
+      });
+    }catch{}
+  }
+  function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
+  function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
+  function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
   document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return;
     qsa(".tab").forEach(x=>x.classList.toggle("active",x===t));
     qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab));
   });
 
-  let USER_STATE={}, USER_VOTES={};
-  async function loadUserStateServer(){ try{ const r=await fetch(bust("user_state.json"),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
-  function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({},USER_STATE,j);}catch{} }
-  function setUserStateLocal(id,a){ if(!id) return; if(a==="undo") delete USER_STATE[id]; else USER_STATE[id]={action:a,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{} }
-  function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
-  function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
-  function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
-
-  let OUTBOX=(function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; }})();
-  function saveOutbox(){ try{ localStorage.setItem("vac_outbox",JSON.stringify(OUTBOX)); }catch{} }
-  async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
-  async function postJSON(payload){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); if(!r.ok) throw new Error("net"); }catch{ OUTBOX.push(payload); saveOutbox(); setTimeout(flushOutbox,1500); } return true; }
-
-  async function renderStatus(){
-    try{
-      const r=await fetch(bust("health.json"),{cache:"no-store"}); if(!r.ok) throw 0;
-      const h=await r.json();
-      qs("#health-pill").textContent=h.ok?"Health: OK":"Health: Not OK";
-      qs("#health-pill").className="pill "+(h.ok?"ok":"bad");
-      qs("#last-updated").textContent="Last updated: "+(h.lastUpdated? new Date(h.lastUpdated).toLocaleString() : "—");
-      qs("#total-listings").textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
-    }catch{
-      qs("#health-pill").textContent="Health: Unknown";
-      qs("#health-pill").className="pill";
-      qs("#last-updated").textContent="Last updated: —";
-      qs("#total-listings").textContent="Listings: —";
-    }
-  }
-
-  const trustedChip=()=>' <span class="chip trusted">trusted</span>';
-  const verifyTop=()=>' <span class="verify-top" title="Verified Right">✓</span>';
-  const corroboratedChip=()=>' <span class="chip" title="Multiple sources">x2</span>';
-
-  function addInlineUndo(container,onUndo,seconds=10){
-    if(!container) return;
-    const u=document.createElement("button");
-    u.className="btn ghost tiny"; let left=seconds; u.textContent=`Undo (${left}s)`;
-    container.appendChild(u);
-    const iv=setInterval(()=>{ left--; if(left<=0){ clearInterval(iv); u.remove(); } else { u.textContent=`Undo (${left}s)`; } },1000);
-    u.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
-  }
   function confirmAction(message="Proceed?"){
     return new Promise((resolve)=>{
       const box=qs("#confirm");
@@ -75,6 +58,25 @@
       ok.onclick=()=>{ cleanup(); resolve(true); };
       cancel.onclick=()=>{ cleanup(); resolve(false); };
     });
+  }
+
+  const trustedChip=()=>' <span class="chip trusted">trusted</span>';
+  const verifyTop=()=>' <span class="verify-top" title="Verified Right">✓</span>';
+  const corroboratedChip=()=>' <span class="chip" title="Multiple sources">x2</span>';
+
+  // Inline Undo: replaces the group slot temporarily
+  function renderInlineUndo(slot, label, onUndo, seconds=8){
+    if(!slot) return;
+    const wrap=document.createElement("div");
+    wrap.className="group";
+    const b=document.createElement("button");
+    b.className="btn ghost tiny";
+    let left=seconds;
+    const tick=setInterval(()=>{ left--; if(left<=0){ clearInterval(tick); if(wrap.parentNode) wrap.remove(); } else { b.textContent=`Undo ${label} (${left}s)`; } },1000);
+    b.textContent=`Undo ${label} (${left}s)`;
+    b.onclick=(ev)=>{ ev.preventDefault(); clearInterval(tick); wrap.remove(); onUndo(); };
+    wrap.appendChild(b);
+    slot.replaceChildren(wrap);
   }
 
   function cardHTML(j, applied=false){
@@ -133,7 +135,8 @@
   async function render(){
     const my=++TOKEN;
 
-    await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); await flushOutbox();
+    // State already merged in DOMContentLoaded; loadVotesLocal again for safety
+    loadVotesLocal();
 
     let data=null;
     try{ const r=await fetch(bust("data.json"),{cache:"no-store"}); if(!r.ok) throw 0; data=await r.json(); }catch{ data=null; }
@@ -170,20 +173,21 @@
         e.preventDefault(); e.stopPropagation();
         const act=btn.getAttribute("data-act"), id=card.getAttribute("data-id");
         const detailsUrl=(card.querySelector(".row1 .left a")?.href||"");
+        const voteCell=card.querySelector(".row2 .vote");
         const interestCell=card.querySelector(".row2 .interest");
 
         if(act==="report"){
           const m=qs("#report-modal"); if(!m) return;
           qs("#reportListingId").value=id||"";
           m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
-          // focus trap
           setTimeout(()=>qs("#reportReason")?.focus(),0);
           return;
         }
+
         if(act==="right"){
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"right"); card.classList.add("verified");
-          addInlineUndo(interestCell, async ()=>{
+          renderInlineUndo(voteCell, "vote", async ()=>{
             if(prev==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
             await postJSON({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
             await render();
@@ -191,10 +195,11 @@
           postJSON({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
+
         if(act==="wrong"){
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"wrong");
-          addInlineUndo(interestCell, async ()=>{
+          renderInlineUndo(voteCell, "vote", async ()=>{
             if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
             await postJSON({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
             await render();
@@ -202,13 +207,14 @@
           postJSON({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
+
         if(act==="applied"||act==="not_interested"){
           const confirmMsg = act==="applied" ? "Mark as Applied?" : "Move to Other (Not interested)?";
           const ok = await confirmAction(confirmMsg);
           if(!ok) return;
           const prev=USER_STATE[id]?.action||"";
           setUserStateLocal(id,act);
-          addInlineUndo(interestCell, async ()=>{
+          renderInlineUndo(interestCell, act==="applied"?"applied":"choice", async ()=>{
             if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); }
             await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}});
             await render();
@@ -216,6 +222,7 @@
           await postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}});
           await render(); return;
         }
+
         if(act==="exam_done"){ btn.textContent="Done ✓"; btn.classList.add("disabled"); return; }
       });
 
@@ -232,7 +239,6 @@
   function openModal(sel){
     const m=qs(sel); if(!m) return;
     m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
-    // focus first input
     if(sel==="#missing-modal"){ setTimeout(()=>qs("#missingTitle")?.focus(),0); }
   }
   function closeModalEl(el){
@@ -244,7 +250,11 @@
   });
 
   document.addEventListener("DOMContentLoaded", async ()=>{
+    await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); // merge local over server
+    persistUserStateServer(); // best-effort sync up, so scheduled runs preserve local choices
+
     await renderStatus(); await render();
+
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
 
     const SUBMIT_LOCK=(window.__SUBMIT_LOCK__ ||= new Set());
@@ -274,7 +284,6 @@
         const key=normHref(url);
         if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
         SUBMIT_LOCK.add(key);
-        // normalize last date dd-mm-yy to dd/mm/yyyy
         if(/^\d{1,2}[-/]\d{1,2}[-/]\d{2}$/.test(last)){
           const [d,m,y]=last.replaceAll("-","/").split("/"); last=`${d.padStart(2,"0")}/${m.padStart(2,"0")}/20${y}`;
         }else if(/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(last)){
