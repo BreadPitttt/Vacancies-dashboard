@@ -1,12 +1,12 @@
-// app.js v2025-09-25-restore — fixes script load issues after cache, robust modals, Undo restored, Posts field, alignment intact
+// app.js v2025-09-25-fixes — modal open reliability, posts on cards, 10s Undo with confirm for state changes, layout guard
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
 
   const qs=(s,r)=>(r||document).querySelector(s);
   const qsa=(s,r)=>Array.from((r||document).querySelectorAll(s));
   const esc=(s)=>(s==null?"":String(s)).replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]));
-  const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s : "N/A";
-  const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1600); };
+  const fmtDate=(s)=>s && s.toUpperCase()!=="N/A" ? s.replaceAll("-", "/") : "N/A";
+  const toast=(m)=>{const t=qs("#toast"); if(!t) return alert(m); t.textContent=m; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity="0",1800); };
   const bust=(p)=>p+(p.includes("?")?"&":"?")+"t="+Date.now();
 
   // Tabs
@@ -15,7 +15,7 @@
     qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab));
   });
 
-  // State
+  // State stores
   let USER_STATE={}, USER_VOTES={};
   async function loadUserStateServer(){ try{ const r=await fetch(bust("user_state.json"),{cache:"no-store"}); if(r.ok) USER_STATE=await r.json(); }catch{} }
   function loadUserStateLocal(){ try{ const j=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(j) USER_STATE=Object.assign({},USER_STATE,j);}catch{} }
@@ -24,13 +24,13 @@
   function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
-  // Outbox with retry
+  // Outbox
   let OUTBOX=(function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; }})();
   function saveOutbox(){ try{ localStorage.setItem("vac_outbox",JSON.stringify(OUTBOX)); }catch{} }
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
   async function postJSON(payload){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); if(!r.ok) throw new Error("net"); }catch{ OUTBOX.push(payload); saveOutbox(); setTimeout(flushOutbox,1500); } return true; }
 
-  // Status header
+  // Status
   async function renderStatus(){
     try{
       const r=await fetch(bust("health.json"),{cache:"no-store"}); if(!r.ok) throw 0;
@@ -49,8 +49,8 @@
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
 
-  // Inline Undo helper (restored)
-  function addUndo(container,onUndo,seconds=10){
+  // Inline 10s Undo helper (reused across actions)
+  function addInlineUndo(container,onUndo,seconds=10){
     if(!container) return;
     const u=document.createElement("button");
     u.className="btn ghost tiny"; let left=seconds; u.textContent=`Undo (${left}s)`;
@@ -59,10 +59,23 @@
     u.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
   }
 
-  // Card HTML: Organization replaced by Posts; keep order otherwise unchanged
+  // Global confirm dialog for state changes (not for votes)
+  function confirmAction(message="Proceed?"){
+    return new Promise((resolve)=>{
+      const box=qs("#confirm");
+      qs("#confirm-text").textContent=message;
+      box.style.display="flex";
+      const ok=qs("#confirm-ok"), cancel=qs("#confirm-cancel");
+      const cleanup=()=>{ box.style.display="none"; ok.onclick=null; cancel.onclick=null; };
+      ok.onclick=()=>{ cleanup(); resolve(true); };
+      cancel.onclick=()=>{ cleanup(); resolve(false); };
+    });
+  }
+
+  // Card template: Organization removed; Posts added (uses numberOfPosts | flags.posts | N/A)
   function cardHTML(j, applied=false){
     const src=(j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
-    const d=j.daysLeft!=null?j.daysLeft:"—";
+    const d=(j.daysLeft!=null && j.daysLeft!=="")?j.daysLeft:"—";
     const det=esc(j.detailLink||j.applyLink||"#");
     const lid=j.id||"";
     const vote=USER_VOTES[lid]?.vote||"";
@@ -70,13 +83,15 @@
     const verified= vote==="right" ? " verified" : "";
     const trust = j.flags && j.flags.trusted ? trustedChip() : "";
     const appliedBadge = applied ? '<span class="badge-done">Applied</span>' : "";
-    const postsText=(j.posts!=null&&j.posts!=="")?esc(String(j.posts)):"N/A";
+    const posts = (j.numberOfPosts!=null && j.numberOfPosts!=="")
+                  ? String(j.numberOfPosts)
+                  : (j.flags && j.flags.posts ? String(j.flags.posts) : "N/A");
 
     return [
       '<article class="card', (applied?' applied':''), verified, '" data-id="', esc(lid), '">',
         '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, tick, trust, appliedBadge, '</header>',
         '<div class="card-body">',
-          '<div class="rowline"><span class="muted">Posts</span><span>', postsText, '</span></div>',
+          '<div class="rowline"><span class="muted">Posts</span><span>', esc(posts), '</span></div>',
           '<div class="rowline"><span class="muted">Qualification</span><span>', esc(j.qualificationLevel||"N/A"), '</span></div>',
           '<div class="rowline"><span class="muted">Domicile</span><span>', esc(j.domicile||"All India"), '</span></div>',
           '<div class="rowline"><span class="muted">Last date</span><span>', esc(fmtDate(j.deadline)), ' <span class="muted">(', d, ' days)</span></span></div>',
@@ -145,6 +160,7 @@
       const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
       const card=wrap.firstElementChild;
 
+      // Button handler (modal opening fixed)
       card.addEventListener("click", async (e)=>{
         const btn=e.target.closest("[data-act]"); if(!btn) return;
         e.preventDefault(); e.stopPropagation();
@@ -158,10 +174,10 @@
           m.classList.remove("hidden"); m.setAttribute("aria-hidden","false");
           return;
         }
-        if(act==="right"){
+        if(act==="right"){ // no confirm for votes
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"right"); card.classList.add("verified");
-          addUndo(interestCell, async ()=>{
+          addInlineUndo(interestCell, async ()=>{
             if(prev==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
             await postJSON({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
             await render();
@@ -169,10 +185,10 @@
           postJSON({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
-        if(act==="wrong"){
+        if(act==="wrong"){ // no confirm for votes
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled");
-          addUndo(interestCell, async ()=>{
+          addInlineUndo(interestCell, async ()=>{
             if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
             await postJSON({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
             await render();
@@ -181,14 +197,17 @@
           return;
         }
         if(act==="applied"||act==="not_interested"){
+          const confirmMsg = act==="applied" ? "Mark as Applied?" : "Move to Other (Not interested)?";
+          const ok = await confirmAction(confirmMsg);
+          if(!ok) return;
           const prev=USER_STATE[id]?.action||"";
           setUserStateLocal(id,act);
-          addUndo(interestCell, async ()=>{
+          addInlineUndo(interestCell, async ()=>{
             if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); }
             await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}});
             await render();
           });
-          postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}});
+          await postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}});
           await render(); return;
         }
         if(act==="exam_done"){ btn.textContent="Done ✓"; btn.classList.add("disabled"); return; }
@@ -204,20 +223,21 @@
     rootOther.replaceChildren(fOther);
   }
 
-  // Modal helpers + global close
-  function openModal(sel){ const m=qs(sel); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
-  function closeModal(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
+  // Modal open/close (fixes: ensure display toggles correctly and overlay click closes)
+  function openModal(sel){ const m=qs(sel); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex"; } }
+  function closeModalEl(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); m.style.display="none"; } }
   document.addEventListener("click",(e)=>{
-    if(e.target && e.target.hasAttribute("data-close")){ e.preventDefault(); closeModal(e.target); }
-    if(e.target && e.target.classList.contains("modal")){ e.preventDefault(); e.target.classList.add("hidden"); e.target.setAttribute("aria-hidden","true"); }
+    if(e.target && e.target.hasAttribute("data-close")){ e.preventDefault(); closeModalEl(e.target); }
+    if(e.target && e.target.classList.contains("modal")){ e.preventDefault(); e.target.classList.add("hidden"); e.target.setAttribute("aria-hidden","true"); e.target.style.display="none"; }
   });
 
   document.addEventListener("DOMContentLoaded", async ()=>{
     await renderStatus(); await render();
 
+    // Submit missing open button
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
 
-    // Robust form handling on document to survive re-renders
+    // Delegate form submissions
     document.addEventListener("submit", async (e)=>{
       const f=e.target;
       if(f && f.id==="reportForm"){
@@ -229,7 +249,7 @@
         const note=document.getElementById("reportNote")?.value?.trim()||"";
         if(!id||!rc) return toast("Please select a reason.");
         await postJSON({type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,note,ts:new Date().toISOString()});
-        closeModal(f); f.reset(); toast("Reported.");
+        closeModalEl(f); f.reset(); toast("Reported.");
       }
       if(f && f.id==="missingForm"){
         e.preventDefault(); e.stopPropagation();
@@ -243,7 +263,7 @@
         const SUBMIT_LOCK=(window.__SUBMIT_LOCK__ ||= new Set());
         const key=url.replace(/[?#].*$/,"").toLowerCase(); if(SUBMIT_LOCK.has(key)) return toast("Already submitted."); SUBMIT_LOCK.add(key);
         await postJSON({type:"missing",title,url,officialSite:site,lastDate:last,posts:posts||null,note,ts:new Date().toISOString()});
-        closeModal(f); f.reset(); toast("Saved. Will appear after refresh.");
+        closeModalEl(f); f.reset(); toast("Saved. Will appear after refresh.");
       }
     });
   });
