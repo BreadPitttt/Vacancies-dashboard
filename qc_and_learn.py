@@ -1,4 +1,5 @@
-# qc_and_learn.py — QC + learn + deadline extension + sticky user state + posts normalization
+#!/usr/bin/env python3
+# qc_and_learn.py — QC + learn + deadline extension + sticky user state + posts normalization (2025-09-25-fixes)
 import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
 
@@ -81,7 +82,7 @@ def parse_posts_from_text(txt):
         except: return None
     return None
 
-# Split parents/updates
+# --- Split parents vs updates, attach updates, extend deadlines, collect posts from updates ---
 parents=[j for j in jobs if not is_update_title(j.get("title"))]
 kept=[]; merged=0
 for j in jobs:
@@ -96,7 +97,7 @@ for j in jobs:
         if s>score: score, best = s, p
     if best and score>=0.6:
         best.setdefault("updates", []).append({"title": j.get("title"), "link": j.get("applyLink"), "capturedAt": datetime.utcnow().isoformat()+"Z"})
-        # Max deadline found in title if later
+        # Extend deadline if update mentions a later date
         dates=[m.group(1) for m in DATE_PAT.finditer(j.get("title") or "")]
         parsed=[parse_deadline(x.replace("-","/")) for x in dates if x]
         parsed=[d for d in parsed if d]
@@ -105,7 +106,7 @@ for j in jobs:
             cur=parse_deadline(best.get("deadline"))
             if not cur or new_deadline>cur:
                 best["deadline"]=new_deadline.strftime("%d/%m/%Y")
-        # Try posts from update title
+        # Posts from update title
         pcount = parse_posts_from_text(j.get("title"))
         if pcount and not best.get("numberOfPosts"):
             best["numberOfPosts"]=pcount
@@ -176,7 +177,7 @@ for s in subs:
         if url not in rules["captureHints"]: rules["captureHints"].append(url)
         if site and site not in rules["captureHints"]: rules["captureHints"].append(site)
 
-# --- Green tick learning + demotions (unchanged) ---
+# --- Green tick learning + demotions ---
 pin=set(); demote=set()
 for v in votes:
     if v.get("type")=="vote":
@@ -208,22 +209,22 @@ def keep_date(j):
         except: return None
     return None
 
+# Sectioning with canonical numberOfPosts normalization
 primary=[]; applied_list=[]; other=[]; to_delete=set()
 for j in jobs:
     jid=j["id"]
     last=keep_date(j)
     if last: j["daysLeft"]=(last - date.today()).days
-    # bring posts from title if missing
+    # canonicalize posts (top-level numberOfPosts preferred)
     if not j.get("numberOfPosts"):
-        c=parse_posts_from_text(j.get("title"))
+        c=parse_posts_from_text(j.get("title")) or j.get("flags",{}).get("posts")
         if c: j["numberOfPosts"]=c
     if jid in APPLIED:
         j.setdefault("flags",{})["applied"]=True
         d=parse_deadline(j.get("deadline"))
         if d and (date.today()-d).days>60:
             j.setdefault("flags",{})["applied_expired"]=True
-        applied_list.append(j)
-        continue
+        applied_list.append(j); continue
     if jid in NOTI and (date.today()-NOTI[jid]).days>14:
         to_delete.add(jid); continue
     if last and last < date.today():
@@ -261,7 +262,7 @@ JWRITE("learn.json", {"mergedUpdates": merged,"generatedAt": datetime.utcnow().i
 rules["blacklistedDomains"] = rules.get("blacklistedDomains", [])
 rules["autoRemoveReasons"] = rules.get("autoRemoveReasons", ["expired"])
 
-# AggregatorScores learner retained
+# AggregatorScores learner
 def domain_of(u):
     try: return urllib.parse.urlparse(u or "").netloc.lower()
     except: return ""
