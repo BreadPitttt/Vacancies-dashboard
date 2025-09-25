@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# qc_and_learn.py — merge reopen/extension; revive; learn aggregator trust; add submit-missing officialSite to captureHints
+# qc_and_learn.py v2025-09-25-pro — reopen merge + posts + 7-day auto-archive + captureHints enrich + sourcesByStatus
 import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
 
@@ -38,13 +38,9 @@ def norm_url(u):
     try:
         p=urllib.parse.urlparse(u or "")
         base=p._replace(query="", fragment="")
-        return urllib.parse.urlunparse(base).rstrip("/").lower()
+        s=urllib.parse.urlunparse(base)
+        return s.rstrip("/").lower()
     except: return (u or "").rstrip("/").lower()
-
-# update detection
-UPD_TOK = ["corrigendum","extension","extended","addendum","amendment","revised","rectified","notice","last date","reopen","re-open","reopened"]
-DATE_PAT = re.compile(r"(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})")
-def is_update_title(t): return any(k in (t or "").lower() for k in UPD_TOK)
 
 def parse_deadline(s):
     if not s or s.strip().upper()=="N/A": return None
@@ -52,6 +48,10 @@ def parse_deadline(s):
         try: return datetime.strptime(s.strip(), f).date()
         except: pass
     return None
+
+UPD_TOK = ["corrigendum","extension","extended","addendum","amendment","revised","rectified","notice","last date","reopen","re-open","reopened"]
+DATE_PAT = re.compile(r"(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})")
+def is_update_title(t): return any(k in (t or "").lower() for k in UPD_TOK)
 
 def normalize_pdf_stem(u):
     try:
@@ -81,7 +81,7 @@ def parse_posts_from_text(txt):
         except: return None
     return None
 
-# merge updates into parents
+# Merge updates into parents
 parents=[j for j in jobs if not is_update_title(j.get("title"))]
 kept=[]; merged=0
 for j in jobs:
@@ -112,55 +112,37 @@ for j in jobs:
         j["type"]="UPDATE"; j.setdefault("flags",{})["no_parent_found"]=True; kept.append(j)
 jobs=kept
 
-# submissions: add official site to captureHints if provided
-subs = JLOADL("submissions.jsonl")
-seen={norm_url(j.get("applyLink")) for j in jobs}
-for s in subs:
-    if s.get("type")=="missing":
-        url=(s.get("url") or "").strip()
-        site=(s.get("officialSite") or "").strip()
-        if site and site not in rules["captureHints"]:
-            rules["captureHints"].append(site)
-        if url and norm_url(url) not in seen:
-            jobs.append({
-                "id": f"user_{abs(hash(url))%10**9}",
-                "title": (s.get("title") or "").strip(),
-                "qualificationLevel": "Any graduate",
-                "domicile": "All India",
-                "deadline": (s.get("lastDate") or s.get("deadline") or "N/A").strip() or "N/A",
-                "applyLink": url,
-                "detailLink": url,
-                "source": "official",
-                "type": "VACANCY",
-                "flags": {"added_from_missing": True, "trusted": True},
-                "numberOfPosts": int(s.get("posts")) if (isinstance(s.get("posts"),str) and s.get("posts").isdigit()) else s.get("posts") or None
-            })
+# Submissions: de-dup + captureHints enrich
+seen_keys={norm_url(j.get("applyLink")) for j in jobs}
+for s in JLOADL("submissions.jsonl"):
+    if s.get("type")!="missing": continue
+    title=(s.get("title") or "").strip()
+    url=norm_url((s.get("url") or "").strip())
+    site=(s.get("officialSite") or "").strip()
+    last=(s.get("lastDate") or s.get("deadline") or "").strip() or "N/A"
+    posts=s.get("posts")
+    if site and site not in rules["captureHints"]: rules["captureHints"].append(site)
+    if not title or not url: continue
+    if url in seen_keys: continue
+    card={
+        "id": f"user_{abs(hash(url))%10**9}",
+        "title": title,
+        "qualificationLevel": "Any graduate",
+        "domicile": "All India",
+        "deadline": last,
+        "applyLink": url,
+        "detailLink": url,
+        "source": "official",
+        "type": "VACANCY",
+        "flags": {"added_from_missing": True, "trusted": True}
+    }
+    try:
+        if isinstance(posts,str) and posts.strip().isdigit(): posts=int(posts.strip())
+        if isinstance(posts,int) and posts>0: card["numberOfPosts"]=posts
+    except: pass
+    jobs.append(card); seen_keys.add(url)
 
-# learning from votes to adjust aggregatorScores priority
-scores = rules.get("aggregatorScores", {})
-def domain_of(u):
-    try: return urllib.parse.urlparse(u or "").netloc.lower()
-    except: return ""
-def is_official_host(h):
-    return h.endswith(".gov.in") or h.endswith(".nic.in") or h.endswith(".gov") or h.endswith(".go.in") or "rbi.org.in" in h or "isro.gov.in" in h
-
-def bump(h, delta):
-    if not h or is_official_host(h): return
-    v = float(scores.get(h, 0.5)) + delta
-    v = max(0.0, min(1.0, v))
-    scores[h] = round(v, 3)
-
-for v in votes:
-    if v.get("type")!="vote": continue
-    link = v.get("url") or ""
-    h = domain_of(link)
-    if not h: continue
-    if v.get("vote")=="right": bump(h, +0.05)
-    elif v.get("vote")=="wrong": bump(h, -0.05)
-
-rules["aggregatorScores"] = scores
-
-# sectioning (revive to Open if deadline extended)
+# Sectioning + 7-day auto-archive of expired listings
 def keep_date(j):
     d=parse_deadline(j.get("deadline"))
     if d: return d
@@ -197,21 +179,43 @@ for j in jobs:
     if jid in NOTI and (today-NOTI[jid]).days>14:
         to_delete.add(jid); continue
     if last and last < today:
-        other.append(j)
+        # if expired more than 7 days, move to archive instead of showing in Other
+        if (today - last).days > 7:
+            j.setdefault("flags",{})["auto_archived"]="expired_7d"
+            archived.append(j)
+        else:
+            other.append(j)
     else:
         primary.append(j)
 
+# Build outputs
 jobs_out=[j for j in primary+other+applied_list if j["id"] not in to_delete]
 for j in jobs_out:
     if not j.get("detailLink"): j["detailLink"]= j.get("applyLink")
 
+# transparency metrics including sourcesByStatus
+def host(u):
+    try: return urllib.parse.urlparse(u or "").netloc.lower()
+    except: return ""
+sources=set()
+for h in (rules.get("captureHints") or []):
+    try: sources.add(urllib.parse.urlparse(h).netloc.lower())
+    except: pass
+seen_hosts={}
+for j in jobs_out:
+    seen_hosts.setdefault(host(j.get("applyLink")),0)
+    seen_hosts[host(j.get("applyLink"))]+=1
+sources_status=[{"host":h,"items":seen_hosts.get(h,0)} for h in sorted(sources)]
+
 transp = raw.get("transparencyInfo") or {}
 transp.update({
-    "schemaVersion":"1.5",
+    "schemaVersion":"1.6",
     "runMode": RUN_MODE,
     "lastUpdated": datetime.utcnow().isoformat()+"Z",
     "mergedUpdates": merged,
-    "totalListings": len(jobs_out)
+    "totalListings": len(jobs_out),
+    "sourcesByStatus": sources_status,
+    "archivedCount": len(archived)
 })
 out = {
     "jobListings": jobs_out,
