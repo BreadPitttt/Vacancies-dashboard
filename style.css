@@ -20,59 +20,62 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 
 .container{max-width:1140px;margin:0 auto;padding:12px}
 
+/* Slightly wider minimum card to keep actions on one line more often */
+.cards-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(340px,1fr));
+  gap:16px;
+}
+@media(max-width:1100px){.cards-grid{grid-template-columns:repeat(2,minmax(340px,1fr))}}
+@media(max-width:740px){.cards-grid{grid-template-columns:minmax(320px,1fr)}}
+
 .tabs{display:flex;gap:10px;border-bottom:1px solid var(--line);margin:10px 0 16px}
 .tab{padding:8px 12px;border-radius:8px 8px 0 0;cursor:pointer;color:#1e3a8a}
 .tab.active{background:var(--primary-bg);border:1px solid var(--primary-line);border-bottom-color:transparent;color:var(--primary)}
 .panel{display:none}
 .panel.active{display:block}
 
-.cards-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-@media(max-width:1000px){.cards-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){.cards-grid{grid-template-columns:1fr}}
-
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.06);overflow:hidden}
 .card-head{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px dashed var(--line)}
 .title{font-size:15px;font-weight:600;margin-right:auto}
 .card-body{padding:12px}
-.rowline{display:grid;grid-template-columns:160px 1fr;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}
+
+/* Narrower label column to free space for values and actions */
+.rowline{
+  display:grid;
+  grid-template-columns:120px 1fr;
+  gap:10px;
+  padding:8px 0;
+  border-bottom:1px dashed var(--line)
+}
 .rowline .muted{color:var(--muted)}
 .rowline:last-child{border-bottom:none}
 
-/* Actions: row1 stays 2-column for Details/Report */
+/* Row1 unchanged */
 .actions-row{border-top:1px dashed var(--line);padding:10px 12px}
 .actions-row.row1{display:grid;grid-template-columns:1fr 1fr;align-items:center}
 .actions-row.row1 .left{justify-self:start}
 .actions-row.row1 .right{justify-self:end}
 
-/* Row2: single flexible line that wraps within the card */
-.actions-row.row2{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px 10px;
-  align-items:center;
-}
-.group{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  min-width:0;
-}
+/* Row2 wraps but prefers single-line when space allows */
+.actions-row.row2{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.group{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
 
-/* Chip-like buttons; allow shrink, cap width, stay on one line */
+/* Tighter, chip-like buttons: slightly smaller font and padding */
 .btn{
   border-radius:999px;
   background:#fff;
   border:1px solid var(--btn-line);
   color:var(--text);
   cursor:pointer;
-  font-size:12px;
-  padding:6px 10px;
+  font-size:11.5px;          /* was 12px */
+  padding:5px 9px;           /* was 6px 10px */
   line-height:1.2;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
   flex:0 1 auto;
-  min-width:88px;
+  min-width:84px;            /* was 88px */
   max-width:160px;
 }
 .btn.primary{background:var(--primary-bg);border-color:var(--primary-line);color:var(--primary)}
@@ -82,19 +85,19 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.applied{background:var(--applied-bg);border-color:var(--applied-line);color:var(--applied)}
 .btn.other{background:var(--other-bg);border-color:var(--other-line);color:var(--other)}
 .btn.ghost{background:#fff;border:1px dashed var(--line);color:var(--muted)}
-.btn.tiny{padding:4px 8px;font-size:12px;min-width:0;max-width:120px}
+.btn.tiny{padding:4px 7px;font-size:11.5px;min-width:0;max-width:118px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
-/* After Right, hide vote buttons but keep layout space stable */
+/* After Right, hide votes but keep layout */
 .verified .row2 .group.vote{visibility:hidden}
 
 /* Chips */
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
 .chip.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
-.badge-done{padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
+.badge-done{padding:2px 8px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
 .trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 
-/* Modals with footer containment */
+/* Modals: footer containment and red Close (kept) */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20}
 .modal.hidden{display:none}
 .modal:not(.hidden){display:flex}
@@ -104,8 +107,6 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .modal .form input,.modal .form textarea,.modal .form select{width:100%;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px;margin-bottom:10px}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .modal-actions .btn{min-width:96px}
-
-/* Make Close red as requested */
 .modal .form .btn[data-close]{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
 
 .icon-btn{background:#fff;color:var(--muted);border:1px dashed var(--line);padding:4px 8px;border-radius:8px;cursor:pointer}
