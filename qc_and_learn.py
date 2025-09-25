@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# qc_and_learn.py — QC + learn + deadline extension + sticky user state + posts normalization (2025-09-25-fixes)
+# qc_and_learn.py — posts propagation + updates + sticky state (2025-09-25-posts)
 import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
 
@@ -32,7 +32,7 @@ votes = JLOADL("votes.jsonl")
 reports = JLOADL("reports.jsonl")
 subs = JLOADL("submissions.jsonl")
 rules = JLOAD("rules.json", {"captureHints":[]})
-user_state = JLOAD("user_state.json", {})  # sticky server-side store for user actions
+user_state = JLOAD("user_state.json", {})
 
 def norm_url(u):
     try:
@@ -48,7 +48,6 @@ def parse_deadline(s):
         except: pass
     return None
 
-# --- Extension resolver helpers ---
 UPD_TOK = ["corrigendum","extension","extended","addendum","amendment","revised","rectified","notice","last date"]
 DATE_PAT = re.compile(r"(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})")
 def is_update_title(t): return any(k in (t or "").lower() for k in UPD_TOK)
@@ -72,7 +71,6 @@ def adv_no(t):
     m=re.search(r"(advt|advertisement|notice)\s*(no\.?|number)?\s*[:\-]?\s*([A-Za-z0-9\/\-\._]+)", t or "", re.I)
     return m.group(3).lower() if m else ""
 
-# Posts normalization
 POSTS_PAT = re.compile(r"(\d{1,6})\s*(posts?|vacanc(?:y|ies)|seats?)", re.I)
 def parse_posts_from_text(txt):
     if not txt: return None
@@ -82,7 +80,7 @@ def parse_posts_from_text(txt):
         except: return None
     return None
 
-# --- Split parents vs updates, attach updates, extend deadlines, collect posts from updates ---
+# Split parents/updates and merge updates (deadline extension + posts)
 parents=[j for j in jobs if not is_update_title(j.get("title"))]
 kept=[]; merged=0
 for j in jobs:
@@ -97,7 +95,6 @@ for j in jobs:
         if s>score: score, best = s, p
     if best and score>=0.6:
         best.setdefault("updates", []).append({"title": j.get("title"), "link": j.get("applyLink"), "capturedAt": datetime.utcnow().isoformat()+"Z"})
-        # Extend deadline if update mentions a later date
         dates=[m.group(1) for m in DATE_PAT.finditer(j.get("title") or "")]
         parsed=[parse_deadline(x.replace("-","/")) for x in dates if x]
         parsed=[d for d in parsed if d]
@@ -106,7 +103,6 @@ for j in jobs:
             cur=parse_deadline(best.get("deadline"))
             if not cur or new_deadline>cur:
                 best["deadline"]=new_deadline.strftime("%d/%m/%Y")
-        # Posts from update title
         pcount = parse_posts_from_text(j.get("title"))
         if pcount and not best.get("numberOfPosts"):
             best["numberOfPosts"]=pcount
@@ -115,9 +111,8 @@ for j in jobs:
         j["type"]="UPDATE"; j.setdefault("flags",{})["no_parent_found"]=True; kept.append(j)
 jobs=kept
 
-# --- Hard reports -> archive + optional posts intake ---
-hard_ids=set(); hard_urls=set(); hard_titles=set()
-report_posts={}
+# Apply hard reports and collect posts if reported
+hard_ids=set(); hard_urls=set(); hard_titles=set(); report_posts={}
 for r in reports:
     if r.get("type")=="report":
         jid=(r.get("jobId") or r.get("listingId") or "").strip()
@@ -125,7 +120,6 @@ for r in reports:
         if r.get("url"): hard_urls.add(norm_url(r["url"]))
         if r.get("evidenceUrl"): hard_urls.add(norm_url(r["evidenceUrl"]))
         if r.get("title"): hard_titles.add((r["title"] or "").strip().lower())
-        # take posts if provided
         try:
             p = r.get("posts")
             if isinstance(p,str) and p.strip().isdigit(): p=int(p.strip())
@@ -134,7 +128,6 @@ for r in reports:
 tmp=[]
 for j in raw.get("jobListings", []):
     jid=j.get("id",""); url=norm_url(j.get("applyLink")); title=(j.get("title") or "").strip().lower()
-    # posts from reports (non-destructive)
     if jid in report_posts and not j.get("numberOfPosts"): j["numberOfPosts"]=report_posts[jid]
     if jid in hard_ids or url in hard_urls or title in hard_titles:
         j.setdefault("flags",{})["removed_reason"]="reported_hard"; archived.append(j)
@@ -142,7 +135,7 @@ for j in raw.get("jobListings", []):
         tmp.append(j)
 jobs=tmp
 
-# --- Missing submissions -> add card + capture hints + posts intake ---
+# Add missing submissions and capture posts if provided
 subs = JLOADL("submissions.jsonl")
 seen={norm_url(j.get("applyLink")) for j in jobs}
 for s in subs:
@@ -168,7 +161,6 @@ for s in subs:
             "type": "VACANCY",
             "flags": {"added_from_missing": True, "trusted": True}
         }
-        # posts if provided
         try:
             if isinstance(posts,str) and posts.strip().isdigit(): posts=int(posts.strip())
             if isinstance(posts,int) and posts>0: card["numberOfPosts"]=posts
@@ -177,7 +169,7 @@ for s in subs:
         if url not in rules["captureHints"]: rules["captureHints"].append(url)
         if site and site not in rules["captureHints"]: rules["captureHints"].append(site)
 
-# --- Green tick learning + demotions ---
+# Learning: trusted/demote
 pin=set(); demote=set()
 for v in votes:
     if v.get("type")=="vote":
@@ -191,7 +183,7 @@ for j in jobs:
     if j["id"] in demote:
         j.setdefault("flags",{})["demoted"]=True
 
-# --- User state + sectioning + soft expiry; merge server + sticky user_state ---
+# Overlay server-side sticky state, compute sections; ensure numberOfPosts is present
 APPLIED=set(); NOTI={}
 for jid, st in (user_state or {}).items():
     a=(st or {}).get("action"); ts=(st or {}).get("ts")
@@ -209,13 +201,11 @@ def keep_date(j):
         except: return None
     return None
 
-# Sectioning with canonical numberOfPosts normalization
 primary=[]; applied_list=[]; other=[]; to_delete=set()
 for j in jobs:
     jid=j["id"]
     last=keep_date(j)
-    if last: j["daysLeft"]=(last - date.today()).days
-    # canonicalize posts (top-level numberOfPosts preferred)
+    if last is not None: j["daysLeft"]=(last - date.today()).days
     if not j.get("numberOfPosts"):
         c=parse_posts_from_text(j.get("title")) or j.get("flags",{}).get("posts")
         if c: j["numberOfPosts"]=c
@@ -236,13 +226,12 @@ jobs_out=[j for j in primary+other+applied_list if j["id"] not in to_delete]
 for j in jobs_out:
     if not j.get("detailLink"): j["detailLink"]= j.get("applyLink")
 
-# Transparency + write
 transp = raw.get("transparencyInfo") or {}
 transp.update({
     "schemaVersion":"1.5",
     "runMode": RUN_MODE,
     "lastUpdated": datetime.utcnow().isoformat()+"Z",
-    "mergedUpdates": merged,
+    "mergedUpdates": 0,
     "totalListings": len(jobs_out)
 })
 out = {
@@ -256,19 +245,16 @@ out = {
     "transparencyInfo": transp
 }
 JWRITE("data.json", out)
-JWRITE("learn.json", {"mergedUpdates": merged,"generatedAt": datetime.utcnow().isoformat()+"Z","runMode": RUN_MODE})
+JWRITE("learn.json", {"generatedAt": datetime.utcnow().isoformat()+"Z","runMode": RUN_MODE})
 
-# Keep rules coherent
+# keep rules coherent and aggregator scores
 rules["blacklistedDomains"] = rules.get("blacklistedDomains", [])
 rules["autoRemoveReasons"] = rules.get("autoRemoveReasons", ["expired"])
-
-# AggregatorScores learner
 def domain_of(u):
     try: return urllib.parse.urlparse(u or "").netloc.lower()
     except: return ""
 def is_official_host(h):
     return h.endswith(".gov.in") or h.endswith(".nic.in") or h.endswith(".gov") or h.endswith(".go.in") or "rbi.org.in" in h
-
 scores = rules.get("aggregatorScores", {})
 def bump(h, delta):
     if not h or is_official_host(h): return
@@ -277,12 +263,10 @@ def bump(h, delta):
     scores[h] = round(v, 3)
 for v in votes:
     if v.get("type")!="vote": continue
-    link = v.get("url") or ""
-    h = domain_of(link)
+    link = v.get("url") or ""; h = domain_of(link)
     if not h: continue
     if v.get("vote")=="right": bump(h, +0.05)
     elif v.get("vote")=="wrong": bump(h, -0.05)
 rules["aggregatorScores"] = scores
-
 JWRITE("rules.json", rules)
 JWRITE("health.json", {"ok": True, **transp})
