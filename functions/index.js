@@ -1,4 +1,5 @@
-// functions/index.js — unified Worker (KV + GitHub), GET friendly in browser too
+// functions/index.js — unified Worker with KV + GitHub writes
+// CORS pinned to Pages origin
 const ALLOW_ORIGIN = "https://breadpitttt.github.io";
 const OWNER = "BreadPitttt";
 const REPO  = "Vacancies-dashboard";
@@ -8,14 +9,14 @@ export default {
     const url = new URL(req.url);
     const origin = req.headers.get("Origin") || "";
 
-    // Diagnostics: GET /diag
+    // Diagnostics
     if (url.pathname === "/diag" && req.method === "GET") {
       const hasToken = !!(env && env.FEEDBACK_TOKEN);
       const hasKV = !!(env && env.VAC_STATE);
       return json({ ok: true, hasToken, hasKV }, 200);
     }
 
-    // CORS preflight
+    // Preflight
     if (req.method === "OPTIONS") {
       if (origin === ALLOW_ORIGIN) {
         return new Response(null, {
@@ -31,21 +32,20 @@ export default {
       return new Response(null, { status: 403 });
     }
 
-    // KV: GET ?state=1 -> return KV user_state.json (allow direct browser GET too)
+    // KV read: GET ?state=1
     if (req.method === "GET" && url.searchParams.get("state") === "1") {
       try {
         const raw = await env.VAC_STATE.get("user_state.json");
         const body = raw ? JSON.parse(raw) : {};
-        // If no Origin (typed in address bar), return JSON anyway
         return withCORS(json({ ok: true, state: body }, 200), ALLOW_ORIGIN);
       } catch {
         return withCORS(json({ ok: false, error: "read_failed" }, 500), ALLOW_ORIGIN);
       }
     }
 
-    // Only POST after here
+    // Only POST for the rest
     if (req.method !== "POST") {
-      return withCORS(json({ ok:false, error:"Method Not Allowed" }, 405), ALLOW_ORIGIN);
+      return withCORS(new Response("Method Not Allowed", { status: 405 }), ALLOW_ORIGIN);
     }
 
     if (origin !== ALLOW_ORIGIN) {
@@ -58,7 +58,7 @@ export default {
 
     const type = body && body.type;
 
-    // KV sync: merge and store user_state.json
+    // KV save: user_state_sync
     if (type === "user_state_sync") {
       try {
         let current = {};
@@ -72,7 +72,7 @@ export default {
       }
     }
 
-    // GitHub logging (unchanged)
+    // GitHub-backed writes (votes/reports/missing/state)
     const token = env && env.FEEDBACK_TOKEN;
     if (!token) {
       return withCORS(json({ error:"Missing FEEDBACK_TOKEN secret on Worker (Production)" }, 500), ALLOW_ORIGIN);
@@ -88,9 +88,14 @@ export default {
     if (type === "report") {
       const rec = {
         type,
-        jobId: body.jobId||"", title: body.title||"",
-        url: body.url||"", note: body.note||"", reasonCode: body.reasonCode||"",
-        evidenceUrl: body.evidenceUrl||"", posts: body.posts||null,
+        jobId: body.jobId||"",
+        title: body.title||"",
+        url: body.url||"",
+        reasonCode: body.reasonCode||"",
+        evidenceUrl: body.evidenceUrl||"",
+        posts: body.posts||null,
+        lastDate: body.lastDate||"",
+        note: body.note||"",
         ts: new Date().toISOString()
       };
       if (!rec.jobId && !rec.title && !rec.url) return withCORS(json({ error:"Bad report payload" }, 400), ALLOW_ORIGIN);
@@ -135,7 +140,7 @@ function json(obj, status=200){
   return new Response(JSON.stringify(obj), { status, headers: { "Content-Type":"application/json; charset=utf-8" }});
 }
 
-// GitHub API helpers
+// GitHub helpers
 async function ghGet(token, owner, repo, path){
   return fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, {
     headers: { "Accept":"application/vnd.github+json", "Authorization":`Bearer ${token}`, "User-Agent":"vacancy-worker" }
