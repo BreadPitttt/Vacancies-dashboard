@@ -1,4 +1,4 @@
-// app.js v2025-09-26-stable — fixes missing renderStatus, preserves all prior features
+// app.js v2025-09-26-stable — Worker-aware state load (tiny change), keeps all features
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
@@ -9,7 +9,6 @@
   const bust=(p)=>p+(p.includes("?")?"&":"?")+"t="+Date.now();
   function normHref(u){ try{ const p=new URL(u.trim()); p.hash=""; p.search=""; let s=p.toString(); if(s.endsWith("/")) s=s.slice(0,-1); return s.toLowerCase(); }catch{ return (u||"").trim().toLowerCase().replace(/[?#].*$/,"").replace(/\/$/,""); } }
 
-  // Health/status — define first so initial call cannot fail
   async function renderStatus(){
     try{
       const r=await fetch(bust("health.json"),{cache:"no-store"}); if(!r.ok) throw 0;
@@ -28,17 +27,32 @@
     }
   }
 
-  // Tabs
   document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return;
     qsa(".tab").forEach(x=>x.classList.toggle("active",x===t));
     qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab));
   });
 
-  // State merge + sync
   let USER_STATE={}, USER_VOTES={};
+
+  // Worker-aware: try Worker GET ?state=1 first, then fall back to repo file
   async function loadUserStateServer(){
-    try{ const r=await fetch(bust("user_state.json"),{cache:"no-store"}); if(!r.ok) throw 0;
-      const remote=await r.json(); if(remote && typeof remote==="object"){ USER_STATE={...remote}; }
+    // 1) Worker KV (reliable cross-device)
+    try{
+      const wr=await fetch(ENDPOINT+"?state=1",{mode:"cors"});
+      if(wr.ok){
+        const wj=await wr.json();
+        if(wj && wj.ok && wj.state && typeof wj.state==="object"){
+          USER_STATE={...wj.state};
+          return;
+        }
+      }
+    }catch{}
+    // 2) Repo user_state.json (fallback)
+    try{
+      const r=await fetch(bust("user_state.json"),{cache:"no-store"});
+      if(!r.ok) throw 0;
+      const remote=await r.json();
+      if(remote && typeof remote==="object"){ USER_STATE={...remote}; }
     }catch{ USER_STATE={}; }
   }
   function loadUserStateLocal(){ try{ const local=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(local && typeof local==="object"){ USER_STATE={...USER_STATE, ...local}; } }catch{} }
@@ -208,7 +222,7 @@
 
         if(act==="applied"||act==="not_interested"){
           const confirmMsg = act==="applied" ? "Mark as Applied?" : "Move to Other (Not interested)?";
-          const ok = await new Promise((res)=>{ const b=confirm(confirmMsg); res(b); }); // fast confirm
+          const ok = await new Promise((res)=>{ const b=confirm(confirmMsg); res(b); });
           if(!ok) return;
           const prev=USER_STATE[id]?.action||"";
           setUserStateLocal(id,act);
@@ -249,7 +263,7 @@
 
   document.addEventListener("DOMContentLoaded", async ()=>{
     await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal();
-    persistUserStateServer(); // best-effort
+    persistUserStateServer();
     await renderStatus();
     await render();
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
