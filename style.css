@@ -67,10 +67,8 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .vote-btn.right{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 .vote-btn.wrong{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
 
-/* Show only top verify tick; bottom icons remain but are hidden by card.verified via JS */
-.card.verified .group.vote{gap:0}
+/* Only top verify tick; bottom vote icons hidden once verified via JS */
 .card.verified .group.vote .vote-btn{display:none}
-.card.verified .group.vote::before{content:"";display:none}
 
 .verify-top{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;border:1px solid var(--ok-line);background:var(--ok-bg);color:var(--ok);font-size:12px}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
@@ -84,11 +82,11 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .modal:not(.hidden){display:flex}
 .modal .modal-body{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 20px 44px rgba(15,23,42,.12);width:clamp(320px,92vw,640px);max-width:640px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;position:relative}
 
-/* Header: title + top-right red ✗ button */
+/* Header: title hidden; top-right red ✗ button */
 .modal .modal-head{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;margin-bottom:8px}
+.modal .modal-head h3.hidden{display:none}
 .modal .modal-head .close-top{justify-self:end;border-radius:8px;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-line);padding:6px 10px;cursor:pointer;line-height:1}
-.modal .modal-head .close-top::before{content:"✗";margin-right:4px}
-.modal .modal-head h3{margin:0}
+.modal .modal-head .close-top::before{content:"✗";margin-right:0}
 
 .modal .form{display:flex;flex-direction:column}
 .modal .form input,.modal .form textarea,.modal .form select{width:100%;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px;margin-bottom:10px;box-sizing:border-box}
