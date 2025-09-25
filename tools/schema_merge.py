@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Adds robust numberOfPosts propagation and normalizes deadline format
+# schema_merge.py — promote numberOfPosts reliably and normalize to int
 import json, sys, re, hashlib
 from datetime import datetime
 
@@ -47,11 +47,16 @@ def posts_from_text(txt):
         except: return None
     return None
 
+def to_int(n):
+    if n is None: return None
+    if isinstance(n,int): return n
+    if isinstance(n,str) and n.strip().isdigit(): return int(n.strip())
+    return None
+
 def validate(i):
     out = {
         "id": i.get("id") or ("src_" + make_key(i)),
         "title": norm_spaces(i.get("title")),
-        "organization": norm_spaces(i.get("organization") or ""),
         "qualificationLevel": norm_spaces(i.get("qualificationLevel") or ""),
         "domicile": norm_spaces(i.get("domicile") or ""),
         "deadline": norm_date(i.get("deadline") or ""),
@@ -61,12 +66,8 @@ def validate(i):
         "type": i.get("type") or "VACANCY",
         "flags": i.get("flags") or {},
     }
-    # Promote canonical numberOfPosts when present or derivable
-    n=i.get("numberOfPosts")
-    if isinstance(n,str) and n.isdigit(): n=int(n)
-    if isinstance(n,int) and n>0: out["numberOfPosts"]=n
-    elif posts_from_text(out["title"]): out["numberOfPosts"]=posts_from_text(out["title"])
-    # Derive daysLeft
+    p = to_int(i.get("numberOfPosts")) or posts_from_text(out["title"])
+    if p: out["numberOfPosts"]=p
     dl = compute_days_left(out["deadline"])
     if dl is not None: out["daysLeft"] = dl
     return out
@@ -82,15 +83,12 @@ def merge(existing, candidates):
             for f in ["qualificationLevel","domicile","deadline","applyLink","detailLink","source","type"]:
                 if v.get(f) and (not ex.get(f) or ex.get(f)=="N/A"):
                     ex[f] = v[f]
-            # numberOfPosts prefers explicit integer; fallback to title parse
             if v.get("numberOfPosts") and not ex.get("numberOfPosts"):
                 ex["numberOfPosts"]=v["numberOfPosts"]
-            # merge flags and daysLeft
             ex["flags"] = { **(ex.get("flags") or {}), **(v.get("flags") or {}) }
             if v.get("daysLeft") is not None: ex["daysLeft"] = v["daysLeft"]
         else:
             existing.append(v); idx[k]=v; added += 1
-    # Sort by deadline then title
     def sort_key(it):
         dd = it.get("deadline","N/A")
         try:
