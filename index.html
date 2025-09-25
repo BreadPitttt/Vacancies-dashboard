@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
   <link rel="stylesheet" href="style.css" />
-  <link id="main-css" rel="stylesheet" href="style.css?v=2025-09-25-fixes" />
+  <link id="main-css" rel="stylesheet" href="style.css?v=2025-09-25-final" />
 </head>
 <body class="u-bg">
   <header class="topbar">
@@ -73,8 +73,8 @@
         </div>
         <label>Note (optional)</label>
         <textarea id="missingNote" rows="3" placeholder="Any extra info"></textarea>
-        <div class="row end">
-          <button type="button" class="btn ghost" data-close>Close</button>
+        <div class="row end modal-actions">
+          <button type="button" class="btn danger" data-close>Close</button>
           <button type="submit" class="btn primary">Submit</button>
         </div>
       </form>
@@ -116,9 +116,9 @@
           <label>Note (optional)</label>
           <input id="reportNote" placeholder="Tell more if needed" />
         </div>
-        <div class="row end gap">
-          <button type="button" class="btn ghost" data-close>Close</button>
-          <button type="submit" class="btn danger">Report</button>
+        <div class="row end modal-actions">
+          <button type="button" class="btn danger" data-close>Close</button>
+          <button type="submit" class="btn primary">Report</button>
         </div>
       </form>
     </div>
@@ -139,7 +139,6 @@
   </div>
   <div id="toast"></div>
 
-  <!-- Self-learning app -->
-  <script src="app.js?v=2025-09-25-fixes" defer></script>
+  <script src="app.js?v=2025-09-25-final" defer></script>
 </body>
 </html>
