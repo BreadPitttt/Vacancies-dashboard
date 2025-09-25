@@ -1,4 +1,4 @@
-// app.js v2025-09-25-pro3 — top-left Close, centered primary, inline Undo + persistent state
+// app.js v2025-09-26-stable — fixes missing renderStatus, preserves all prior features
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
@@ -9,44 +9,44 @@
   const bust=(p)=>p+(p.includes("?")?"&":"?")+"t="+Date.now();
   function normHref(u){ try{ const p=new URL(u.trim()); p.hash=""; p.search=""; let s=p.toString(); if(s.endsWith("/")) s=s.slice(0,-1); return s.toLowerCase(); }catch{ return (u||"").trim().toLowerCase().replace(/[?#].*$/,"").replace(/\/$/,""); } }
 
-  // --- State persistence: merge server + local and never lose local flags ---
-  let USER_STATE={}, USER_VOTES={};
+  // Health/status — define first so initial call cannot fail
+  async function renderStatus(){
+    try{
+      const r=await fetch(bust("health.json"),{cache:"no-store"}); if(!r.ok) throw 0;
+      const h=await r.json();
+      const pill=qs("#health-pill");
+      pill.textContent=h.ok?"Health: OK":"Health: Not OK";
+      pill.className="pill "+(h.ok?"ok":"bad");
+      qs("#last-updated").textContent="Last updated: "+(h.lastUpdated? new Date(h.lastUpdated).toLocaleString() : "—");
+      qs("#total-listings").textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
+    }catch{
+      const pill=qs("#health-pill");
+      pill.textContent="Health: Unknown";
+      pill.className="pill";
+      qs("#last-updated").textContent="Last updated: —";
+      qs("#total-listings").textContent="Listings: —";
+    }
+  }
 
-  async function loadUserStateServer(){
-    try{
-      const r=await fetch(bust("user_state.json"),{cache:"no-store"});
-      if(!r.ok) throw 0;
-      const remote=await r.json();
-      if(remote && typeof remote==="object"){ USER_STATE={...remote}; }
-    }catch{ USER_STATE={}; }
-  }
-  function loadUserStateLocal(){
-    try{
-      const local=JSON.parse(localStorage.getItem("vac_user_state")||"{}");
-      if(local && typeof local==="object"){ USER_STATE={...USER_STATE, ...local}; }
-    }catch{}
-  }
-  function setUserStateLocal(id,a){
-    if(!id) return;
-    if(a==="undo") delete USER_STATE[id];
-    else USER_STATE[id]={action:a,ts:new Date().toISOString()};
-    try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{}
-  }
-  async function persistUserStateServer(){
-    try{
-      await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({type:"user_state_sync", payload:USER_STATE, ts:new Date().toISOString()})
-      });
-    }catch{}
-  }
-  function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
-  function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
-  function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
-
+  // Tabs
   document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return;
     qsa(".tab").forEach(x=>x.classList.toggle("active",x===t));
     qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab));
   });
+
+  // State merge + sync
+  let USER_STATE={}, USER_VOTES={};
+  async function loadUserStateServer(){
+    try{ const r=await fetch(bust("user_state.json"),{cache:"no-store"}); if(!r.ok) throw 0;
+      const remote=await r.json(); if(remote && typeof remote==="object"){ USER_STATE={...remote}; }
+    }catch{ USER_STATE={}; }
+  }
+  function loadUserStateLocal(){ try{ const local=JSON.parse(localStorage.getItem("vac_user_state")||"{}"); if(local && typeof local==="object"){ USER_STATE={...USER_STATE, ...local}; } }catch{} }
+  function setUserStateLocal(id,a){ if(!id) return; if(a==="undo") delete USER_STATE[id]; else USER_STATE[id]={action:a,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_state",JSON.stringify(USER_STATE)); }catch{} }
+  async function persistUserStateServer(){ try{ await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"user_state_sync", payload:USER_STATE, ts:new Date().toISOString()})}); }catch{} }
+  function loadVotesLocal(){ try{ USER_VOTES=JSON.parse(localStorage.getItem("vac_user_votes")||"{}")||{}; }catch{ USER_VOTES={}; } }
+  function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
+  function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
   function confirmAction(message="Proceed?"){
     return new Promise((resolve)=>{
@@ -64,7 +64,6 @@
   const verifyTop=()=>' <span class="verify-top" title="Verified Right">✓</span>';
   const corroboratedChip=()=>' <span class="chip" title="Multiple sources">x2</span>';
 
-  // Inline Undo: replaces the group slot temporarily
   function renderInlineUndo(slot, label, onUndo, seconds=8){
     if(!slot) return;
     const wrap=document.createElement("div");
@@ -135,7 +134,6 @@
   async function render(){
     const my=++TOKEN;
 
-    // State already merged in DOMContentLoaded; loadVotesLocal again for safety
     loadVotesLocal();
 
     let data=null;
@@ -189,10 +187,10 @@
           setVoteLocal(id,"right"); card.classList.add("verified");
           renderInlineUndo(voteCell, "vote", async ()=>{
             if(prev==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
-            await postJSON({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
+            await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
             await render();
           });
-          postJSON({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
+          fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
           return;
         }
 
@@ -201,25 +199,25 @@
           setVoteLocal(id,"wrong");
           renderInlineUndo(voteCell, "vote", async ()=>{
             if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
-            await postJSON({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
+            await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
             await render();
           });
-          postJSON({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
+          fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
           return;
         }
 
         if(act==="applied"||act==="not_interested"){
           const confirmMsg = act==="applied" ? "Mark as Applied?" : "Move to Other (Not interested)?";
-          const ok = await confirmAction(confirmMsg);
+          const ok = await new Promise((res)=>{ const b=confirm(confirmMsg); res(b); }); // fast confirm
           if(!ok) return;
           const prev=USER_STATE[id]?.action||"";
           setUserStateLocal(id,act);
           renderInlineUndo(interestCell, act==="applied"?"applied":"choice", async ()=>{
             if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); }
-            await postJSON({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}});
+            await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}})});
             await render();
           });
-          await postJSON({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}});
+          await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}})});
           await render(); return;
         }
 
@@ -250,15 +248,13 @@
   });
 
   document.addEventListener("DOMContentLoaded", async ()=>{
-    await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal(); // merge local over server
-    persistUserStateServer(); // best-effort sync up, so scheduled runs preserve local choices
-
-    await renderStatus(); await render();
-
+    await loadUserStateServer(); loadUserStateLocal(); loadVotesLocal();
+    persistUserStateServer(); // best-effort
+    await renderStatus();
+    await render();
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
 
     const SUBMIT_LOCK=(window.__SUBMIT_LOCK__ ||= new Set());
-
     document.addEventListener("submit", async (e)=>{
       const f=e.target;
       if(f && f.id==="reportForm"){
@@ -269,7 +265,7 @@
         const posts=document.getElementById("reportPosts")?.value?.trim()||"";
         const note=document.getElementById("reportNote")?.value?.trim()||"";
         if(!id||!rc) return toast("Please select a reason.");
-        await postJSON({type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,note,ts:new Date().toISOString()});
+        await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,note,ts:new Date().toISOString()})});
         closeModalEl(f); f.reset(); toast("Reported.");
       }
       if(f && f.id==="missingForm"){
@@ -282,14 +278,13 @@
         const note=document.getElementById("missingNote").value.trim();
         if(!title||!url) return toast("Post name and notification link are required.");
         const key=normHref(url);
-        if(SUBMIT_LOCK.has(key)) return toast("Already submitted.");
-        SUBMIT_LOCK.add(key);
+        if(SUBMIT_LOCK.has(key)) return toast("Already submitted."); SUBMIT_LOCK.add(key);
         if(/^\d{1,2}[-/]\d{1,2}[-/]\d{2}$/.test(last)){
           const [d,m,y]=last.replaceAll("-","/").split("/"); last=`${d.padStart(2,"0")}/${m.padStart(2,"0")}/20${y}`;
         }else if(/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(last)){
           const [d,m,y]=last.replaceAll("-","/").split("/"); last=`${d.padStart(2,"0")}/${m.padStart(2,"0")}/${y}`;
         }
-        await postJSON({type:"missing",title,url:key,officialSite:site,lastDate:last||"N/A",posts:posts||null,note,ts:new Date().toISOString()});
+        await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"missing",title,url:key,officialSite:site,lastDate:last||"N/A",posts:posts||null,note,ts:new Date().toISOString()})});
         closeModalEl(f); f.reset(); toast("Saved. Will appear after refresh.");
       }
     });
