@@ -38,36 +38,29 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .rowline .muted{color:var(--muted)}
 .rowline:last-child{border-bottom:none}
 
-/* Two fixed columns for action rows */
+/* Actions: keep inside frame on all sizes */
 .actions-row{border-top:1px dashed var(--line);padding:10px 12px}
 .actions-row.row1{display:grid;grid-template-columns:1fr 1fr;align-items:center}
 .actions-row.row1 .left{justify-self:start}
 .actions-row.row1 .right{justify-self:end}
 
-/* Keep both interest buttons on the same row on small screens too */
 .actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:8px}
-.group{display:flex;gap:10px;align-items:center;flex-wrap:nowrap;min-width:0}
+.group{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0}
 
-/* Buttons: compact and shrink to keep inside frame */
-.actions-row .btn{
-  min-width:92px;
-  max-width:160px;
-  flex:0 1 auto;
+/* Compact chip-like buttons (visual weight similar to Official/trusted) */
+.btn{
+  border-radius:999px;
+  background:#fff;
+  border:1px solid var(--btn-line);
+  color:var(--text);
+  cursor:pointer;
   font-size:12px;
-  padding:7px 10px;
+  padding:6px 10px;
+  line-height:1.2;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
-
-/* Chips and badges */
-.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
-.chip.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
-.badge-done{padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
-.trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
-
-/* Button skins */
-.btn{border-radius:10px;background:var(--btn);border:1px solid var(--btn-line);color:var(--text);cursor:pointer}
 .btn.primary{background:var(--primary-bg);border-color:var(--primary-line);color:var(--primary)}
 .btn.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 .btn.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
@@ -75,11 +68,21 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.applied{background:var(--applied-bg);border-color:var(--applied-line);color:var(--applied)}
 .btn.other{background:var(--other-bg);border-color:var(--other-line);color:var(--other)}
 .btn.ghost{background:#fff;border:1px dashed var(--line);color:var(--muted)}
-.btn.tiny{padding:6px 8px;font-size:12px}
+.btn.tiny{padding:4px 8px;font-size:12px}
 .btn.disabled{opacity:.6;pointer-events:none}
+
+/* Ensure long labels wrap neatly within group width without overflow */
+.group .btn{flex:0 1 auto;max-width:calc(50% - 6px)}
+@media(max-width:640px){ .group .btn{max-width:100%} }
 
 /* Hide vote group visuals after Right; preserve layout */
 .verified .row2 .group.vote{visibility:hidden}
+
+/* Chips */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
+.chip.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.badge-done{padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
+.trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 
 /* Modal styles */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20}
@@ -89,6 +92,10 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .modal .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .modal .form input,.modal .form textarea,.modal .form select{width:100%;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px;margin-bottom:10px}
 .icon-btn{background:#fff;color:var(--muted);border:1px dashed var(--line);padding:4px 8px;border-radius:8px;cursor:pointer}
+
+/* Make Close buttons red per request without changing other colors */
+.modal .row.end .btn.ghost[data-close],
+.modal .row.end .btn[data-close]{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
 
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row{display:flex;gap:10px}
