@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# qc_and_learn.py v2025-09-26-stable2 — merge updates, apply report deadlines, 7-day auto-archive, captureHints enrich
+# qc_and_learn.py v2025-09-26-stable3 — report-driven corrections + update merge + 7-day archive
 
 import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
@@ -114,7 +114,7 @@ for j in jobs:
         j["type"]="UPDATE"; j.setdefault("flags",{})["no_parent_found"]=True; kept.append(j)
 jobs=kept
 
-# Submissions: de-dup + captureHints enrich
+# Submissions -> captureHints + append if unique
 seen_keys={norm_url(j.get("applyLink")) for j in jobs}
 for s in subs:
     if s.get("type")!="missing": continue
@@ -144,18 +144,19 @@ for s in subs:
     except: pass
     jobs.append(card); seen_keys.add(url)
 
-# Reports: collect lastDate/evidence per jobId
-report_deadlines = {}
-report_evidence = {}
+# Reports -> corrections map
+report_map = {}
 for r in reports:
-    if r.get("type")=="report":
-        jid=(r.get("jobId") or "").strip()
-        ld = (r.get("lastDate") or "").strip()
-        ev = (r.get("evidenceUrl") or "").strip()
-        if jid and ld: report_deadlines[jid]=ld
-        if jid and ev: report_evidence[jid]=ev
+    if r.get("type")!="report": continue
+    jid=(r.get("jobId") or "").strip()
+    if not jid: continue
+    rec=report_map.setdefault(jid, {"reasons": []})
+    rec["reasons"].append(r.get("reasonCode") or "")
+    if r.get("lastDate"): rec["lastDate"]=r.get("lastDate").strip()
+    if r.get("eligibility"): rec["eligibility"]=r.get("eligibility").strip()
+    if r.get("evidenceUrl"): rec["evidenceUrl"]=r.get("evidenceUrl").strip()
+    if r.get("posts"): rec["posts"]=r.get("posts")
 
-# Helpers for sectioning
 def keep_date(j):
     d=parse_date_any(j.get("deadline"))
     if d: return d
@@ -179,9 +180,22 @@ for j in jobs:
     jid=j.get("id") or f"user_{abs(hash(j.get('applyLink','')))%10**9}"
     j["id"]=jid
 
-    # Apply reported deadline override (e.g., extension)
-    if jid in report_deadlines:
-        j["deadline"]=report_deadlines[jid]
+    # Apply report-driven corrections
+    if jid in report_map:
+        info=report_map[jid]; reasons=info.get("reasons", [])
+        if "wrong_last_date" in reasons and info.get("lastDate"):
+            j["deadline"]=info["lastDate"]
+        if "wrong_eligibility" in reasons and info.get("eligibility"):
+            j["qualificationLevel"]=info["eligibility"]
+        if "bad_link" in reasons and info.get("evidenceUrl"):
+            j["applyLink"]=info["evidenceUrl"]; j["detailLink"]=info["evidenceUrl"]; j.setdefault("flags",{})["fixed_link"]=True
+        if "duplicate" in reasons or "not_vacancy" in reasons or "last_date_over" in reasons:
+            j.setdefault("flags",{})["removed_reason"]="reported_"+("_".join(sorted(set(reasons)))) ; archived.append(j) ; continue
+        if info.get("posts") and not j.get("numberOfPosts"):
+            try:
+                p=int(info["posts"])
+                if p>0: j["numberOfPosts"]=p
+            except: pass
 
     last=keep_date(j)
     if last is not None: j["daysLeft"]=(last - today).days
