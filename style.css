@@ -20,11 +20,7 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 
 .container{max-width:1140px;margin:0 auto;padding:12px}
 
-.cards-grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(340px,1fr));
-  gap:16px;
-}
+.cards-grid{display:grid;grid-template-columns:repeat(3,minmax(340px,1fr));gap:16px}
 @media(max-width:1100px){.cards-grid{grid-template-columns:repeat(2,minmax(340px,1fr))}}
 @media(max-width:740px){.cards-grid{grid-template-columns:minmax(320px,1fr)}}
 
@@ -39,52 +35,24 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .title{font-size:15px;font-weight:600;margin-right:auto}
 .card-body{padding:12px}
 
-.rowline{
-  display:grid;
-  grid-template-columns:120px 1fr;
-  gap:10px;
-  padding:8px 0;
-  border-bottom:1px dashed var(--line)
-}
+.rowline{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}
 .rowline .muted{color:var(--muted)}
 .rowline:last-child{border-bottom:none}
 
-/* Row1: Details | Report */
+/* Actions rows */
 .actions-row{border-top:1px dashed var(--line);padding:10px 12px}
 .actions-row.row1{display:grid;grid-template-columns:1fr 1fr;align-items:center}
 .actions-row.row1 .left{justify-self:start}
 .actions-row.row1 .right{justify-self:end}
-
-/* Row2 mirrors row1 for perfect vertical alignment */
-.actions-row.row2{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  align-items:center;
-  gap:10px;
-}
+.actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:10px}
 
 /* Groups */
 .group{display:flex;align-items:center;min-width:0}
 .group.vote{gap:10px;flex-wrap:nowrap}
 .group.interest{gap:10px;flex-wrap:nowrap;justify-content:flex-end}
 
-/* Interest chips */
-.btn{
-  border-radius:999px;
-  background:#fff;
-  border:1px solid var(--btn-line);
-  color:var(--text);
-  cursor:pointer;
-  font-size:11.5px;
-  padding:5px 9px;
-  line-height:1.2;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  flex:0 1 auto;
-  min-width:98px;
-  max-width:140px;
-}
+/* Buttons and chips */
+.btn{border-radius:999px;background:#fff;border:1px solid var(--btn-line);color:var(--text);cursor:pointer;font-size:11.5px;padding:5px 9px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:98px;max-width:140px}
 .btn.primary{background:var(--primary-bg);border-color:var(--primary-line);color:var(--primary)}
 .btn.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 .btn.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
@@ -95,51 +63,37 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.tiny{padding:4px 7px;font-size:11.5px;min-width:0;max-width:118px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
-/* Vote icons */
-.vote-btn{
-  border-radius:999px;border:1px solid var(--btn-line);background:#fff;color:var(--text);
-  font-size:15px;line-height:1;padding:6px 12px;cursor:pointer;user-select:none
-}
-.vote-btn.right{ background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok) }
-.vote-btn.wrong{ background:var(--danger-bg); border-color:var(--danger-line); color:var(--danger) }
+.vote-btn{border-radius:999px;border:1px solid var(--btn-line);background:#fff;color:var(--text);font-size:15px;line-height:1;padding:6px 12px;cursor:pointer;user-select:none}
+.vote-btn.right{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.vote-btn.wrong{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
 
-/* Verified visuals */
-.card.verified .group.vote{ gap:0 }
-.card.verified .group.vote .vote-btn{ display:none }
-.card.verified .group.vote::before{
-  content:"✓";display:inline-block;font-weight:600;color:var(--ok);
-  padding:6px 12px;border-radius:999px;border:1px solid var(--ok-line);background:var(--ok-bg);line-height:1
-}
+/* Show only top verify tick; bottom icons remain but are hidden by card.verified via JS */
+.card.verified .group.vote{gap:0}
+.card.verified .group.vote .vote-btn{display:none}
+.card.verified .group.vote::before{content:"";display:none}
 
-/* Top verification chip */
 .verify-top{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;border:1px solid var(--ok-line);background:var(--ok-bg);color:var(--ok);font-size:12px}
-
-/* Chips */
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--chip-line);border-radius:999px;background:var(--chip);color:var(--chip-text);font-size:12px}
 .chip.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 .badge-done{padding:2px 8px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;color:#0f172a;margin-left:8px;font-size:12px}
 .trusted{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
 
-/* Modals — fixed overflow, red top-left Close, centered primary button */
+/* Modals */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20;padding:16px}
 .modal.hidden{display:none}
 .modal:not(.hidden){display:flex}
-.modal .modal-body{
-  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 20px 44px rgba(15,23,42,.12);
-  width:clamp(320px,92vw,640px);max-width:640px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;position:relative
-}
-.modal .modal-head{
-  display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;margin-bottom:8px
-}
-.modal .modal-head .close-top{
-  border-radius:8px;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-line);padding:6px 10px;cursor:pointer;line-height:1
-}
+.modal .modal-body{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 20px 44px rgba(15,23,42,.12);width:clamp(320px,92vw,640px);max-width:640px;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;position:relative}
+
+/* Header: title + top-right red ✗ button */
+.modal .modal-head{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;margin-bottom:8px}
+.modal .modal-head .close-top{justify-self:end;border-radius:8px;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-line);padding:6px 10px;cursor:pointer;line-height:1}
+.modal .modal-head .close-top::before{content:"✗";margin-right:4px}
 .modal .modal-head h3{margin:0}
+
 .modal .form{display:flex;flex-direction:column}
-.modal .form input,.modal .form textarea,.modal .form select{
-  width:100%;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px;margin-bottom:10px;box-sizing:border-box
-}
-/* Footer as 3-area layout: left Close, center Primary, right spacer */
+.modal .form input,.modal .form textarea,.modal .form select{width:100%;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px;margin-bottom:10px;box-sizing:border-box}
+
+/* Footer: center primary button only */
 .modal-actions{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin-top:4px}
 .modal-actions .slot-left{justify-self:start}
 .modal-actions .slot-middle{justify-self:center}
@@ -150,7 +104,6 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
   .modal-actions .slot-left,.modal-actions .slot-middle,.modal-actions .slot-right{justify-self:stretch}
   .modal-actions .btn{width:100%}
 }
-/* Keep Close buttons red across header and footer */
 .modal .form .btn[data-close]{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
 
 .icon-btn{background:#fff;color:var(--muted);border:1px dashed var(--line);padding:4px 8px;border-radius:8px;cursor:pointer}
