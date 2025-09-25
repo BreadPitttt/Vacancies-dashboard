@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# qc_and_learn.py v2025-09-25-pro — reopen merge + posts + 7-day auto-archive + captureHints enrich + sourcesByStatus
+# qc_and_learn.py v2025-09-26-stable2 — merge updates, apply report deadlines, 7-day auto-archive, captureHints enrich
+
 import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
 
@@ -42,10 +43,11 @@ def norm_url(u):
         return s.rstrip("/").lower()
     except: return (u or "").rstrip("/").lower()
 
-def parse_deadline(s):
+def parse_date_any(s):
     if not s or s.strip().upper()=="N/A": return None
-    for f in ("%d-%m-%Y","%d/%m/%Y","%d %b %Y","%d %B %Y","%Y-%m-%d"):
-        try: return datetime.strptime(s.strip(), f).date()
+    s=s.strip()
+    for f in ("%Y-%m-%d","%d/%m/%Y","%d-%m-%Y","%d %B %Y","%d %b %Y"):
+        try: return datetime.strptime(s,f).date()
         except: pass
     return None
 
@@ -97,11 +99,11 @@ for j in jobs:
     if best and score>=0.6:
         best.setdefault("updates", []).append({"title": j.get("title"), "link": j.get("applyLink"), "capturedAt": datetime.utcnow().isoformat()+"Z"})
         dates=[m.group(1) for m in DATE_PAT.finditer(j.get("title") or "")]
-        parsed=[parse_deadline(x.replace("-","/")) for x in dates if x]
+        parsed=[parse_date_any(x.replace("-","/")) for x in dates if x]
         parsed=[d for d in parsed if d]
         if parsed:
             new_deadline=max(parsed)
-            cur=parse_deadline(best.get("deadline"))
+            cur=parse_date_any(best.get("deadline"))
             if not cur or new_deadline>cur:
                 best["deadline"]=new_deadline.strftime("%d/%m/%Y")
         pcount = parse_posts_from_text(j.get("title"))
@@ -114,7 +116,7 @@ jobs=kept
 
 # Submissions: de-dup + captureHints enrich
 seen_keys={norm_url(j.get("applyLink")) for j in jobs}
-for s in JLOADL("submissions.jsonl"):
+for s in subs:
     if s.get("type")!="missing": continue
     title=(s.get("title") or "").strip()
     url=norm_url((s.get("url") or "").strip())
@@ -142,9 +144,20 @@ for s in JLOADL("submissions.jsonl"):
     except: pass
     jobs.append(card); seen_keys.add(url)
 
-# Sectioning + 7-day auto-archive of expired listings
+# Reports: collect lastDate/evidence per jobId
+report_deadlines = {}
+report_evidence = {}
+for r in reports:
+    if r.get("type")=="report":
+        jid=(r.get("jobId") or "").strip()
+        ld = (r.get("lastDate") or "").strip()
+        ev = (r.get("evidenceUrl") or "").strip()
+        if jid and ld: report_deadlines[jid]=ld
+        if jid and ev: report_evidence[jid]=ev
+
+# Helpers for sectioning
 def keep_date(j):
-    d=parse_deadline(j.get("deadline"))
+    d=parse_date_any(j.get("deadline"))
     if d: return d
     ku=j.get("flags",{}).get("keep_until")
     if ku:
@@ -165,21 +178,26 @@ today=date.today()
 for j in jobs:
     jid=j.get("id") or f"user_{abs(hash(j.get('applyLink','')))%10**9}"
     j["id"]=jid
+
+    # Apply reported deadline override (e.g., extension)
+    if jid in report_deadlines:
+        j["deadline"]=report_deadlines[jid]
+
     last=keep_date(j)
     if last is not None: j["daysLeft"]=(last - today).days
+
     if not j.get("numberOfPosts"):
         c=parse_posts_from_text(j.get("title")) or j.get("flags",{}).get("posts")
         if c: j["numberOfPosts"]=c
+
     if jid in APPLIED:
         j.setdefault("flags",{})["applied"]=True
-        d=parse_deadline(j.get("deadline"))
-        if d and (today-d).days>60:
-            j.setdefault("flags",{})["applied_expired"]=True
         applied_list.append(j); continue
+
     if jid in NOTI and (today-NOTI[jid]).days>14:
         to_delete.add(jid); continue
+
     if last and last < today:
-        # if expired more than 7 days, move to archive instead of showing in Other
         if (today - last).days > 7:
             j.setdefault("flags",{})["auto_archived"]="expired_7d"
             archived.append(j)
@@ -188,12 +206,10 @@ for j in jobs:
     else:
         primary.append(j)
 
-# Build outputs
 jobs_out=[j for j in primary+other+applied_list if j["id"] not in to_delete]
 for j in jobs_out:
     if not j.get("detailLink"): j["detailLink"]= j.get("applyLink")
 
-# transparency metrics including sourcesByStatus
 def host(u):
     try: return urllib.parse.urlparse(u or "").netloc.lower()
     except: return ""
