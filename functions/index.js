@@ -1,8 +1,10 @@
-// functions/index.js — unified Worker with KV + GitHub writes
-// CORS pinned to Pages origin
+// functions/index.js — single-tenant KV key for personal state
 const ALLOW_ORIGIN = "https://breadpitttt.github.io";
 const OWNER = "BreadPitttt";
 const REPO  = "Vacancies-dashboard";
+
+// Single-tenant key: all devices write/read the same blob
+const STATE_KEY = "user_state_personal.json";
 
 export default {
   async fetch(req, env, ctx) {
@@ -13,10 +15,11 @@ export default {
     if (url.pathname === "/diag" && req.method === "GET") {
       const hasToken = !!(env && env.FEEDBACK_TOKEN);
       const hasKV = !!(env && env.VAC_STATE);
-      return json({ ok: true, hasToken, hasKV }, 200);
+      const snap = await env.VAC_STATE.get(STATE_KEY);
+      return json({ ok: true, hasToken, hasKV, bytes: (snap? snap.length: 0) }, 200);
     }
 
-    // Preflight
+    // CORS preflight
     if (req.method === "OPTIONS") {
       if (origin === ALLOW_ORIGIN) {
         return new Response(null, {
@@ -32,10 +35,10 @@ export default {
       return new Response(null, { status: 403 });
     }
 
-    // KV read: GET ?state=1
+    // KV read: GET ?state=1 → always returns the single-tenant blob
     if (req.method === "GET" && url.searchParams.get("state") === "1") {
       try {
-        const raw = await env.VAC_STATE.get("user_state.json");
+        const raw = await env.VAC_STATE.get(STATE_KEY);
         const body = raw ? JSON.parse(raw) : {};
         return withCORS(json({ ok: true, state: body }, 200), ALLOW_ORIGIN);
       } catch {
@@ -58,21 +61,21 @@ export default {
 
     const type = body && body.type;
 
-    // KV save: user_state_sync
+    // KV save: user_state_sync → merge into the single-tenant key
     if (type === "user_state_sync") {
       try {
         let current = {};
-        const raw = await env.VAC_STATE.get("user_state.json");
+        const raw = await env.VAC_STATE.get(STATE_KEY);
         if (raw) current = JSON.parse(raw);
         const merged = { ...current, ...(body.payload || {}) };
-        await env.VAC_STATE.put("user_state.json", JSON.stringify(merged));
+        await env.VAC_STATE.put(STATE_KEY, JSON.stringify(merged));
         return withCORS(json({ ok: true, saved: Object.keys(merged).length }, 200), ALLOW_ORIGIN);
       } catch {
         return withCORS(json({ ok: false, error: "kv_write_failed" }, 500), ALLOW_ORIGIN);
       }
     }
 
-    // GitHub-backed writes (votes/reports/missing/state)
+    // GitHub-backed writes (unchanged)
     const token = env && env.FEEDBACK_TOKEN;
     if (!token) {
       return withCORS(json({ error:"Missing FEEDBACK_TOKEN secret on Worker (Production)" }, 500), ALLOW_ORIGIN);
@@ -95,6 +98,7 @@ export default {
         evidenceUrl: body.evidenceUrl||"",
         posts: body.posts||null,
         lastDate: body.lastDate||"",
+        eligibility: body.eligibility||"",
         note: body.note||"",
         ts: new Date().toISOString()
       };
@@ -140,7 +144,7 @@ function json(obj, status=200){
   return new Response(JSON.stringify(obj), { status, headers: { "Content-Type":"application/json; charset=utf-8" }});
 }
 
-// GitHub helpers
+// GitHub helpers (unchanged)
 async function ghGet(token, owner, repo, path){
   return fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, {
     headers: { "Accept":"application/vnd.github+json", "Authorization":`Bearer ${token}`, "User-Agent":"vacancy-worker" }
@@ -157,11 +161,8 @@ async function appendJsonl(token, owner, repo, path, record){
   let sha, current="";
   const g = await ghGet(token, owner, repo, path);
   if (g.status===200){
-    const j = await g.json();
-    sha = j.sha; current = atob(j.content||"");
-  } else if (g.status!==404){
-    return { ok:false, status:g.status };
-  }
+    const j = await g.json(); sha = j.sha; current = atob(j.content||"");
+  } else if (g.status!==404){ return { ok:false, status:g.status }; }
   const updated = btoa(current + JSON.stringify(record) + "\n");
   const p = await ghPut(token, owner, repo, path, updated, sha, `append ${path}`);
   return { ok:p.ok, status:p.status };
@@ -170,11 +171,8 @@ async function upsertJsonMap(token, owner, repo, path, transform){
   let sha, obj={};
   const g = await ghGet(token, owner, repo, path);
   if (g.status===200){
-    const j = await g.json();
-    sha = j.sha; obj = JSON.parse(atob(j.content||"")||"{}");
-  } else if (g.status!==404){
-    return { ok:false, status:g.status };
-  }
+    const j = await g.json(); sha = j.sha; obj = JSON.parse(atob(j.content||"")||"{}");
+  } else if (g.status!==404){ return { ok:false, status:g.status }; }
   const next = transform(obj)||{};
   const updated = btoa(JSON.stringify(next,null,2));
   const p = await ghPut(token, owner, repo, path, updated, sha, `upsert ${path}`);
