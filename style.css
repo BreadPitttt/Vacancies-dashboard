@@ -43,16 +43,21 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .actions-row.row1{display:grid;grid-template-columns:1fr 1fr;align-items:center}
 .actions-row.row1 .left{justify-self:start}
 .actions-row.row1 .right{justify-self:end}
-.actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:8px}
-.group{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
 
-/* Buttons: compact and allowed to shrink in-pair to keep on one line */
+/* Keep both interest buttons on the same row on small screens too */
+.actions-row.row2{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:8px}
+.group{display:flex;gap:10px;align-items:center;flex-wrap:nowrap;min-width:0}
+
+/* Buttons: compact and shrink to keep inside frame */
 .actions-row .btn{
   min-width:92px;
-  max-width:140px;
+  max-width:160px;
   flex:0 1 auto;
   font-size:12px;
   padding:7px 10px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
 /* Chips and badges */
@@ -73,11 +78,13 @@ html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-ap
 .btn.tiny{padding:6px 8px;font-size:12px}
 .btn.disabled{opacity:.6;pointer-events:none}
 
-/* Keep left width after Right to preserve alignment */
+/* Hide vote group visuals after Right; preserve layout */
 .verified .row2 .group.vote{visibility:hidden}
 
-/* Modal styles (unchanged) */
+/* Modal styles */
 .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20}
+.modal.hidden{display:none}
+.modal:not(.hidden){display:flex}
 .modal .modal-body{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;width:min(640px,94vw);box-shadow:0 20px 44px rgba(15,23,42,.12)}
 .modal .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .modal .form input,.modal .form textarea,.modal .form select{width:100%;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px;margin-bottom:10px}
