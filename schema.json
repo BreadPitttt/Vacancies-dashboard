@@ -12,7 +12,6 @@
           "id",
           "slug",
           "title",
-          "organization",
           "qualificationLevel",
           "domicile",
           "source",
@@ -78,3 +77,4 @@
   },
   "additionalProperties": true
 }
+
