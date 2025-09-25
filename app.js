@@ -1,4 +1,4 @@
-// app.js v2025-09-25-vote-icons — vote row uses ☑/☒; Right collapses; Wrong keeps report visible
+// app.js v2025-09-25-align-verify — vote row aligned with row1; top ✓ appears when Right
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
@@ -43,6 +43,7 @@
   }
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
+  const verifyTop=()=>' <span class="verify-top" title="Verified Right">✓</span>';
 
   function addInlineUndo(container,onUndo,seconds=10){
     if(!container) return;
@@ -64,23 +65,23 @@
     });
   }
 
-  // Card template: vote icons (☑/☒) + spacing to interest group; Organization removed
   function cardHTML(j, applied=false){
     const src=(j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
     const d=(j.daysLeft!=null && j.daysLeft!=="")?j.daysLeft:"—";
     const det=esc(j.detailLink||j.applyLink||"#");
     const lid=j.id||"";
     const vote=USER_VOTES[lid]?.vote||"";
-    const verified= vote==="right" ? " verified" : "";
+    const verified= vote==="right";
     const trust = j.flags && j.flags.trusted ? trustedChip() : "";
+    const topVerify = verified ? verifyTop() : "";
     const appliedBadge = applied ? '<span class="badge-done">Applied</span>' : "";
     const posts = (j.numberOfPosts!=null && j.numberOfPosts!=="")
                   ? String(j.numberOfPosts)
                   : (j.flags && j.flags.posts ? String(j.flags.posts) : "N/A");
 
     return [
-      '<article class="card', (applied?' applied':''), verified, '" data-id="', esc(lid), '">',
-        '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, trust, appliedBadge, '</header>',
+      '<article class="card', (applied?' applied':''), (verified?' verified':''), '" data-id="', esc(lid), '">',
+        '<header class="card-head"><h3 class="title">', esc(j.title||"No Title"), '</h3>', src, trust, topVerify, appliedBadge, '</header>',
         '<div class="card-body">',
           '<div class="rowline"><span class="muted">Posts</span><span>', esc(posts), '</span></div>',
           '<div class="rowline"><span class="muted">Qualification</span><span>', esc(j.qualificationLevel||"N/A"), '</span></div>',
@@ -164,7 +165,7 @@
           m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
           return;
         }
-        if(act==="right"){ // instant; collapse vote group and show inline undo
+        if(act==="right"){
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"right"); card.classList.add("verified");
           addInlineUndo(interestCell, async ()=>{
@@ -175,7 +176,7 @@
           postJSON({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
           return;
         }
-        if(act==="wrong"){ // instant; keep vote icons visible; add inline undo
+        if(act==="wrong"){
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"wrong");
           addInlineUndo(interestCell, async ()=>{
