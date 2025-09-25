@@ -5,9 +5,9 @@
   <title>General Vacancy Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store" />
-  <link rel="stylesheet" href="style.css?v=2025-09-26-a" />
+  <link rel="stylesheet" href="style.css?v=2025-09-26-fix1" />
 </head>
-<body class="u-bg">
+<body>
   <header class="topbar">
     <div class="brand">
       <h1>General Vacancy Dashboard</h1>
@@ -29,6 +29,7 @@
       <div class="tab" data-tab="other">Other</div>
     </div>
 
+    <!-- Do not change the IDs below -->
     <section id="panel-open" class="panel active">
       <div id="open-root" class="cards-grid"></div>
     </section>
@@ -40,7 +41,7 @@
     </section>
   </main>
 
-  <!-- Missing modal -->
+  <!-- Submit Missing Modal (only header/footer adjusted) -->
   <div id="missing-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="missing-title">
     <div class="modal-body">
       <div class="modal-head">
@@ -84,7 +85,7 @@
     </div>
   </div>
 
-  <!-- Report modal -->
+  <!-- Report Modal (only header/footer adjusted) -->
   <div id="report-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="report-title">
     <div class="modal-body">
       <div class="modal-head">
@@ -95,7 +96,7 @@
       <form id="reportForm" class="form" novalidate>
         <input type="hidden" id="reportListingId" />
         <label>Reason</label>
-        <select id="reportReason" class="select" required>
+        <select id="reportReason" required>
           <option value="" disabled selected>Select reason…</option>
           <option value="not_vacancy">Not a vacancy (result/admit/exam date)</option>
           <option value="last_date_over">Last date over</option>
@@ -131,7 +132,7 @@
     </div>
   </div>
 
-  <!-- Confirm + snackbar + toast -->
+  <!-- Confirm / Toast -->
   <div id="confirm"><div class="box">
     <div id="confirm-text">Confirm?</div>
     <div class="row">
@@ -146,6 +147,7 @@
   </div>
   <div id="toast"></div>
 
-  <script src="app.js?v=2025-09-26-a" defer></script>
+  <!-- Keep the exact script include; only bump version -->
+  <script src="app.js?v=2025-09-26-fix1" defer></script>
 </body>
 </html>
