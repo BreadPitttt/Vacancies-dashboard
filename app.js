@@ -1,4 +1,4 @@
-// app.js v2025-09-25-undo-modals — undo restored, robust modals, Posts field, alignment intact
+// app.js v2025-09-25-restore — fixes script load issues after cache, robust modals, Undo restored, Posts field, alignment intact
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
 
@@ -24,7 +24,7 @@
   function setVoteLocal(id,v){ USER_VOTES[id]={vote:v,ts:new Date().toISOString()}; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
   function clearVoteLocal(id){ delete USER_VOTES[id]; try{ localStorage.setItem("vac_user_votes",JSON.stringify(USER_VOTES)); }catch{} }
 
-  // Outbox
+  // Outbox with retry
   let OUTBOX=(function(){ try{ return JSON.parse(localStorage.getItem("vac_outbox")||"[]"); }catch{ return []; }})();
   function saveOutbox(){ try{ localStorage.setItem("vac_outbox",JSON.stringify(OUTBOX)); }catch{} }
   async function flushOutbox(){ if(!OUTBOX.length) return; let rest=[]; for(const p of OUTBOX){ try{ const r=await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}); if(!r.ok) rest.push(p);}catch{rest.push(p);} } OUTBOX=rest; saveOutbox(); }
@@ -38,7 +38,7 @@
       qs("#health-pill").textContent=h.ok?"Health: OK":"Health: Not OK";
       qs("#health-pill").className="pill "+(h.ok?"ok":"bad");
       qs("#last-updated").textContent="Last updated: "+(h.lastUpdated? new Date(h.lastUpdated).toLocaleString() : "—");
-      qs("#total-listings").textContent="Listings: "+(typeof h.totalListings==="number)?h.totalListings:"—");
+      qs("#total-listings").textContent="Listings: "+(typeof h.totalListings==="number"?h.totalListings:"—");
     }catch{
       qs("#health-pill").textContent="Health: Unknown";
       qs("#health-pill").className="pill";
@@ -49,8 +49,9 @@
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
 
-  // Add inline undo button for any action
+  // Inline Undo helper (restored)
   function addUndo(container,onUndo,seconds=10){
+    if(!container) return;
     const u=document.createElement("button");
     u.className="btn ghost tiny"; let left=seconds; u.textContent=`Undo (${left}s)`;
     container.appendChild(u);
@@ -58,7 +59,7 @@
     u.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); clearInterval(iv); u.remove(); onUndo(); });
   }
 
-  // Card with Posts instead of Organization
+  // Card HTML: Organization replaced by Posts; keep order otherwise unchanged
   function cardHTML(j, applied=false){
     const src=(j.source||"").toLowerCase()==="official" ? '<span class="chip" title="Official source">Official</span>' : '<span class="chip" title="From aggregator">Agg</span>';
     const d=j.daysLeft!=null?j.daysLeft:"—";
@@ -69,7 +70,7 @@
     const verified= vote==="right" ? " verified" : "";
     const trust = j.flags && j.flags.trusted ? trustedChip() : "";
     const appliedBadge = applied ? '<span class="badge-done">Applied</span>' : "";
-    const postsText = (j.posts!=null && j.posts!=="") ? esc(String(j.posts)) : "N/A";
+    const postsText=(j.posts!=null&&j.posts!=="")?esc(String(j.posts)):"N/A";
 
     return [
       '<article class="card', (applied?' applied':''), verified, '" data-id="', esc(lid), '">',
@@ -158,10 +159,10 @@
           return;
         }
         if(act==="right"){
-          const prevVote=USER_VOTES[id]?.vote||"";
+          const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"right"); card.classList.add("verified");
           addUndo(interestCell, async ()=>{
-            if(prevVote==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prevVote||""); }
+            if(prev==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
             await postJSON({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
             await render();
           });
@@ -169,10 +170,10 @@
           return;
         }
         if(act==="wrong"){
-          const prevVote=USER_VOTES[id]?.vote||"";
+          const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"wrong"); btn.textContent="Marked ✖"; btn.classList.add("disabled");
           addUndo(interestCell, async ()=>{
-            if(prevVote==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prevVote||""); }
+            if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
             await postJSON({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()});
             await render();
           });
@@ -203,7 +204,7 @@
     rootOther.replaceChildren(fOther);
   }
 
-  // Modal helpers and global close
+  // Modal helpers + global close
   function openModal(sel){ const m=qs(sel); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); } }
   function closeModal(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); } }
   document.addEventListener("click",(e)=>{
@@ -214,10 +215,9 @@
   document.addEventListener("DOMContentLoaded", async ()=>{
     await renderStatus(); await render();
 
-    // Always open Missing modal
     qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
 
-    // Report submit
+    // Robust form handling on document to survive re-renders
     document.addEventListener("submit", async (e)=>{
       const f=e.target;
       if(f && f.id==="reportForm"){
@@ -231,12 +231,6 @@
         await postJSON({type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,note,ts:new Date().toISOString()});
         closeModal(f); f.reset(); toast("Reported.");
       }
-    });
-
-    // Missing submit
-    const SUBMIT_LOCK=new Set();
-    document.addEventListener("submit", async (e)=>{
-      const f=e.target;
       if(f && f.id==="missingForm"){
         e.preventDefault(); e.stopPropagation();
         const title=document.getElementById("missingTitle").value.trim();
@@ -246,6 +240,7 @@
         const posts=document.getElementById("missingPosts")?.value?.trim()||"";
         const note=document.getElementById("missingNote").value.trim();
         if(!title||!url) return toast("Post name and notification link are required.");
+        const SUBMIT_LOCK=(window.__SUBMIT_LOCK__ ||= new Set());
         const key=url.replace(/[?#].*$/,"").toLowerCase(); if(SUBMIT_LOCK.has(key)) return toast("Already submitted."); SUBMIT_LOCK.add(key);
         await postJSON({type:"missing",title,url,officialSite:site,lastDate:last,posts:posts||null,note,ts:new Date().toISOString()});
         closeModal(f); f.reset(); toast("Saved. Will appear after refresh.");
