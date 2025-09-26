@@ -1,4 +1,4 @@
-// functions/index.js — single-tenant state + normalized reports.jsonl with required reasonCode
+// functions/index.js — normalized report schema and required reasonCode
 const ALLOW_ORIGIN = "https://breadpitttt.github.io";
 const OWNER = "BreadPitttt";
 const REPO  = "Vacancies-dashboard";
