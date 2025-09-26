@@ -1,4 +1,4 @@
-// functions/index.js — enforce normalized report schema so lastDate/eligibility always persist
+// functions/index.js — single-tenant state + normalized reports.jsonl with required reasonCode
 const ALLOW_ORIGIN = "https://breadpitttt.github.io";
 const OWNER = "BreadPitttt";
 const REPO  = "Vacancies-dashboard";
@@ -9,23 +9,18 @@ export default {
     const url = new URL(req.url);
     const origin = req.headers.get("Origin") || "";
 
-    // CORS preflight
     if (req.method === "OPTIONS") {
       if (origin === ALLOW_ORIGIN) {
-        return new Response(null, {
-          status: 204,
-          headers: {
-            "Access-Control-Allow-Origin": ALLOW_ORIGIN,
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Max-Age": "86400"
-          }
-        });
+        return new Response(null, { status: 204, headers: {
+          "Access-Control-Allow-Origin": ALLOW_ORIGIN,
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Access-Control-Max-Age": "86400"
+        }});
       }
       return new Response(null, { status: 403 });
     }
 
-    // KV single-tenant read
     if (req.method === "GET" && url.searchParams.get("state") === "1") {
       try {
         const raw = await env.VAC_STATE.get(STATE_KEY);
@@ -48,7 +43,6 @@ export default {
     const type = body && body.type;
     const token = env && env.FEEDBACK_TOKEN;
 
-    // Single-tenant state merge (unchanged)
     if (type === "user_state_sync") {
       try {
         let current = {};
@@ -64,7 +58,6 @@ export default {
 
     if (!token) return cors(json({ error:"Missing FEEDBACK_TOKEN secret" }, 500), ALLOW_ORIGIN);
 
-    // Votes (unchanged)
     if (type === "vote") {
       if (!body.vote || !body.jobId) return cors(json({ error:"Bad vote payload" }, 400), ALLOW_ORIGIN);
       const rec = { type, vote: body.vote, jobId: body.jobId, title: body.title||"", url: body.url||"", ts: new Date().toISOString() };
@@ -72,7 +65,6 @@ export default {
       return cors(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
     }
 
-    // REPORTS — enforce normalized schema here
     if (type === "report") {
       const nd = normalizeDate(body.lastDate || "");
       const rec = {
@@ -80,23 +72,24 @@ export default {
         jobId: String(body.jobId||"").trim(),
         title: String(body.title||"").trim(),
         url: normalizeUrl(String(body.url||"").trim()),
-        reasonCode: String(body.reasonCode||"").trim(),        // critical
+        reasonCode: String(body.reasonCode||"").trim(),
         evidenceUrl: String(body.evidenceUrl||"").trim(),
         posts: body.posts===null || body.posts===undefined || body.posts==="" ? null : String(body.posts).trim(),
-        lastDate: nd || "",                                     // dd/mm/yyyy or ""
+        lastDate: nd || "",
         eligibility: String(body.eligibility||"").trim(),
         note: String(body.note||"").trim(),
         ts: new Date().toISOString()
       };
-      // Require enough identity
       if (!rec.jobId && !rec.title && !rec.url) {
         return cors(json({ error:"Bad report payload" }, 400), ALLOW_ORIGIN);
+      }
+      if (!rec.reasonCode) {
+        return cors(json({ ok:false, error:"reasonCode_required" }, 400), ALLOW_ORIGIN);
       }
       const r = await appendJsonl(token, OWNER, REPO, "reports.jsonl", rec);
       return cors(json({ ok:r.ok, normalizedLastDate: rec.lastDate }), r.ok?200:500);
     }
 
-    // Missing submissions (unchanged, but normalize date)
     if (type === "missing") {
       if (!body.title || !body.url) return cors(json({ error:"Missing title/url" }, 400), ALLOW_ORIGIN);
       const rec = {
@@ -113,7 +106,6 @@ export default {
       return cors(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
     }
 
-    // State audit in repo (unchanged)
     if (type === "state") {
       const p = body.payload||{};
       const jobId = p.jobId||"", action=p.action||"";
@@ -147,7 +139,6 @@ function normalizeDate(s){
   return s;
 }
 
-// GitHub helpers (unchanged)
 async function ghGet(token, owner, repo, path){
   return fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, {
     headers: { "Accept":"application/vnd.github+json", "Authorization":`Bearer ${token}`, "User-Agent":"vacancy-worker" }
