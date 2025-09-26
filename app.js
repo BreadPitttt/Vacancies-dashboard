@@ -77,7 +77,7 @@
   function confirmAction(message="Proceed?"){ return Promise.resolve(confirm(message)); }
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
-  const topVerify=()=>'<span class="verify-top" title="Verified Right">✓</span>';
+  const topVerify=()=>' <span class="verify-top" title="Verified Right">✓</span>';
   const corroboratedChip=()=>' <span class="chip" title="Multiple sources">x2</span>';
 
   function renderInlineUndo(slot, label, onUndo, onCommit, seconds=10){
@@ -291,9 +291,13 @@
         const note=document.getElementById("reportNote")?.value?.trim()||"";
         const last=document.getElementById("reportLastDate")?.value?.trim()||"";
         const elig=document.getElementById("reportEligibility")?.value?.trim()||"";
-        if(!id||!rc) return toast("Please select a reason.");
+        if(!id||!rc){ return toast("Please select a reason and try again."); }
         await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-          type:"report",jobId:id,title,url,reasonCode:rc,evidenceUrl:ev,posts:posts||null,lastDate:last||"",eligibility:elig||"",note,ts:new Date().toISOString()
+          type:"report",
+          jobId:id, title, url,
+          reasonCode:rc, evidenceUrl:ev,
+          posts:posts||null, lastDate:last||"", eligibility:elig||"", note,
+          ts:new Date().toISOString()
         })});
         closeModalEl(f); f.reset(); toast("Reported.");
       }
