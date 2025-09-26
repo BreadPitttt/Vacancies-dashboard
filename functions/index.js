@@ -1,4 +1,4 @@
-// functions/index.js — final version with strict CORS and required reasonCode
+// functions/index.js — normalized report schema, strict CORS, required reasonCode
 const ALLOW_ORIGIN = "https://breadpitttt.github.io";
 const OWNER = "BreadPitttt";
 const REPO  = "Vacancies-dashboard";
@@ -9,22 +9,28 @@ export default {
     const url = new URL(req.url);
     const origin = req.headers.get("Origin") || "";
 
+    // Strict CORS preflight
     if (req.method === "OPTIONS") {
       if (origin === ALLOW_ORIGIN) {
-        return new Response(null, { status: 204, headers: {
-          "Access-Control-Allow-Origin": ALLOW_ORIGIN,
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
-          "Access-Control-Max-Age": "86400"
-        }});
+        return new Response(null, {
+          status: 204,
+          headers: {
+            "Access-Control-Allow-Origin": ALLOW_ORIGIN,
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "86400"
+          }
+        });
       }
       return new Response(null, { status: 403 });
     }
 
+    // Block non-allowed origins
     if (origin && origin !== ALLOW_ORIGIN) {
       return cors(json({ error: "Origin not allowed" }, 403), ALLOW_ORIGIN);
     }
 
+    // GET state (single-tenant KV snapshot)
     if (req.method === "GET" && url.searchParams.get("state") === "1") {
       try {
         const raw = await env.VAC_STATE.get(STATE_KEY);
@@ -35,6 +41,7 @@ export default {
       }
     }
 
+    // Only POST beyond this point
     if (req.method !== "POST") {
       return cors(new Response("Method Not Allowed", { status: 405 }), ALLOW_ORIGIN);
     }
@@ -45,6 +52,7 @@ export default {
     const token = env && env.FEEDBACK_TOKEN;
     if (!token) return cors(json({ error:"Missing FEEDBACK_TOKEN secret" }, 500), ALLOW_ORIGIN);
 
+    // Sync user state (single-tenant)
     if (type === "user_state_sync") {
       try {
         let current = {};
@@ -80,7 +88,7 @@ export default {
         note: String(body.note||"").trim(),
         ts: new Date().toISOString()
       };
-      if (!rec.jobId || !rec.title || !rec.url) return cors(json({ error:"Bad report payload" }, 400), ALLOW_ORIGIN);
+      if (!rec.jobId && !rec.title && !rec.url) return cors(json({ error:"Bad report payload" }, 400), ALLOW_ORIGIN);
       if (!rec.reasonCode) return cors(json({ ok:false, error:"reasonCode_required" }, 400), ALLOW_ORIGIN);
       const r = await appendJsonl(token, OWNER, REPO, "reports.jsonl", rec);
       return cors(json({ ok:r.ok, normalizedLastDate: rec.lastDate }), r.ok?200:500);
@@ -135,6 +143,7 @@ function normalizeDate(s){
   return s;
 }
 
+// GitHub helpers
 async function ghGet(token, owner, repo, path){
   return fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, {
     headers: { "Accept":"application/vnd.github+json", "Authorization":`Bearer ${token}`, "User-Agent":"vacancy-worker" }
