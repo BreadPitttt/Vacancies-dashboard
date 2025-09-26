@@ -89,13 +89,14 @@ jobs:
           set -e
           git config user.name "GitHub Actions Bot"
           git config user.email "actions-bot@users.noreply.github.com"
-          if ! git diff --quiet -- data.json health.json learn.json rules.json rules.jsonl; then
-            git add data.json health.json learn.json rules.json rules.jsonl
-            git commit -m "chore: ${{ steps.mode.outputs.mode }} ingest+QC update"
-            git pull --rebase
-            git push
-          else
+          # Stage only the files this pipeline writes
+          git add data.json health.json learn.json rules.json rules.jsonl learn_registry.json || true
+          # Commit if there is anything staged
+          if git diff --cached --quiet; then
             echo "No changes."
+          else
+            git commit -m "chore: ${{ steps.mode.outputs.mode }} ingest+QC update"
+            git push
           fi
 
       - name: Print merge stats
