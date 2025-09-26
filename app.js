@@ -1,4 +1,4 @@
-// app.js v2025-09-26-singleTenant — KV-first, single-tenant sync, 10s deferred moves, icon-only close
+// app.js v2025-09-26-singleTenant
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
@@ -274,8 +274,6 @@
     await renderStatus();
     await render();
 
-    qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); e.stopPropagation(); openModal("#missing-modal"); });
-
     const SUBMIT_LOCK=(window.__SUBMIT_LOCK__ ||= new Set());
 
     document.addEventListener("submit", async (e)=>{
@@ -291,36 +289,11 @@
         const note=document.getElementById("reportNote")?.value?.trim()||"";
         const last=document.getElementById("reportLastDate")?.value?.trim()||"";
         const elig=document.getElementById("reportEligibility")?.value?.trim()||"";
-        if(!id||!rc){ return toast("Please select a reason and try again."); }
+        if(!id||!rc) return toast("Please choose a reason and try again.");
         await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-          type:"report",
-          jobId:id, title, url,
-          reasonCode:rc, evidenceUrl:ev,
-          posts:posts||null, lastDate:last||"", eligibility:elig||"", note,
-          ts:new Date().toISOString()
+          type:"report",jobId:id,title,url,reasonCode:rc,evidenceUrl:ev,posts:posts||null,lastDate:last||"",eligibility:elig||"",note,ts:new Date().toISOString()
         })});
-        closeModalEl(f); f.reset(); toast("Reported.");
-      }
-      if(f && f.id==="missingForm"){
-        e.preventDefault(); e.stopPropagation();
-        const title=document.getElementById("missingTitle").value.trim();
-        const url=document.getElementById("missingUrl").value.trim();
-        const site=document.getElementById("missingSite").value.trim();
-        let last=document.getElementById("missingLastDate").value.trim();
-        const posts=document.getElementById("missingPosts")?.value?.trim()||"";
-        const note=document.getElementById("missingNote").value.trim();
-        if(!title||!url) return toast("Post name and notification link are required.");
-        const key=normHref(url);
-        if(SUBMIT_LOCK.has(key)) return toast("Already submitted."); SUBMIT_LOCK.add(key);
-        if(/^\d{1,2}[-/]\d{1,2}[-/]\d{2}$/.test(last)){
-          const [d,m,y]=last.replaceAll("-","/").split("/"); last=`${d.padStart(2,"0")}/${m.padStart(2,"0")}/20${y}`;
-        }else if(/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(last)){
-          const [d,m,y]=last.replaceAll("-","/").split("/"); last=`${d.padStart(2,"0")}/${m.padStart(2,"0")}/${y}`;
-        }
-        await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-          type:"missing",title,url:key,officialSite:site,lastDate:last||"N/A",posts:posts||null,note,ts:new Date().toISOString()
-        })});
-        closeModalEl(f); f.reset(); toast("Saved. Will appear after refresh.");
+        f.reset(); toast("Reported."); document.querySelector('[data-close]')?.click();
       }
     });
   });
