@@ -77,7 +77,7 @@
   function confirmAction(message="Proceed?"){ return Promise.resolve(confirm(message)); }
 
   const trustedChip=()=>' <span class="chip trusted">trusted</span>';
-  const topVerify=()=>' <span class="verify-top" title="Verified Right">✓</span>';
+  const topVerify=()=>'<span class="verify-top" title="Verified Right">✓</span>';
   const corroboratedChip=()=>' <span class="chip" title="Multiple sources">x2</span>';
 
   function renderInlineUndo(slot, label, onUndo, onCommit, seconds=10){
