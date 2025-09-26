@@ -20,6 +20,7 @@ export default {
       }
       return new Response(null, { status: 403 });
     }
+
     if (origin && origin !== ALLOW_ORIGIN) {
       return cors(json({ error: "Origin not allowed" }, 403), ALLOW_ORIGIN);
     }
