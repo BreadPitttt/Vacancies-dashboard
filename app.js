@@ -1,9 +1,7 @@
 // app.js v2025-09-26-singleTenant — KV-first, single-tenant sync, 10s deferred moves, icon-only close
 (function(){
-  // Cloudflare Worker endpoint (unchanged)
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
 
-  // DOM helpers
   const qs=(s,r)=>(r||document).querySelector(s);
   const qsa=(s,r)=>Array.from((r||document).querySelectorAll(s));
   const esc=(s)=>(s==null?"":String(s)).replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]));
@@ -16,7 +14,6 @@
     catch{ return (u||"").trim().toLowerCase().replace(/[?#].*$/,"").replace(/\/$/,""); }
   }
 
-  // Status header
   async function renderStatus(){
     try{
       const r=await fetch(bust("health.json"),{cache:"no-store"}); if(!r.ok) throw 0;
@@ -35,16 +32,13 @@
     }
   }
 
-  // Tabs
   document.addEventListener("click",(e)=>{ const t=e.target.closest(".tab"); if(!t) return;
     qsa(".tab").forEach(x=>x.classList.toggle("active",x===t));
     qsa(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+t.dataset.tab));
   });
 
-  // Single-tenant state
   let USER_STATE={}, USER_VOTES={};
 
-  // Load KV single-tenant first; fallback to repo json if KV empty; then merge local overlay
   async function loadUserStateServer(){
     try{
       const wr=await fetch(ENDPOINT+"?state=1",{mode:"cors"});
@@ -72,7 +66,6 @@
       await fetch(ENDPOINT,{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        // tenantId optional; Worker stores under fixed single-tenant key
         body:JSON.stringify({ type:"user_state_sync", tenantId:"personal", payload:USER_STATE, ts:new Date().toISOString() })
       });
     }catch{}
@@ -88,7 +81,6 @@
   const topVerify=()=>' <span class="verify-top" title="Verified Right">✓</span>';
   const corroboratedChip=()=>' <span class="chip" title="Multiple sources">x2</span>';
 
-  // 10s inline Undo with deferred commit (keeps UI stable; state persisted only on commit)
   function renderInlineUndo(slot, label, onUndo, onCommit, seconds=10){
     if(!slot) return;
     const wrap=document.createElement("div");
@@ -176,10 +168,8 @@
     const sections=data.sections||{};
     qs("#total-listings").textContent="Listings: "+list.length;
 
-    // Start with pipeline sections
     const idsApplied=new Set(sections.applied||[]), idsOther=new Set(sections.other||[]);
 
-    // Overlay single-tenant user state
     Object.entries(USER_STATE).forEach(([jid,s])=>{
       if(!s||!s.action)return;
       if(s.action==="applied"){ idsApplied.add(jid); idsOther.delete(jid); }
@@ -204,7 +194,10 @@
 
         if(act==="report"){
           const m=qs("#report-modal"); if(!m) return;
+          const titleText = card.querySelector(".title")?.textContent?.trim() || "";
           qs("#reportListingId").value=id||"";
+          qs("#reportListingTitle").value=titleText;
+          qs("#reportListingUrl").value=detailsUrl;
           m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
           setTimeout(()=>qs("#reportReason")?.focus(),0);
           return;
@@ -214,16 +207,11 @@
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"right"); card.classList.add("verified");
           renderInlineUndo(voteCell, "vote",
-            async ()=>{ // Undo
-              if(prev==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
+            async ()=>{ if(prev==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
               await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await persistUserStateServer(); await render();
-            },
-            async ()=>{ // Commit after 10s
-              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await persistUserStateServer(); await render();
-            },
-            10);
+              await persistUserStateServer(); await render(); },
+            async ()=>{ await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
+              await persistUserStateServer(); await render(); }, 10);
           return;
         }
 
@@ -231,16 +219,11 @@
           const prev=USER_VOTES[id]?.vote||"";
           setVoteLocal(id,"wrong");
           renderInlineUndo(voteCell, "vote",
-            async ()=>{
-              if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
+            async ()=>{ if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
               await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await persistUserStateServer(); await render();
-            },
-            async ()=>{
-              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await persistUserStateServer(); await render();
-            },
-            10);
+              await persistUserStateServer(); await render(); },
+            async ()=>{ await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
+              await persistUserStateServer(); await render(); }, 10);
           return;
         }
 
@@ -248,18 +231,13 @@
           const ok = await confirmAction(act==="applied" ? "Mark as Applied?" : "Move to Other (Not interested)?");
           if(!ok) return;
           const prev=USER_STATE[id]?.action||"";
-          setUserStateLocal(id,act); // UI feedback now
+          setUserStateLocal(id,act);
           renderInlineUndo(interestCell, act==="applied"?"applied":"choice",
-            async ()=>{ // Undo
-              if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); }
+            async ()=>{ if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); }
               await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}})});
-              await persistUserStateServer(); await render();
-            },
-            async ()=>{ // Commit after 10s (state persisted and sections updated)
-              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}})});
-              await persistUserStateServer(); await render();
-            },
-            10);
+              await persistUserStateServer(); await render(); },
+            async ()=>{ await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}})});
+              await persistUserStateServer(); await render(); }, 10);
           return;
         }
 
@@ -276,7 +254,6 @@
     rootOther.replaceChildren(fOther);
   }
 
-  // Modals
   function openModal(sel){
     const m=qs(sel); if(!m) return;
     m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
@@ -290,12 +267,11 @@
     if(e.target && e.target.classList.contains("modal")){ e.preventDefault(); e.target.classList.add("hidden"); e.target.setAttribute("aria-hidden","true"); e.target.style.display="none"; }
   });
 
-  // Init
   document.addEventListener("DOMContentLoaded", async ()=>{
-    await loadUserStateServer();   // KV single-tenant first
-    loadUserStateLocal();          // merge local overlay
+    await loadUserStateServer();
+    loadUserStateLocal();
     loadVotesLocal();
-    await persistUserStateServer();// push merged snapshot to KV so all devices align
+    await persistUserStateServer();
     await renderStatus();
     await render();
 
@@ -308,6 +284,8 @@
       if(f && f.id==="reportForm"){
         e.preventDefault(); e.stopPropagation();
         const id=qs("#reportListingId").value.trim();
+        const title=qs("#reportListingTitle").value.trim();
+        const url=qs("#reportListingUrl").value.trim();
         const rc=document.getElementById("reportReason").value||"";
         const ev=document.getElementById("reportEvidenceUrl")?.value?.trim()||"";
         const posts=document.getElementById("reportPosts")?.value?.trim()||"";
@@ -316,7 +294,7 @@
         const elig=document.getElementById("reportEligibility")?.value?.trim()||"";
         if(!id||!rc) return toast("Please select a reason.");
         await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-          type:"report",jobId:id,reasonCode:rc,evidenceUrl:ev,posts:posts||null,lastDate:last||"",eligibility:elig||"",note,ts:new Date().toISOString()
+          type:"report",jobId:id,title,url,reasonCode:rc,evidenceUrl:ev,posts:posts||null,lastDate:last||"",eligibility:elig||"",note,ts:new Date().toISOString()
         })});
         closeModalEl(f); f.reset(); toast("Reported.");
       }
