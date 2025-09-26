@@ -1,4 +1,4 @@
-// app.js v2025-09-26-singleTenant
+// app.js v2025-09-26-final-fix
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
   const qs=(s,r)=>(r||document).querySelector(s);
@@ -149,15 +149,12 @@
   let TOKEN=0;
   async function render(){
     const my=++TOKEN;
-
     loadVotesLocal();
-
     let data=null;
     try{ const r=await fetch(bust("data.json"),{cache:"no-store"}); if(!r.ok) throw 0; data=await r.json(); }catch{ data=null; }
     if(my!==TOKEN) return;
 
     const rootOpen=qs("#open-root"), rootApp=qs("#applied-root"), rootOther=qs("#other-root");
-
     if(!data || !Array.isArray(data.jobListings)){
       rootOpen.innerHTML='<div class="empty">No active job listings found (data.json missing or invalid).</div>';
       return;
@@ -166,7 +163,6 @@
     const list=sortByDeadline(data.jobListings||[]);
     const sections=data.sections||{};
     qs("#total-listings").textContent="Listings: "+list.length;
-
     const idsApplied=new Set(sections.applied||[]), idsOther=new Set(sections.other||[]);
 
     Object.entries(USER_STATE).forEach(([jid,s])=>{
@@ -177,7 +173,6 @@
     });
 
     const fOpen=document.createDocumentFragment(), fApp=document.createDocumentFragment(), fOther=document.createDocumentFragment();
-
     for(const job of list){
       const applied=idsApplied.has(job.id);
       const wrap=document.createElement("div"); wrap.innerHTML=cardHTML(job,applied);
@@ -193,53 +188,35 @@
 
         if(act==="report"){
           const m=qs("#report-modal"); if(!m) return;
-          const titleText = card.querySelector(".title")?.textContent?.trim() || "";
           qs("#reportListingId").value=id||"";
-          qs("#reportListingTitle").value=titleText;
-          qs("#reportListingUrl").value=detailsUrl;
+          qs("#reportListingTitle").value = card.querySelector(".title")?.textContent?.trim() || "";
+          qs("#reportListingUrl").value = card.querySelector(".row1 .left a")?.href || "";
           m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
           setTimeout(()=>qs("#reportReason")?.focus(),0);
           return;
         }
 
-        if(act==="right"){
+        if(act==="right" || act === "wrong"){
           const prev=USER_VOTES[id]?.vote||"";
-          setVoteLocal(id,"right"); card.classList.add("verified");
+          setVoteLocal(id, act);
           renderInlineUndo(voteCell, "vote",
-            async ()=>{ if(prev==="right"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
-              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await persistUserStateServer(); await render(); },
-            async ()=>{ await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"right",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await persistUserStateServer(); await render(); }, 10);
-          return;
-        }
-
-        if(act==="wrong"){
-          const prev=USER_VOTES[id]?.vote||"";
-          setVoteLocal(id,"wrong");
-          renderInlineUndo(voteCell, "vote",
-            async ()=>{ if(prev==="wrong"){ clearVoteLocal(id); } else { setVoteLocal(id,prev||""); }
-              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"undo_wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await persistUserStateServer(); await render(); },
-            async ()=>{ await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:"wrong",jobId:id,url:detailsUrl,ts:new Date().toISOString()})});
-              await persistUserStateServer(); await render(); }, 10);
+            async ()=>{ setVoteLocal(id, prev); await persistUserStateServer(); await render(); },
+            async ()=>{ await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"vote",vote:act,jobId:id,url:detailsUrl,ts:new Date().toISOString()})}); }, 10);
+          await render();
           return;
         }
 
         if(act==="applied"||act==="not_interested"){
-          const ok = await confirmAction(act==="applied" ? "Mark as Applied?" : "Move to Other (Not interested)?");
+          const ok = await confirmAction(act==="applied" ? "Mark as Applied?" : "Move to Other?");
           if(!ok) return;
           const prev=USER_STATE[id]?.action||"";
           setUserStateLocal(id,act);
-          renderInlineUndo(interestCell, act==="applied"?"applied":"choice",
-            async ()=>{ if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); }
-              await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:"undo",ts:new Date().toISOString()}})});
-              await persistUserStateServer(); await render(); },
-            async ()=>{ await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"state",payload:{jobId:id,action:act,ts:new Date().toISOString()}})});
-              await persistUserStateServer(); await render(); }, 10);
+          renderInlineUndo(interestCell, act,
+            async ()=>{ if(prev){ setUserStateLocal(id,prev); } else { setUserStateLocal(id,"undo"); } await persistUserStateServer(); await render(); },
+            async ()=>{ await persistUserStateServer(); }, 10);
+          await render();
           return;
         }
-
         if(act==="exam_done"){ btn.textContent="Done ✓"; btn.classList.add("disabled"); return; }
       });
 
@@ -247,53 +224,46 @@
       else if(idsOther.has(job.id)) fOther.appendChild(card);
       else fOpen.appendChild(card);
     }
-
-    rootOpen.replaceChildren(fOpen);
-    rootApp.replaceChildren(fApp);
-    rootOther.replaceChildren(fOther);
+    rootOpen.replaceChildren(fOpen); rootApp.replaceChildren(fApp); rootOther.replaceChildren(fOther);
   }
 
-  function openModal(sel){
-    const m=qs(sel); if(!m) return;
-    m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex";
-    if(sel==="#missing-modal"){ setTimeout(()=>qs("#missingTitle")?.focus(),0); }
-  }
-  function closeModalEl(el){
-    const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); m.style.display="none"; }
-  }
+  function openModal(sel){ const m=qs(sel); if(m){ m.classList.remove("hidden"); m.setAttribute("aria-hidden","false"); m.style.display="flex"; if(sel==="#missing-modal") setTimeout(()=>qs("#missingTitle")?.focus(),0); } }
+  function closeModalEl(el){ const m=el.closest(".modal"); if(m){ m.classList.add("hidden"); m.setAttribute("aria-hidden","true"); m.style.display="none"; } }
   document.addEventListener("click",(e)=>{
     if(e.target && (e.target.hasAttribute("data-close") || e.target.classList.contains("close-top"))){ e.preventDefault(); closeModalEl(e.target); }
-    if(e.target && e.target.classList.contains("modal")){ e.preventDefault(); e.target.classList.add("hidden"); e.target.setAttribute("aria-hidden","true"); e.target.style.display="none"; }
+    if(e.target && e.target.classList.contains("modal")){ e.preventDefault(); closeModalEl(e.target); }
   });
 
   document.addEventListener("DOMContentLoaded", async ()=>{
     await loadUserStateServer();
     loadUserStateLocal();
-    loadVotesLocal();
     await persistUserStateServer();
     await renderStatus();
     await render();
 
-    const SUBMIT_LOCK=(window.__SUBMIT_LOCK__ ||= new Set());
+    qs("#btn-missing")?.addEventListener("click",(e)=>{ e.preventDefault(); openModal("#missing-modal"); });
 
     document.addEventListener("submit", async (e)=>{
-      const f=e.target;
-      if(f && f.id==="reportForm"){
-        e.preventDefault(); e.stopPropagation();
-        const id=qs("#reportListingId").value.trim();
-        const title=qs("#reportListingTitle").value.trim();
-        const url=qs("#reportListingUrl").value.trim();
-        const rc=document.getElementById("reportReason").value||"";
-        const ev=document.getElementById("reportEvidenceUrl")?.value?.trim()||"";
-        const posts=document.getElementById("reportPosts")?.value?.trim()||"";
-        const note=document.getElementById("reportNote")?.value?.trim()||"";
-        const last=document.getElementById("reportLastDate")?.value?.trim()||"";
-        const elig=document.getElementById("reportEligibility")?.value?.trim()||"";
-        if(!id||!rc) return toast("Please choose a reason and try again.");
+      e.preventDefault(); const f=e.target;
+      if(f.id === "reportForm"){
+        const id=qs("#reportListingId").value.trim(), rc=qs("#reportReason").value;
+        if(!id||!rc) return toast("Please select a reason.");
         await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-          type:"report",jobId:id,title,url,reasonCode:rc,evidenceUrl:ev,posts:posts||null,lastDate:last||"",eligibility:elig||"",note,ts:new Date().toISOString()
+          type:"report", jobId:id, title:qs("#reportListingTitle").value, url:qs("#reportListingUrl").value,
+          reasonCode:rc, evidenceUrl:qs("#reportEvidenceUrl").value.trim(), posts:qs("#reportPosts").value.trim()||null,
+          lastDate:qs("#reportLastDate").value.trim(), eligibility:qs("#reportEligibility").value.trim(),
+          note:qs("#reportNote").value.trim(), ts:new Date().toISOString()
         })});
-        f.reset(); toast("Reported."); document.querySelector('[data-close]')?.click();
+        f.reset(); closeModalEl(f); toast("Reported.");
+      }
+      if(f.id === "missingForm"){
+        const title=qs("#missingTitle").value.trim(), url=qs("#missingUrl").value.trim();
+        if(!title||!url) return toast("Title and URL required.");
+        await fetch(ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+          type:"missing",title,url,officialSite:qs("#missingSite").value.trim(),lastDate:qs("#missingLastDate").value.trim()||"N/A",
+          posts:qs("#missingPosts").value.trim()||null,note:qs("#missingNote").value.trim(),ts:new Date().toISOString()
+        })});
+        f.reset(); closeModalEl(f); toast("Saved.");
       }
     });
   });
