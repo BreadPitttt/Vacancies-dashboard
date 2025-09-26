@@ -1,157 +1,186 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>General Vacancy Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Cache-Control" content="no-store" />
-  <link rel="stylesheet" href="style.css?v=2025-09-26-stable4" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <h1>General Vacancy Dashboard</h1>
-      <div class="meta">
-        <span id="health-pill" class="pill">Health: Unknown</span>
-        <span id="last-updated" class="muted">Last updated: —</span>
-        <span id="total-listings" class="muted">Listings: —</span>
-      </div>
-    </div>
-    <div class="actions">
-      <button id="btn-missing" class="btn primary" type="button">Submit missing</button>
-    </div>
-  </header>
+// functions/index.js — single-tenant state + normalized reports.jsonl
+const ALLOW_ORIGIN = "https://breadpitttt.github.io";
+const OWNER = "BreadPitttt";
+const REPO  = "Vacancies-dashboard";
+const STATE_KEY = "user_state_personal.json";
 
-  <main class="container">
-    <div class="tabs">
-      <div class="tab active" data-tab="open">Open</div>
-      <div class="tab" data-tab="applied">Applied</div>
-      <div class="tab" data-tab="other">Other</div>
-    </div>
+export default {
+  async fetch(req, env, ctx) {
+    const url = new URL(req.url);
+    const origin = req.headers.get("Origin") || "";
 
-    <section id="panel-open" class="panel active">
-      <div id="open-root" class="cards-grid"></div>
-    </section>
-    <section id="panel-applied" class="panel">
-      <div id="applied-root" class="cards-grid"></div>
-    </section>
-    <section id="panel-other" class="panel">
-      <div id="other-root" class="cards-grid"></div>
-    </section>
-  </main>
+    if (req.method === "OPTIONS") {
+      if (origin === ALLOW_ORIGIN) {
+        return new Response(null, { status: 204, headers: {
+          "Access-Control-Allow-Origin": ALLOW_ORIGIN,
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Access-Control-Max-Age": "86400"
+        }});
+      }
+      return new Response(null, { status: 403 });
+    }
 
-  <!-- Missing modal -->
-  <div id="missing-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="missing-title">
-    <div class="modal-body">
-      <div class="modal-head">
-        <button type="button" class="close-top" data-close aria-label="Close"></button>
-        <h3 id="missing-title" class="hidden">Submit Missing Vacancy</h3>
-      </div>
-      <form id="missingForm" class="form" novalidate>
-        <label>Post name</label>
-        <input id="missingTitle" placeholder="e.g., EMRS Non‑teaching 2025" required />
-        <div class="grid2">
-          <div>
-            <label>Notification link (required)</label>
-            <input id="missingUrl" placeholder="PDF or notice URL" required />
-          </div>
-          <div>
-            <label>Official website (optional)</label>
-            <input id="missingSite" placeholder="https://...gov.in/ or portal home" />
-          </div>
-        </div>
-        <div class="grid2">
-          <div>
-            <label>Number of posts (optional)</label>
-            <input id="missingPosts" placeholder="e.g., 420" />
-          </div>
-          <div>
-            <label>Last date (DD-MM-YYYY or N/A)</label>
-            <input id="missingLastDate" placeholder="27-10-2025 or N/A" />
-          </div>
-        </div>
-        <label>Note (optional)</label>
-        <textarea id="missingNote" rows="3" placeholder="Any extra info"></textarea>
-        <div class="modal-actions">
-          <div class="slot-left"></div>
-          <div class="slot-middle">
-            <button type="submit" class="btn primary">Submit</button>
-          </div>
-          <div class="slot-right"></div>
-        </div>
-      </form>
-    </div>
-  </div>
+    if (req.method === "GET" && url.searchParams.get("state") === "1") {
+      try {
+        const raw = await env.VAC_STATE.get(STATE_KEY);
+        const body = raw ? JSON.parse(raw) : {};
+        return cors(json({ ok: true, state: body }), ALLOW_ORIGIN);
+      } catch {
+        return cors(json({ ok: false, error: "read_failed" }, 500), ALLOW_ORIGIN);
+      }
+    }
 
-  <!-- Report modal -->
-  <div id="report-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="report-title">
-    <div class="modal-body">
-      <div class="modal-head">
-        <button type="button" class="close-top" data-close aria-label="Close"></button>
-        <h3 id="report-title" class="hidden">Report listing</h3>
-      </div>
-      <form id="reportForm" class="form" novalidate>
-        <input type="hidden" id="reportListingId" />
-        <label>Reason</label>
-        <select id="reportReason" required>
-          <option value="" disabled selected>Select reason…</option>
-          <option value="not_vacancy">Not a vacancy (result/admit/exam date)</option>
-          <option value="last_date_over">Last date over</option>
-          <option value="wrong_last_date">Wrong last date</option>
-          <option value="wrong_eligibility">Wrong eligibility</option>
-          <option value="duplicate">Duplicate / Already listed</option>
-          <option value="bad_link">Broken / Unofficial link</option>
-        </select>
-        <div class="grid2">
-          <div>
-            <label>Evidence URL (optional)</label>
-            <input id="reportEvidenceUrl" placeholder="Official page" />
-          </div>
-          <div>
-            <label>Number of posts (optional)</label>
-            <input id="reportPosts" placeholder="e.g., 420" />
-          </div>
-        </div>
-        <div class="grid2">
-          <div>
-            <label>Correct last date (optional)</label>
-            <input id="reportLastDate" placeholder="dd/mm/yyyy" />
-          </div>
-          <div>
-            <label>Correct eligibility (optional)</label>
-            <input id="reportEligibility" placeholder="e.g., Any graduate" />
-          </div>
-        </div>
-        <div>
-          <label>Note (optional)</label>
-          <input id="reportNote" placeholder="Tell more if needed" />
-        </div>
-        <div class="modal-actions">
-          <div class="slot-left"></div>
-          <div class="slot-middle">
-            <button type="submit" class="btn primary">Report</button>
-          </div>
-          <div class="slot-right"></div>
-        </div>
-      </form>
-    </div>
-  </div>
+    if (req.method !== "POST") {
+      return cors(new Response("Method Not Allowed", { status: 405 }), ALLOW_ORIGIN);
+    }
+    if (origin !== ALLOW_ORIGIN) {
+      return cors(json({ error: "Origin not allowed" }, 403), ALLOW_ORIGIN);
+    }
 
-  <!-- Confirm/snackbar/toast (unchanged) -->
-  <div id="confirm"><div class="box">
-    <div id="confirm-text">Confirm?</div>
-    <div class="row">
-      <button id="confirm-cancel" class="btn ghost">Cancel</button>
-      <button id="confirm-ok" class="btn primary">OK</button>
-    </div>
-  </div></div>
-  <div id="snackbar">
-    <span id="snack-text">Saved</span>
-    <span class="count" id="snack-count">(10s)</span>
-    <button id="snack-undo" class="btn ghost">Undo</button>
-  </div>
-  <div id="toast"></div>
+    let body;
+    try { body = await req.json(); } catch { return cors(json({ error: "Invalid JSON" }, 400), ALLOW_ORIGIN); }
+    const type = body && body.type;
+    const token = env && env.FEEDBACK_TOKEN;
 
-  <script src="app.js?v=2025-09-26-stable3" defer></script>
-</body>
-</html>
+    // KV single-tenant merge
+    if (type === "user_state_sync") {
+      try {
+        let current = {};
+        const raw = await env.VAC_STATE.get(STATE_KEY);
+        if (raw) current = JSON.parse(raw);
+        const merged = { ...current, ...(body.payload || {}) };
+        await env.VAC_STATE.put(STATE_KEY, JSON.stringify(merged));
+        return cors(json({ ok: true, saved: Object.keys(merged).length }), ALLOW_ORIGIN);
+      } catch {
+        return cors(json({ ok: false, error: "kv_write_failed" }, 500), ALLOW_ORIGIN);
+      }
+    }
+
+    if (!token) {
+      return cors(json({ error:"Missing FEEDBACK_TOKEN secret" }, 500), ALLOW_ORIGIN);
+    }
+
+    if (type === "vote") {
+      if (!body.vote || !body.jobId) return cors(json({ error:"Bad vote payload" }, 400), ALLOW_ORIGIN);
+      const rec = { type, vote: body.vote, jobId: body.jobId, title: body.title||"", url: body.url||"", ts: new Date().toISOString() };
+      const r = await appendJsonl(token, OWNER, REPO, "votes.jsonl", rec);
+      return cors(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
+    }
+
+    if (type === "report") {
+      // Normalize lastDate into dd/mm/yyyy if possible
+      const nd = normalizeDate(body.lastDate || "");
+      const rec = {
+        type: "report",
+        jobId: String(body.jobId||"").trim(),
+        title: String(body.title||"").trim(),
+        url: String(body.url||"").trim(),
+        reasonCode: String(body.reasonCode||"").trim(),       // e.g., wrong_last_date
+        evidenceUrl: String(body.evidenceUrl||"").trim(),
+        posts: body.posts===null || body.posts===undefined || body.posts==="" ? null : String(body.posts).trim(),
+        lastDate: nd || "",                                    // normalized dd/mm/yyyy or ""
+        eligibility: String(body.eligibility||"").trim(),
+        note: String(body.note||"").trim(),
+        ts: new Date().toISOString()
+      };
+      // Require at least jobId or title/url
+      if (!rec.jobId && !rec.title && !rec.url) {
+        return cors(json({ error:"Bad report payload" }, 400), ALLOW_ORIGIN);
+      }
+      const r = await appendJsonl(token, OWNER, REPO, "reports.jsonl", rec);
+      return cors(json({ ok:r.ok, normalizedLastDate: rec.lastDate }), r.ok?200:500);
+    }
+
+    if (type === "missing") {
+      if (!body.title || !body.url) return cors(json({ error:"Missing title/url" }, 400), ALLOW_ORIGIN);
+      const rec = {
+        type:"missing",
+        title:String(body.title||"").trim(),
+        url:normalizeUrl(String(body.url||"").trim()),
+        lastDate: normalizeDate(body.lastDate||"") || String(body.lastDate||"").trim(),
+        note:String(body.note||"").trim(),
+        officialSite:String(body.officialSite||"").trim(),
+        posts: body.posts===null || body.posts===undefined || body.posts==="" ? null : String(body.posts).trim(),
+        ts:new Date().toISOString()
+      };
+      const r = await appendJsonl(token, OWNER, REPO, "submissions.jsonl", rec);
+      return cors(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
+    }
+
+    if (type === "state") {
+      const p = body.payload||{};
+      const jobId = p.jobId||"", action=p.action||"";
+      if (!jobId || !action) return cors(json({ error:"Bad state payload" }, 400), ALLOW_ORIGIN);
+      const r = await upsertJsonMap(token, OWNER, REPO, "user_state.json", (state = {}) => {
+        if (action === "undo") delete state[jobId];
+        else state[jobId] = { action, ts: p.ts || new Date().toISOString() };
+        return state;
+      });
+      return cors(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
+    }
+
+    return cors(json({ ok:true, message:"pong" }), ALLOW_ORIGIN);
+  }
+};
+
+function cors(res, origin){
+  const h = new Headers(res.headers);
+  h.set("Access-Control-Allow-Origin", origin);
+  return new Response(res.body, { status: res.status, headers: h });
+}
+function json(obj, status=200){
+  return new Response(JSON.stringify(obj), { status, headers: { "Content-Type":"application/json; charset=utf-8" }});
+}
+
+// Helpers
+function normalizeUrl(u){
+  try{ const p=new URL(u); p.hash=""; p.search=""; let s=p.toString(); if(s.endsWith("/")) s=s.slice(0,-1); return s; }catch{ return (u||"").replace(/[?#].*$/,"").replace(/\/$/,""); }
+}
+function normalizeDate(s){
+  if(!s) return "";
+  s=String(s).trim();
+  // dd-mm-yyyy or dd/mm/yyyy
+  let m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if(m){ const d=m[1].padStart(2,"0"), mo=m[2].padStart(2,"0"), y=m[3]; return `${d}/${mo}/${y}`; }
+  // dd-mm-yy or dd/mm/yy -> 20yy
+  m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2})$/);
+  if(m){ const d=m[1].padStart(2,"0"), mo=m[2].padStart(2,"0"), y=`20${m[3]}`; return `${d}/${mo}/${y}`; }
+  // leave others unchanged; qc will try additional formats
+  return s;
+}
+
+// GitHub helpers
+async function ghGet(token, owner, repo, path){
+  return fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, {
+    headers: { "Accept":"application/vnd.github+json", "Authorization":`Bearer ${token}`, "User-Agent":"vacancy-worker" }
+  });
+}
+async function ghPut(token, owner, repo, path, contentB64, sha, message){
+  return fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`, {
+    method:"PUT",
+    headers: { "Accept":"application/vnd.github+json", "Authorization":`Bearer ${token}`, "User-Agent":"vacancy-worker" },
+    body: JSON.stringify(sha ? { message, content: contentB64, sha } : { message, content: contentB64 })
+  });
+}
+async function appendJsonl(token, owner, repo, path, record){
+  let sha, current="";
+  const g = await ghGet(token, owner, repo, path);
+  if (g.status===200){
+    const j = await g.json(); sha = j.sha; current = atob(j.content||"");
+  } else if (g.status!==404){ return { ok:false, status:g.status }; }
+  const updated = btoa(current + JSON.stringify(record) + "\n");
+  const p = await ghPut(token, owner, repo, path, updated, sha, `append ${path}`);
+  return { ok:p.ok, status:p.status };
+}
+async function upsertJsonMap(token, owner, repo, path, transform){
+  let sha, obj={};
+  const g = await ghGet(token, owner, repo, path);
+  if (g.status===200){
+    const j = await g.json(); sha = j.sha; obj = JSON.parse(atob(j.content||"")||"{}");
+  } else if (g.status!==404){ return { ok:false, status:g.status }; }
+  const next = transform(obj)||{};
+  const updated = btoa(JSON.stringify(next,null,2));
+  const p = await ghPut(token, owner, repo, path, updated, sha, `upsert ${path}`);
+  return { ok:p.ok, status:p.status };
+}
