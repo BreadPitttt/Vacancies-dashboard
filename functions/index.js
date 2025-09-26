@@ -1,23 +1,13 @@
-// functions/index.js — single-tenant KV key for personal state
+// functions/index.js — enforce normalized report schema so lastDate/eligibility always persist
 const ALLOW_ORIGIN = "https://breadpitttt.github.io";
 const OWNER = "BreadPitttt";
 const REPO  = "Vacancies-dashboard";
-
-// Single-tenant key: all devices write/read the same blob
 const STATE_KEY = "user_state_personal.json";
 
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
     const origin = req.headers.get("Origin") || "";
-
-    // Diagnostics
-    if (url.pathname === "/diag" && req.method === "GET") {
-      const hasToken = !!(env && env.FEEDBACK_TOKEN);
-      const hasKV = !!(env && env.VAC_STATE);
-      const snap = await env.VAC_STATE.get(STATE_KEY);
-      return json({ ok: true, hasToken, hasKV, bytes: (snap? snap.length: 0) }, 200);
-    }
 
     // CORS preflight
     if (req.method === "OPTIONS") {
@@ -35,33 +25,30 @@ export default {
       return new Response(null, { status: 403 });
     }
 
-    // KV read: GET ?state=1 → always returns the single-tenant blob
+    // KV single-tenant read
     if (req.method === "GET" && url.searchParams.get("state") === "1") {
       try {
         const raw = await env.VAC_STATE.get(STATE_KEY);
         const body = raw ? JSON.parse(raw) : {};
-        return withCORS(json({ ok: true, state: body }, 200), ALLOW_ORIGIN);
+        return cors(json({ ok: true, state: body }), ALLOW_ORIGIN);
       } catch {
-        return withCORS(json({ ok: false, error: "read_failed" }, 500), ALLOW_ORIGIN);
+        return cors(json({ ok: false, error: "read_failed" }, 500), ALLOW_ORIGIN);
       }
     }
 
-    // Only POST for the rest
     if (req.method !== "POST") {
-      return withCORS(new Response("Method Not Allowed", { status: 405 }), ALLOW_ORIGIN);
+      return cors(new Response("Method Not Allowed", { status: 405 }), ALLOW_ORIGIN);
     }
-
     if (origin !== ALLOW_ORIGIN) {
-      return withCORS(json({ error: "Origin not allowed" }, 403), ALLOW_ORIGIN);
+      return cors(json({ error: "Origin not allowed" }, 403), ALLOW_ORIGIN);
     }
 
     let body;
-    try { body = await req.json(); }
-    catch { return withCORS(json({ error: "Invalid JSON" }, 400), ALLOW_ORIGIN); }
-
+    try { body = await req.json(); } catch { return cors(json({ error: "Invalid JSON" }, 400), ALLOW_ORIGIN); }
     const type = body && body.type;
+    const token = env && env.FEEDBACK_TOKEN;
 
-    // KV save: user_state_sync → merge into the single-tenant key
+    // Single-tenant state merge (unchanged)
     if (type === "user_state_sync") {
       try {
         let current = {};
@@ -69,79 +56,95 @@ export default {
         if (raw) current = JSON.parse(raw);
         const merged = { ...current, ...(body.payload || {}) };
         await env.VAC_STATE.put(STATE_KEY, JSON.stringify(merged));
-        return withCORS(json({ ok: true, saved: Object.keys(merged).length }, 200), ALLOW_ORIGIN);
+        return cors(json({ ok: true, saved: Object.keys(merged).length }), ALLOW_ORIGIN);
       } catch {
-        return withCORS(json({ ok: false, error: "kv_write_failed" }, 500), ALLOW_ORIGIN);
+        return cors(json({ ok: false, error: "kv_write_failed" }, 500), ALLOW_ORIGIN);
       }
     }
 
-    // GitHub-backed writes (unchanged)
-    const token = env && env.FEEDBACK_TOKEN;
-    if (!token) {
-      return withCORS(json({ error:"Missing FEEDBACK_TOKEN secret on Worker (Production)" }, 500), ALLOW_ORIGIN);
-    }
+    if (!token) return cors(json({ error:"Missing FEEDBACK_TOKEN secret" }, 500), ALLOW_ORIGIN);
 
+    // Votes (unchanged)
     if (type === "vote") {
-      if (!body.vote || !body.jobId) return withCORS(json({ error:"Bad vote payload" }, 400), ALLOW_ORIGIN);
+      if (!body.vote || !body.jobId) return cors(json({ error:"Bad vote payload" }, 400), ALLOW_ORIGIN);
       const rec = { type, vote: body.vote, jobId: body.jobId, title: body.title||"", url: body.url||"", ts: new Date().toISOString() };
       const r = await appendJsonl(token, OWNER, REPO, "votes.jsonl", rec);
-      return withCORS(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
+      return cors(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
     }
 
+    // REPORTS — enforce normalized schema here
     if (type === "report") {
+      const nd = normalizeDate(body.lastDate || "");
       const rec = {
-        type,
-        jobId: body.jobId||"",
-        title: body.title||"",
-        url: body.url||"",
-        reasonCode: body.reasonCode||"",
-        evidenceUrl: body.evidenceUrl||"",
-        posts: body.posts||null,
-        lastDate: body.lastDate||"",
-        eligibility: body.eligibility||"",
-        note: body.note||"",
+        type: "report",
+        jobId: String(body.jobId||"").trim(),
+        title: String(body.title||"").trim(),
+        url: normalizeUrl(String(body.url||"").trim()),
+        reasonCode: String(body.reasonCode||"").trim(),        // critical
+        evidenceUrl: String(body.evidenceUrl||"").trim(),
+        posts: body.posts===null || body.posts===undefined || body.posts==="" ? null : String(body.posts).trim(),
+        lastDate: nd || "",                                     // dd/mm/yyyy or ""
+        eligibility: String(body.eligibility||"").trim(),
+        note: String(body.note||"").trim(),
         ts: new Date().toISOString()
       };
-      if (!rec.jobId && !rec.title && !rec.url) return withCORS(json({ error:"Bad report payload" }, 400), ALLOW_ORIGIN);
+      // Require enough identity
+      if (!rec.jobId && !rec.title && !rec.url) {
+        return cors(json({ error:"Bad report payload" }, 400), ALLOW_ORIGIN);
+      }
       const r = await appendJsonl(token, OWNER, REPO, "reports.jsonl", rec);
-      return withCORS(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
+      return cors(json({ ok:r.ok, normalizedLastDate: rec.lastDate }), r.ok?200:500);
     }
 
+    // Missing submissions (unchanged, but normalize date)
     if (type === "missing") {
-      if (!body.title || !body.url) return withCORS(json({ error:"Missing title/url" }, 400), ALLOW_ORIGIN);
+      if (!body.title || !body.url) return cors(json({ error:"Missing title/url" }, 400), ALLOW_ORIGIN);
       const rec = {
-        type, title: body.title, url: body.url,
-        lastDate: body.lastDate||"", note: body.note||"",
-        officialSite: body.officialSite||"", posts: body.posts||null,
-        ts: new Date().toISOString()
+        type:"missing",
+        title:String(body.title||"").trim(),
+        url:normalizeUrl(String(body.url||"").trim()),
+        lastDate: normalizeDate(body.lastDate||"") || String(body.lastDate||"").trim(),
+        note:String(body.note||"").trim(),
+        officialSite:String(body.officialSite||"").trim(),
+        posts: body.posts===null || body.posts===undefined || body.posts==="" ? null : String(body.posts).trim(),
+        ts:new Date().toISOString()
       };
       const r = await appendJsonl(token, OWNER, REPO, "submissions.jsonl", rec);
-      return withCORS(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
+      return cors(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
     }
 
+    // State audit in repo (unchanged)
     if (type === "state") {
       const p = body.payload||{};
       const jobId = p.jobId||"", action=p.action||"";
-      if (!jobId || !action) return withCORS(json({ error:"Bad state payload" }, 400), ALLOW_ORIGIN);
+      if (!jobId || !action) return cors(json({ error:"Bad state payload" }, 400), ALLOW_ORIGIN);
       const r = await upsertJsonMap(token, OWNER, REPO, "user_state.json", (state = {}) => {
         if (action === "undo") delete state[jobId];
         else state[jobId] = { action, ts: p.ts || new Date().toISOString() };
         return state;
       });
-      return withCORS(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
+      return cors(json({ ok:r.ok }, r.ok?200:500), ALLOW_ORIGIN);
     }
 
-    return withCORS(json({ ok:true, message:"pong" }, 200), ALLOW_ORIGIN);
+    return cors(json({ ok:true, message:"pong" }), ALLOW_ORIGIN);
   }
 };
 
-function withCORS(res, origin){
-  const h = new Headers(res.headers);
-  h.set("Access-Control-Allow-Origin", origin);
-  return new Response(res.body, { status: res.status, headers: h });
+function cors(res, origin){ const h = new Headers(res.headers); h.set("Access-Control-Allow-Origin", origin); return new Response(res.body, { status: res.status, headers: h }); }
+function json(obj, status=200){ return new Response(JSON.stringify(obj), { status, headers: { "Content-Type":"application/json; charset=utf-8" }}); }
+
+function normalizeUrl(u){
+  try{ const p=new URL(u); p.hash=""; p.search=""; let s=p.toString(); if(s.endsWith("/")) s=s.slice(0,-1); return s; }
+  catch{ return (u||"").replace(/[?#].*$/,"").replace(/\/$/,""); }
 }
-function json(obj, status=200){
-  return new Response(JSON.stringify(obj), { status, headers: { "Content-Type":"application/json; charset=utf-8" }});
+function normalizeDate(s){
+  if(!s) return "";
+  s=String(s).trim();
+  let m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if(m){ const d=m[1].padStart(2,"0"), mo=m[2].padStart(2,"0"), y=m[3]; return `${d}/${mo}/${y}`; }
+  m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2})$/);
+  if(m){ const d=m[1].padStart(2,"0"), mo=m[2].padStart(2,"0"), y=`20${m[3]}`; return `${d}/${mo}/${y}`; }
+  return s;
 }
 
 // GitHub helpers (unchanged)
