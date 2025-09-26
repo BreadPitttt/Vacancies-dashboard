@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
-# qc_and_learn.py v2025-09-26-learn-pattern-hardened
-# - Initializes learn_registry keys if missing (prevents KeyError: 'patterns')
-# - Pattern-first non-vacancy learning (host + tokens)
-# - Safe field fixes (lastDate/eligibility/posts/fixedLink) per slug
-# - Merge updates, submissions->captureHints, 7-day archive
-# - No dependency on user_state; UI overlays personal sections
+# qc_and_learn.py v2025-09-26-learn-pattern-hardened+lastDate
+# Same as hardened build; prefers dd/mm/yyyy from reports and overwrites deadline on wrong_last_date
 
 import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
@@ -38,12 +34,11 @@ reports = JLOADL("reports.jsonl")
 subs = JLOADL("submissions.jsonl")
 rules = JLOAD("rules.json", {"captureHints":[], "aggregatorScores":{}})
 
-# Load/repair learning registry keys to avoid KeyError
 learn = JLOAD("learn_registry.json", {})
 if not isinstance(learn, dict): learn={}
 learn.setdefault("byHost", {})
 learn.setdefault("bySlug", {})
-learn.setdefault("patterns", {})   # host -> [ {kind,titleTokens,pathTokens,addedAt} ]
+learn.setdefault("patterns", {})
 learn.setdefault("notes", [])
 
 def note(ev):
@@ -79,7 +74,8 @@ def slugify(text):
 def parse_date_any(s):
   if not s or s.strip().upper()=="N/A": return None
   s=s.strip()
-  for f in ("%Y-%m-%d","%d/%m/%Y","%d-%m-%Y","%d %B %Y","%d %b %Y"):
+  # Prefer dd/mm/yyyy (Worker normalization)
+  for f in ("%d/%m/%Y","%Y-%m-%d","%d-%m-%Y","%d %B %Y","%d %b %Y"):
     try: return datetime.strptime(s,f).date()
     except: pass
   return None
@@ -116,20 +112,14 @@ def parse_posts_from_text(txt):
     except: return None
   return None
 
-# -------- Pattern helpers (guarded) --------
-
-def patterns_for_host(h):
-  return (learn.get("patterns") or {}).get(h, [])
-
+def patterns_for_host(h): return (learn.get("patterns") or {}).get(h, [])
 def mark_non_vacancy_pattern(h, title, url):
   if not h: return
   tt = list(dict.fromkeys(title_tokens(title)))[:8]
   pt = [x for x in path_tokens(url) if len(x)<=40][:6]
   pat = {"kind":"non_vacancy","titleTokens":tt,"pathTokens":pt,"addedAt":datetime.utcnow().isoformat()+"Z"}
-  arr = (learn.get("patterns") or {}).setdefault(h, [])
-  # ensure learn['patterns'] is attached if it was missing
-  learn["patterns"] = learn.get("patterns") or {}
-  learn["patterns"].setdefault(h, arr)
+  learn["patterns"]=learn.get("patterns") or {}
+  arr = learn["patterns"].setdefault(h, [])
   def same(a,b): return a.get("kind")==b.get("kind") and a.get("titleTokens")==b.get("titleTokens") and a.get("pathTokens")==b.get("pathTokens")
   if not any(same(p,pat) for p in arr):
     arr.append(pat); note({"learned":"non_vacancy_pattern","host":h,"titleTokens":tt,"pathTokens":pt})
@@ -137,33 +127,16 @@ def mark_non_vacancy_pattern(h, title, url):
 def matches_non_vacancy_pattern(h, title, url):
   arr = patterns_for_host(h)
   if not arr: return False
-  tt = set(title_tokens(title))
-  pt = set(path_tokens(url))
+  tt = set(title_tokens(title)); pt = set(path_tokens(url))
   for p in arr:
     if p.get("kind")!="non_vacancy": continue
-    need_tt = set(p.get("titleTokens",[]))
-    need_pt = set(p.get("pathTokens",[]))
-    if need_pt and not need_pt.issubset(pt): 
-      continue
+    need_tt = set(p.get("titleTokens",[])); need_pt = set(p.get("pathTokens",[]))
+    if need_pt and not need_pt.issubset(pt): continue
     if not need_tt or len(tt.intersection(need_tt))>=max(1,len(need_tt)//2 or 1):
       return True
   return False
 
-def learn_set_slug(slug, **kw):
-  if not slug: return
-  if not isinstance(learn.get("bySlug"), dict):
-    learn["bySlug"]={}
-  rec = learn["bySlug"].setdefault(slug, {})
-  changed=False
-  for k,v in kw.items():
-    if v in (None,""): continue
-    if rec.get(k)!=v:
-      rec[k]=v; changed=True
-  if changed:
-    rec["updatedAt"]=datetime.utcnow().isoformat()+"Z"
-    note({"slug_hint":slug, **kw})
-
-# -------- Merge updates into parents --------
+# Merge updates into parents (unchanged from hardened file)
 parents=[j for j in jobs if not is_update_title(j.get("title"))]
 kept=[]; merged_count=0
 for j in jobs:
@@ -178,10 +151,8 @@ for j in jobs:
     if s>score: score, best = s, p
   if best and score>=0.6:
     best.setdefault("updates", []).append({"title": j.get("title"), "link": j.get("applyLink"), "capturedAt": datetime.utcnow().isoformat()+"Z"})
-    # extract potential extended dates and posts
     dates=[m.group(1) for m in DATE_PAT.finditer(j.get("title") or "")]
-    parsed=[parse_date_any(x.replace("-","/")) for x in dates if x]
-    parsed=[d for d in parsed if d]
+    parsed=[parse_date_any(x.replace("-","/")) for x in dates if x]; parsed=[d for d in parsed if d]
     if parsed:
       new_deadline=max(parsed)
       cur=parse_date_any(best.get("deadline"))
@@ -190,14 +161,13 @@ for j in jobs:
         learn_set_slug(slugify(best.get("title")), lastDate=best["deadline"])
     pcount = parse_posts_from_text(j.get("title"))
     if pcount and not best.get("numberOfPosts"):
-      best["numberOfPosts"]=pcount
-      learn_set_slug(slugify(best.get("title")), posts=pcount)
+      best["numberOfPosts"]=pcount; learn_set_slug(slugify(best.get("title")), posts=pcount)
     merged_count+=1
   else:
     j["type"]="UPDATE"; j.setdefault("flags",{})["no_parent_found"]=True; kept.append(j)
 jobs=kept
 
-# -------- Submissions -> captureHints + add --------
+# Submissions (unchanged)
 seen_keys={norm_url(j.get("applyLink")) for j in jobs}
 for s in subs:
   if s.get("type")!="missing": continue
@@ -222,14 +192,12 @@ for s in subs:
     "flags": {"added_from_missing": True, "trusted": True}
   }
   try:
-    if isinstance(posts,str) and posts.strip().isdigit():
-      posts=int(posts.strip())
-    if isinstance(posts,int) and posts>0:
-      card["numberOfPosts"]=posts
+    if isinstance(posts,str) and posts.strip().isdigit(): posts=int(posts.strip())
+    if isinstance(posts,int) and posts>0: card["numberOfPosts"]=posts
   except: pass
   jobs.append(card); seen_keys.add(url)
 
-# -------- Reports -> corrections + learned patterns --------
+# Reports -> corrections + patterns
 report_map = {}
 for r in reports:
   if r.get("type")!="report": continue
@@ -251,63 +219,60 @@ def keep_date(j):
   return None
 
 primary=[]; other=[]; today=date.today()
+def learn_set_slug(slug, **kw):
+  if not slug: return
+  if not isinstance(learn.get("bySlug"), dict): learn["bySlug"]={}
+  rec = learn["bySlug"].setdefault(slug, {})
+  changed=False
+  for k,v in kw.items():
+    if v in (None,""): continue
+    if rec.get(k)!=v:
+      rec[k]=v; changed=True
+  if changed:
+    rec["updatedAt"]=datetime.utcnow().isoformat()+"Z"
+    note({"slug_hint":slug, **kw})
 
 for j in jobs:
   jid=j.get("id") or f"user_{abs(hash(j.get('applyLink','')))%10**9}"
   j["id"]=jid
-
   h=host(j.get("applyLink"))
-  # Pattern filter: skip early if learned non-vacancy and card lacks strong vacancy signals
+
   if matches_non_vacancy_pattern(h, j.get("title",""), j.get("applyLink","")):
     if not (j.get("numberOfPosts") and parse_date_any(j.get("deadline"))):
-      j.setdefault("flags",{})["auto_filtered"]="learn_non_vacancy"
-      archived.append(j)
-      continue
+      j.setdefault("flags",{})["auto_filtered"]="learn_non_vacancy"; archived.append(j); continue
 
-  # Apply report-driven corrections
   if jid in report_map:
     info=report_map[jid]; reasons=set([x for x in info.get("reasons",[]) if x])
     s=slugify(j.get("title"))
-
     if "wrong_last_date" in reasons and info.get("lastDate"):
       j["deadline"]=info["lastDate"]; learn_set_slug(s, lastDate=j["deadline"])
     if "wrong_eligibility" in reasons and info.get("eligibility"):
       j["qualificationLevel"]=info["eligibility"]; learn_set_slug(s, eligibility=j["qualificationLevel"])
     if "bad_link" in reasons and info.get("evidenceUrl"):
-      j["applyLink"]=info["evidenceUrl"]; j["detailLink"]=info["evidenceUrl"]; j.setdefault("flags",{})["fixed_link"]=True
-      learn_set_slug(s, fixedLink=j["applyLink"])
+      j["applyLink"]=info["evidenceUrl"]; j["detailLink"]=info["evidenceUrl"]; j.setdefault("flags",{})["fixed_link"]=True; learn_set_slug(s, fixedLink=j["applyLink"])
     if "duplicate" in reasons or "not_vacancy" in reasons or "last_date_over" in reasons:
       j.setdefault("flags",{})["removed_reason"]="reported_"+("_".join(sorted(reasons)))
-      if "not_vacancy" in reasons:
-        mark_non_vacancy_pattern(h, j.get("title",""), j.get("applyLink",""))
-      archived.append(j)
-      continue
+      if "not_vacancy" in reasons: mark_non_vacancy_pattern(h, j.get("title",""), j.get("applyLink",""))
+      archived.append(j); continue
     if info.get("posts") and not j.get("numberOfPosts"):
       try:
-        p=int(info["posts"])
-        if p>0:
-          j["numberOfPosts"]=p
-          learn_set_slug(s, posts=p)
+        p=int(info["posts"]); if p>0: j["numberOfPosts"]=p; learn_set_slug(s, posts=p)
       except: pass
 
-  # Compute daysLeft and fallback posts
   last=keep_date(j)
   if last is not None: j["daysLeft"]=(last - today).days
   if not j.get("numberOfPosts"):
     c=parse_posts_from_text(j.get("title")) or j.get("flags",{}).get("posts")
     if c: j["numberOfPosts"]=c
 
-  # Sectioning (applied overlay is UI-side)
   if last and last < today:
     if (today - last).days > 7:
-      j.setdefault("flags",{})["auto_archived"]="expired_7d"
-      archived.append(j)
+      j.setdefault("flags",{})["auto_archived"]="expired_7d"; archived.append(j)
     else:
       other.append(j)
   else:
     primary.append(j)
 
-# Transparency + outputs
 def host_only(u):
   try: return urllib.parse.urlparse(u or "").netloc.lower()
   except: return ""
@@ -326,7 +291,7 @@ transp.update({
   "schemaVersion":"1.7",
   "runMode": RUN_MODE,
   "lastUpdated": datetime.utcnow().isoformat()+"Z",
-  "mergedUpdates": 0,
+  "mergedUpdates": merged_count,
   "totalListings": len(primary)+len(other),
   "sourcesByStatus": sources_status,
   "archivedCount": len(archived),
