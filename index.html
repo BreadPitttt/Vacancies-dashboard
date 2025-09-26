@@ -4,7 +4,9 @@
   <meta charset="utf-8" />
   <title>General Vacancy Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Cache-Control" content="no-store" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <link rel="stylesheet" href="style.css?v=2025-09-26-final-fix" />
 </head>
 <body>
@@ -73,7 +75,11 @@
         <label>Note (optional)</label>
         <textarea id="missingNote" rows="3" placeholder="Any extra info"></textarea>
         <div class="modal-actions">
-          <button type="submit" class="btn primary">Submit</button>
+          <div class="slot-left"></div>
+          <div class="slot-middle">
+            <button type="submit" class="btn primary">Submit</button>
+          </div>
+          <div class="slot-right"></div>
         </div>
       </form>
     </div>
@@ -93,27 +99,59 @@
         <label>Reason</label>
         <select id="reportReason" required>
           <option value="" disabled selected>Select reason…</option>
-          <option value="not_vacancy">Not a vacancy</option>
+          <option value="not_vacancy">Not a vacancy (result/admit/exam date)</option>
           <option value="last_date_over">Last date over</option>
           <option value="wrong_last_date">Wrong last date</option>
           <option value="wrong_eligibility">Wrong eligibility</option>
-          <option value="duplicate">Duplicate</option>
+          <option value="duplicate">Duplicate / Already listed</option>
           <option value="bad_link">Broken / Unofficial link</option>
         </select>
         <div class="grid2">
-          <div><label>Evidence URL</label><input id="reportEvidenceUrl" /></div>
-          <div><label>Posts</label><input id="reportPosts" /></div>
+          <div>
+            <label>Evidence URL (optional)</label>
+            <input id="reportEvidenceUrl" placeholder="Official page" />
+          </div>
+          <div>
+            <label>Number of posts (optional)</label>
+            <input id="reportPosts" placeholder="e.g., 420" />
+          </div>
         </div>
         <div class="grid2">
-          <div><label>Correct last date</label><input id="reportLastDate" placeholder="dd/mm/yyyy" /></div>
-          <div><label>Correct eligibility</label><input id="reportEligibility" /></div>
+          <div>
+            <label>Correct last date (optional)</label>
+            <input id="reportLastDate" placeholder="dd/mm/yyyy" />
+          </div>
+          <div>
+            <label>Correct eligibility (optional)</label>
+            <input id="reportEligibility" placeholder="e.g., Any graduate" />
+          </div>
         </div>
-        <label>Note</label><input id="reportNote" />
+        <div>
+          <label>Note (optional)</label>
+          <input id="reportNote" placeholder="Tell more if needed" />
+        </div>
         <div class="modal-actions">
-          <button type="submit" class="btn primary">Report</button>
+          <div class="slot-left"></div>
+          <div class="slot-middle">
+            <button type="submit" class="btn primary">Report</button>
+          </div>
+          <div class="slot-right"></div>
         </div>
       </form>
     </div>
+  </div>
+
+  <div id="confirm"><div class="box">
+    <div id="confirm-text">Confirm?</div>
+    <div class="row">
+      <button id="confirm-cancel" class="btn ghost">Cancel</button>
+      <button id="confirm-ok" class="btn primary">OK</button>
+    </div>
+  </div></div>
+  <div id="snackbar">
+    <span id="snack-text">Saved</span>
+    <span class="count" id="snack-count">(10s)</span>
+    <button id="snack-undo" class="btn ghost">Undo</button>
   </div>
   <div id="toast"></div>
 
