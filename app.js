@@ -1,7 +1,6 @@
 // app.js v2025-09-26-singleTenant — KV-first, single-tenant sync, 10s deferred moves, icon-only close
 (function(){
   const ENDPOINT = "https://vacancy.animeshkumar97.workers.dev";
-
   const qs=(s,r)=>(r||document).querySelector(s);
   const qsa=(s,r)=>Array.from((r||document).querySelectorAll(s));
   const esc=(s)=>(s==null?"":String(s)).replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;","\"":"&quot;","'":""}[c]));
