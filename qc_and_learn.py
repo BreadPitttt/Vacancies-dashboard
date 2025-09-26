@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-# qc_and_learn.py v2025-09-26-learn-pattern — pattern-based self-learning, safe field fixes, and 7-day archive
-# Changes vs prior:
-# - Fixes Python one-line syntax (posts assignment lines)
-# - Adds pattern registry that learns exact "not vacancy" signatures per host (title/path tokens), not global host penalties
-# - Keeps previous merge, submissions->captureHints, reports corrections, and sections
+# qc_and_learn.py v2025-09-26-learn-pattern-hardened
+# - Initializes learn_registry keys if missing (prevents KeyError: 'patterns')
+# - Pattern-first non-vacancy learning (host + tokens)
+# - Safe field fixes (lastDate/eligibility/posts/fixedLink) per slug
+# - Merge updates, submissions->captureHints, 7-day archive
+# - No dependency on user_state; UI overlays personal sections
 
 import json, pathlib, re, argparse, urllib.parse
 from datetime import datetime, timedelta, date
@@ -37,16 +38,18 @@ reports = JLOADL("reports.jsonl")
 subs = JLOADL("submissions.jsonl")
 rules = JLOAD("rules.json", {"captureHints":[], "aggregatorScores":{}})
 
-# Learning registry (pattern-first)
-learn = JLOAD("learn_registry.json", {
-  "byHost": {},      # optional light stats (ok/bad)
-  "bySlug": {},      # safe field hints per slug
-  "patterns": {},    # host -> [ { kind:"non_vacancy", titleTokens:[...], pathTokens:[...], addedAt:iso } ]
-  "notes": []
-})
+# Load/repair learning registry keys to avoid KeyError
+learn = JLOAD("learn_registry.json", {})
+if not isinstance(learn, dict): learn={}
+learn.setdefault("byHost", {})
+learn.setdefault("bySlug", {})
+learn.setdefault("patterns", {})   # host -> [ {kind,titleTokens,pathTokens,addedAt} ]
+learn.setdefault("notes", [])
 
-def note(ev): 
-  learn["notes"] = ([{**ev, "at": datetime.utcnow().isoformat()+"Z"}] + learn.get("notes",[]))[:50]
+def note(ev):
+  try:
+    learn["notes"] = ([{**ev, "at": datetime.utcnow().isoformat()+"Z"}] + (learn.get("notes") or []))[:50]
+  except: pass
 
 def host(u):
   try: return urllib.parse.urlparse(u or "").netloc.lower()
@@ -113,31 +116,33 @@ def parse_posts_from_text(txt):
     except: return None
   return None
 
-# ---------- Pattern learning helpers ----------
+# -------- Pattern helpers (guarded) --------
 
 def patterns_for_host(h):
-  return learn["patterns"].get(h, [])
+  return (learn.get("patterns") or {}).get(h, [])
 
 def mark_non_vacancy_pattern(h, title, url):
   if not h: return
   tt = list(dict.fromkeys(title_tokens(title)))[:8]
   pt = [x for x in path_tokens(url) if len(x)<=40][:6]
   pat = {"kind":"non_vacancy","titleTokens":tt,"pathTokens":pt,"addedAt":datetime.utcnow().isoformat()+"Z"}
-  arr = learn["patterns"].setdefault(h, [])
-  # de-duplicate by token sets
-  def same(a,b): return a["kind"]==b["kind"] and a["titleTokens"]==b["titleTokens"] and a["pathTokens"]==b["pathTokens"]
+  arr = (learn.get("patterns") or {}).setdefault(h, [])
+  # ensure learn['patterns'] is attached if it was missing
+  learn["patterns"] = learn.get("patterns") or {}
+  learn["patterns"].setdefault(h, arr)
+  def same(a,b): return a.get("kind")==b.get("kind") and a.get("titleTokens")==b.get("titleTokens") and a.get("pathTokens")==b.get("pathTokens")
   if not any(same(p,pat) for p in arr):
     arr.append(pat); note({"learned":"non_vacancy_pattern","host":h,"titleTokens":tt,"pathTokens":pt})
 
 def matches_non_vacancy_pattern(h, title, url):
   arr = patterns_for_host(h)
+  if not arr: return False
   tt = set(title_tokens(title))
   pt = set(path_tokens(url))
   for p in arr:
     if p.get("kind")!="non_vacancy": continue
     need_tt = set(p.get("titleTokens",[]))
     need_pt = set(p.get("pathTokens",[]))
-    # require at least half of required title tokens and all path tokens present
     if need_pt and not need_pt.issubset(pt): 
       continue
     if not need_tt or len(tt.intersection(need_tt))>=max(1,len(need_tt)//2 or 1):
@@ -146,6 +151,8 @@ def matches_non_vacancy_pattern(h, title, url):
 
 def learn_set_slug(slug, **kw):
   if not slug: return
+  if not isinstance(learn.get("bySlug"), dict):
+    learn["bySlug"]={}
   rec = learn["bySlug"].setdefault(slug, {})
   changed=False
   for k,v in kw.items():
@@ -156,7 +163,7 @@ def learn_set_slug(slug, **kw):
     rec["updatedAt"]=datetime.utcnow().isoformat()+"Z"
     note({"slug_hint":slug, **kw})
 
-# ---------- Merge updates into parents ----------
+# -------- Merge updates into parents --------
 parents=[j for j in jobs if not is_update_title(j.get("title"))]
 kept=[]; merged_count=0
 for j in jobs:
@@ -171,7 +178,7 @@ for j in jobs:
     if s>score: score, best = s, p
   if best and score>=0.6:
     best.setdefault("updates", []).append({"title": j.get("title"), "link": j.get("applyLink"), "capturedAt": datetime.utcnow().isoformat()+"Z"})
-    # Try to extract extended date and posts from update title
+    # extract potential extended dates and posts
     dates=[m.group(1) for m in DATE_PAT.finditer(j.get("title") or "")]
     parsed=[parse_date_any(x.replace("-","/")) for x in dates if x]
     parsed=[d for d in parsed if d]
@@ -190,7 +197,7 @@ for j in jobs:
     j["type"]="UPDATE"; j.setdefault("flags",{})["no_parent_found"]=True; kept.append(j)
 jobs=kept
 
-# ---------- Submissions: captureHints + add ----------
+# -------- Submissions -> captureHints + add --------
 seen_keys={norm_url(j.get("applyLink")) for j in jobs}
 for s in subs:
   if s.get("type")!="missing": continue
@@ -222,7 +229,7 @@ for s in subs:
   except: pass
   jobs.append(card); seen_keys.add(url)
 
-# ---------- Reports to corrections and patterns ----------
+# -------- Reports -> corrections + learned patterns --------
 report_map = {}
 for r in reports:
   if r.get("type")!="report": continue
@@ -243,15 +250,14 @@ def keep_date(j):
     except: return None
   return None
 
-primary=[]; applied_list=[]; other=[]; to_delete=set()
-today=date.today()
+primary=[]; other=[]; today=date.today()
 
 for j in jobs:
   jid=j.get("id") or f"user_{abs(hash(j.get('applyLink','')))%10**9}"
   j["id"]=jid
 
-  # Skip by learned non-vacancy pattern (host + tokens), but never if explicit posts and clear deadline exist
   h=host(j.get("applyLink"))
+  # Pattern filter: skip early if learned non-vacancy and card lacks strong vacancy signals
   if matches_non_vacancy_pattern(h, j.get("title",""), j.get("applyLink","")):
     if not (j.get("numberOfPosts") and parse_date_any(j.get("deadline"))):
       j.setdefault("flags",{})["auto_filtered"]="learn_non_vacancy"
@@ -272,10 +278,9 @@ for j in jobs:
       learn_set_slug(s, fixedLink=j["applyLink"])
     if "duplicate" in reasons or "not_vacancy" in reasons or "last_date_over" in reasons:
       j.setdefault("flags",{})["removed_reason"]="reported_"+("_".join(sorted(reasons)))
-      # Learn precise non-vacancy pattern for this host
       if "not_vacancy" in reasons:
-        mark_non_vacancy_pattern(host(j.get("applyLink")), j.get("title",""), j.get("applyLink",""))
-      archived.append(j); 
+        mark_non_vacancy_pattern(h, j.get("title",""), j.get("applyLink",""))
+      archived.append(j)
       continue
     if info.get("posts") and not j.get("numberOfPosts"):
       try:
@@ -285,15 +290,14 @@ for j in jobs:
           learn_set_slug(s, posts=p)
       except: pass
 
-  # Days left + posts fallback
+  # Compute daysLeft and fallback posts
   last=keep_date(j)
   if last is not None: j["daysLeft"]=(last - today).days
   if not j.get("numberOfPosts"):
     c=parse_posts_from_text(j.get("title")) or j.get("flags",{}).get("posts")
     if c: j["numberOfPosts"]=c
 
-  # Sectioning (unchanged; relies on user_state overlay at render time)
-  # We do not have user_state in this script; UI overlays it.
+  # Sectioning (applied overlay is UI-side)
   if last and last < today:
     if (today - last).days > 7:
       j.setdefault("flags",{})["auto_archived"]="expired_7d"
@@ -322,22 +326,22 @@ transp.update({
   "schemaVersion":"1.7",
   "runMode": RUN_MODE,
   "lastUpdated": datetime.utcnow().isoformat()+"Z",
-  "mergedUpdates": merged_count,
+  "mergedUpdates": 0,
   "totalListings": len(primary)+len(other),
   "sourcesByStatus": sources_status,
   "archivedCount": len(archived),
   "learning": {
-    "hosts": len(learn.get("byHost",{})),
-    "slugs": len(learn.get("bySlug",{})),
-    "patterns": { h: len(v) for h,v in learn.get("patterns",{}).items() }
+    "hosts": len(learn.get("byHost") or {}),
+    "slugs": len(learn.get("bySlug") or {}),
+    "patterns": { h: len(v) for h,v in (learn.get("patterns") or {}).items() }
   }
 })
 
 out = {
-  "jobListings": primary+other,   # applied section is overlaid by UI from single-tenant KV
+  "jobListings": primary+other,
   "archivedListings": archived,
   "sections": {
-    "applied": [],   # UI overlays from USER_STATE
+    "applied": [],
     "other": [j["id"] for j in other],
     "primary": [j["id"] for j in primary]
   },
