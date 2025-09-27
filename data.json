@@ -10,7 +10,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-27T03:08:26.588720Z",
+      "extractedAt": "2025-09-27T13:31:00.762322Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -29,7 +29,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-27T03:08:26.588533Z",
+      "extractedAt": "2025-09-27T13:31:00.762139Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -48,7 +48,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-27T03:08:26.588669Z",
+      "extractedAt": "2025-09-27T13:31:00.762271Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -67,7 +67,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-27T03:08:26.587969Z",
+      "extractedAt": "2025-09-27T13:31:00.761596Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -86,7 +86,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-27T03:08:26.588121Z",
+      "extractedAt": "2025-09-27T13:31:00.761747Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -96,7 +96,7 @@
       }
     },
     {
-      "id": "user_712551429",
+      "id": "user_660474490",
       "title": "IBPS RRB 14th Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -112,7 +112,7 @@
       "daysLeft": 1
     },
     {
-      "id": "user_12388752",
+      "id": "user_292232189",
       "title": "RRB Section Controller Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -128,7 +128,7 @@
       "daysLeft": 17
     },
     {
-      "id": "user_652471983",
+      "id": "user_720222762",
       "title": "SSC Delhi Police Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -144,7 +144,7 @@
       "daysLeft": 24
     },
     {
-      "id": "user_548437835",
+      "id": "user_925222829",
       "title": "EMRS Non Teaching Various Post Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -160,7 +160,7 @@
       "daysLeft": 26
     },
     {
-      "id": "user_285849868",
+      "id": "user_177171188",
       "title": "BSSC Office Attendant Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -176,7 +176,7 @@
       "daysLeft": -3
     },
     {
-      "id": "user_477754428",
+      "id": "user_157144000",
       "title": "RBI Officers Grade B Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -192,7 +192,7 @@
       "daysLeft": -1
     },
     {
-      "id": "user_10528698",
+      "id": "user_704172963",
       "title": "BSSC CGL Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -208,7 +208,7 @@
       "daysLeft": -1
     },
     {
-      "id": "user_98525781",
+      "id": "user_757154433",
       "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -228,10 +228,10 @@
   "sections": {
     "applied": [],
     "other": [
-      "user_285849868",
-      "user_477754428",
-      "user_10528698",
-      "user_98525781"
+      "user_177171188",
+      "user_157144000",
+      "user_704172963",
+      "user_757154433"
     ],
     "primary": [
       "src_910b6e6ae3481886",
@@ -239,10 +239,10 @@
       "src_b1722cc128272e37",
       "src_643f6de99465d812",
       "src_45be4957c6cb598f",
-      "user_712551429",
-      "user_12388752",
-      "user_652471983",
-      "user_548437835"
+      "user_660474490",
+      "user_292232189",
+      "user_720222762",
+      "user_925222829"
     ]
   },
   "transparencyInfo": {
@@ -252,7 +252,7 @@
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-27T03:10:05.346708Z",
+    "lastUpdated": "2025-09-27T13:32:28.129047Z",
     "mergedUpdates": 0,
     "sourcesByStatus": [
       {
