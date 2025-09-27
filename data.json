@@ -10,7 +10,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-26T17:42:36.238351Z",
+      "extractedAt": "2025-09-27T03:08:26.588720Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -29,7 +29,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-26T17:42:36.238166Z",
+      "extractedAt": "2025-09-27T03:08:26.588533Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -48,7 +48,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-26T17:42:36.238299Z",
+      "extractedAt": "2025-09-27T03:08:26.588669Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -67,7 +67,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-26T17:42:36.237607Z",
+      "extractedAt": "2025-09-27T03:08:26.587969Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -86,7 +86,7 @@
       "domicile": "All India",
       "source": "official",
       "type": "UPDATE",
-      "extractedAt": "2025-09-26T17:42:36.237772Z",
+      "extractedAt": "2025-09-27T03:08:26.588121Z",
       "meta": {
         "sourceUrl": "https://rrbcdg.gov.in/",
         "sourceSite": "hint4"
@@ -96,7 +96,7 @@
       }
     },
     {
-      "id": "user_882423704",
+      "id": "user_712551429",
       "title": "IBPS RRB 14th Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -109,26 +109,10 @@
         "added_from_missing": true,
         "trusted": true
       },
-      "daysLeft": 2
+      "daysLeft": 1
     },
     {
-      "id": "user_378338695",
-      "title": "RBI Officers Grade B Recruitment 2025",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "deadline": "26/09/2025",
-      "applyLink": "https://rbidocs.rbi.org.in/rdocs/content/pdfs/deprdsim10092053dbf9dfddb224871984f58095857ed88.pdf",
-      "detailLink": "https://rbidocs.rbi.org.in/rdocs/content/pdfs/deprdsim10092053dbf9dfddb224871984f58095857ed88.pdf",
-      "source": "official",
-      "type": "VACANCY",
-      "flags": {
-        "added_from_missing": true,
-        "trusted": true
-      },
-      "daysLeft": 0
-    },
-    {
-      "id": "user_141291285",
+      "id": "user_12388752",
       "title": "RRB Section Controller Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -141,42 +125,10 @@
         "added_from_missing": true,
         "trusted": true
       },
-      "daysLeft": 18
+      "daysLeft": 17
     },
     {
-      "id": "user_370174964",
-      "title": "BSSC CGL Recruitment 2025",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "deadline": "26/09/2025",
-      "applyLink": "https://bssc.bihar.gov.in/advertisement/0525_advt.pdf",
-      "detailLink": "https://bssc.bihar.gov.in/advertisement/0525_advt.pdf",
-      "source": "official",
-      "type": "VACANCY",
-      "flags": {
-        "added_from_missing": true,
-        "trusted": true
-      },
-      "daysLeft": 0
-    },
-    {
-      "id": "user_664388945",
-      "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
-      "qualificationLevel": "Any graduate",
-      "domicile": "All India",
-      "deadline": "26/09/2025",
-      "applyLink": "https://bpsc.bihar.gov.in/wp-content/uploads/bpsc_content/notices/22-8-25-4-advertisement-872025-assistant-education-development-officeraedo-education-dept_bpsc-20250823-u3j8zm.pdf",
-      "detailLink": "https://bpsc.bihar.gov.in/wp-content/uploads/bpsc_content/notices/22-8-25-4-advertisement-872025-assistant-education-development-officeraedo-education-dept_bpsc-20250823-u3j8zm.pdf",
-      "source": "official",
-      "type": "VACANCY",
-      "flags": {
-        "added_from_missing": true,
-        "trusted": true
-      },
-      "daysLeft": 0
-    },
-    {
-      "id": "user_414030869",
+      "id": "user_652471983",
       "title": "SSC Delhi Police Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -189,10 +141,10 @@
         "added_from_missing": true,
         "trusted": true
       },
-      "daysLeft": 25
+      "daysLeft": 24
     },
     {
-      "id": "user_921903892",
+      "id": "user_548437835",
       "title": "EMRS Non Teaching Various Post Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -205,10 +157,10 @@
         "added_from_missing": true,
         "trusted": true
       },
-      "daysLeft": 27
+      "daysLeft": 26
     },
     {
-      "id": "user_605373494",
+      "id": "user_285849868",
       "title": "BSSC Office Attendant Recruitment 2025",
       "qualificationLevel": "Any graduate",
       "domicile": "All India",
@@ -221,14 +173,65 @@
         "added_from_missing": true,
         "trusted": true
       },
-      "daysLeft": -2
+      "daysLeft": -3
+    },
+    {
+      "id": "user_477754428",
+      "title": "RBI Officers Grade B Recruitment 2025",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "deadline": "26/09/2025",
+      "applyLink": "https://rbidocs.rbi.org.in/rdocs/content/pdfs/deprdsim10092053dbf9dfddb224871984f58095857ed88.pdf",
+      "detailLink": "https://rbidocs.rbi.org.in/rdocs/content/pdfs/deprdsim10092053dbf9dfddb224871984f58095857ed88.pdf",
+      "source": "official",
+      "type": "VACANCY",
+      "flags": {
+        "added_from_missing": true,
+        "trusted": true
+      },
+      "daysLeft": -1
+    },
+    {
+      "id": "user_10528698",
+      "title": "BSSC CGL Recruitment 2025",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "deadline": "26/09/2025",
+      "applyLink": "https://bssc.bihar.gov.in/advertisement/0525_advt.pdf",
+      "detailLink": "https://bssc.bihar.gov.in/advertisement/0525_advt.pdf",
+      "source": "official",
+      "type": "VACANCY",
+      "flags": {
+        "added_from_missing": true,
+        "trusted": true
+      },
+      "daysLeft": -1
+    },
+    {
+      "id": "user_98525781",
+      "title": "BPSC Assistant Education Development Officer (AEDO) Recruitment 2025",
+      "qualificationLevel": "Any graduate",
+      "domicile": "All India",
+      "deadline": "26/09/2025",
+      "applyLink": "https://bpsc.bihar.gov.in/wp-content/uploads/bpsc_content/notices/22-8-25-4-advertisement-872025-assistant-education-development-officeraedo-education-dept_bpsc-20250823-u3j8zm.pdf",
+      "detailLink": "https://bpsc.bihar.gov.in/wp-content/uploads/bpsc_content/notices/22-8-25-4-advertisement-872025-assistant-education-development-officeraedo-education-dept_bpsc-20250823-u3j8zm.pdf",
+      "source": "official",
+      "type": "VACANCY",
+      "flags": {
+        "added_from_missing": true,
+        "trusted": true
+      },
+      "daysLeft": -1
     }
   ],
   "archivedListings": [],
   "sections": {
     "applied": [],
     "other": [
-      "user_605373494"
+      "user_285849868",
+      "user_477754428",
+      "user_10528698",
+      "user_98525781"
     ],
     "primary": [
       "src_910b6e6ae3481886",
@@ -236,13 +239,10 @@
       "src_b1722cc128272e37",
       "src_643f6de99465d812",
       "src_45be4957c6cb598f",
-      "user_882423704",
-      "user_378338695",
-      "user_141291285",
-      "user_370174964",
-      "user_664388945",
-      "user_414030869",
-      "user_921903892"
+      "user_712551429",
+      "user_12388752",
+      "user_652471983",
+      "user_548437835"
     ]
   },
   "transparencyInfo": {
@@ -252,7 +252,7 @@
     "sourcesTried": [
       "hint4"
     ],
-    "lastUpdated": "2025-09-26T17:43:56.333948Z",
+    "lastUpdated": "2025-09-27T03:10:05.346708Z",
     "mergedUpdates": 0,
     "sourcesByStatus": [
       {
